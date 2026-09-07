@@ -25,7 +25,7 @@ import { ProjectActionsProvider } from "./views/projectActionsProvider";
 export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand("wendoo.openSettings", () => {
-      vscode.commands.executeCommand("workbench.action.openSettings", "@ext:wendoo.wendoo-vscode-extension");
+      vscode.commands.executeCommand("workbench.action.openSettings", `@ext:${context.extension.id}`);
     })
   );
   // Mode is environment-keyed: the web UI runs bridge mode only, desktop runs
