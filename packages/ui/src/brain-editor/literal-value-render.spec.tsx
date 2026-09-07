@@ -3,8 +3,9 @@
  * for that value type supplies, and the formatted text wherever it supplies
  * none. The entry is found by value type alone, so a literal the environment
  * catalog provides and one a document catalog holds draw the same. A node
- * drawn in place of that text stands unframed, and the tile's label line
- * carries the word the literal reads by.
+ * drawn in place of that text stands in the same frame, at the same box and
+ * label-line minimums, as the text does, and the tile's label line carries the
+ * word the literal reads by.
  */
 
 import assert from "node:assert/strict";
@@ -128,6 +129,27 @@ function renderPlacedTile(tileDef: IBrainTileDef, customLiteralTypes: CustomLite
   );
 }
 
+/** The classes the value area -- the box the value frame stands centered in -- carries in `markup`. */
+function valueAreaClasses(markup: string): string {
+  const match = markup.match(new RegExp(`<div class="([^"]*)"><div ${kTileValueFrameAttribute}=`));
+  assert.ok(match, "expected a value area around the value frame");
+  return match[1];
+}
+
+/** The classes the tile's label line carries in `markup`. */
+function labelLineClasses(markup: string): string {
+  const match = markup.match(/<span class="([^"]*items-end[^"]*)"/);
+  assert.ok(match, "expected a label line");
+  return match[1];
+}
+
+/** The inline style the value frame carries in `markup`. */
+function valueFrameStyle(markup: string): string {
+  const match = markup.match(new RegExp(`${kTileValueFrameAttribute}="" class="[^"]*" style="([^"]*)"`));
+  assert.ok(match, "expected a styled value frame");
+  return match[1];
+}
+
 /** A swatch literal minted into a brain's own catalog, the way the create flow mints one. */
 function documentSwatchLiteral(level: number): { brainDef: BrainDef; placed: IBrainTileDef } {
   const brainDef = BrainDef.emptyBrainDef(services, "swatch value box");
@@ -172,12 +194,16 @@ describe("the value box of a literal whose type supplies a node", () => {
 });
 
 describe("the frame around a placed literal's value", () => {
-  test("is dropped for a literal whose type draws its own node", () => {
+  test("stands for a literal whose type draws its own node, around that node", () => {
     const { placed } = documentSwatchLiteral(3);
 
     const markup = renderPlacedTile(placed, [swatchLiteralType({ renderValue: true })]);
 
-    assert.ok(!markup.includes(kTileValueFrameAttribute));
+    assert.ok(markup.includes(kTileValueFrameAttribute));
+    assert.ok(
+      markup.indexOf(kTileValueFrameAttribute) < markup.indexOf(kSwatchLevelAttribute),
+      "the frame opens before the node it carries"
+    );
   });
 
   test("stands for a literal whose type draws text", () => {
@@ -192,6 +218,33 @@ describe("the frame around a placed literal's value", () => {
     const numberLiteral = new BrainTileLiteralDef(CoreTypeIds.Number, 7, {}, services);
 
     assert.ok(renderPlacedTile(numberLiteral, []).includes(kTileValueFrameAttribute));
+  });
+});
+
+describe("the value box a drawn node stands in", () => {
+  test("takes the same minimums a text tile's does, so both label lines sit at one height", () => {
+    const { placed } = documentSwatchLiteral(3);
+    const numberLiteral = new BrainTileLiteralDef(CoreTypeIds.Number, 7, {}, services);
+
+    const nodeMarkup = renderPlacedTile(placed, [swatchLiteralType({ renderValue: true })]);
+    const textMarkup = renderPlacedTile(numberLiteral, [swatchLiteralType({ renderValue: true })]);
+
+    assert.equal(valueAreaClasses(nodeMarkup), valueAreaClasses(textMarkup));
+    assert.equal(labelLineClasses(nodeMarkup), labelLineClasses(textMarkup));
+  });
+
+  test("is filled with the panel token, where a text tile's carries the tile's own lighter fill", () => {
+    const { placed } = documentSwatchLiteral(3);
+    const numberLiteral = new BrainTileLiteralDef(CoreTypeIds.Number, 7, {}, services);
+
+    const nodeStyle = valueFrameStyle(renderPlacedTile(placed, [swatchLiteralType({ renderValue: true })]));
+    const textStyle = valueFrameStyle(renderPlacedTile(numberLiteral, [swatchLiteralType({ renderValue: true })]));
+
+    assert.match(nodeStyle, /background-color:var\(--color-panel\)/);
+    assert.doesNotMatch(textStyle, /var\(--color-panel\)/);
+    assert.match(textStyle, /background-color:#[0-9a-f]{6}/);
+    assert.match(nodeStyle, /border-color:white/);
+    assert.match(textStyle, /border-color:white/);
   });
 });
 

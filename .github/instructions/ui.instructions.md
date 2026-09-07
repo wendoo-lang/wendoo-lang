@@ -172,19 +172,33 @@ environment catalog provides and one a document catalog holds draw the same.
 a placed tile and of a printed one; the candidate strip's chips and the
 assistant transcript's chips carry a tile's label rather than its value box.
 `customLiteralValueNode` (exported from `TileValue.tsx`) is the shared reading
-of it, and `BrainTile` calls it for two more decisions about the same tile:
+of it. **Every value tile frames the same, at the same minimums:** the white
+frame -- the element marked `kTileValueFrameAttribute`, a `border-[3px]` white
+box -- is drawn around whatever the value box carries, text and node alike, with
+no opt-out, and the value box (`min-h-16`) and the label line (`flex-1`) are
+sized identically whichever it carries. That equality is what puts the label
+lines of the value tiles on one rule at one height, so nothing may make either
+minimum conditional on what the box draws. `literal-value-render.spec.tsx`
+pins it by comparing the two elements' classes across a text tile and a
+node-drawing tile.
 
-- **A node implies frameless.** The white text-literal frame -- the element
-  marked `kTileValueFrameAttribute` -- is drawn only where the value box draws
-  text. There is no separate opt-out.
-- **A node reserves the tile's label line.** A framed value box carries
-  `min-h-16` and the label line grows into what is left, which is how text
-  literals have always been laid out. A tile drawing a node instead lets the
-  value box shrink (`min-h-0`) and holds the label line at its own line height
-  (`shrink-0`), so the word the literal reads by is legible under the drawing.
-  The tile height is fixed at `h-24`, which leaves the node roughly 54px of
-  height once the label line has its own; a taller node is clipped by the value
-  box, not allowed to push the label out.
+`BrainTile` calls `customLiteralValueNode` for one decision about the same
+tile, and one only:
+
+- **A node is drawn on the panel token.** The frame's interior is the tile's own
+  lighter fill behind text and `var(--color-panel)` behind a node, so a drawing
+  floats on the app's plate color with the frame's own padding standing as
+  margin around it, rather than on a bright tile tint. The white border and the
+  inset ring are the same either way.
+
+The geometry a node is drawn into follows from those minimums. The tile height
+is fixed at `h-24`, which leaves 74px of content; the value box takes its 64px
+minimum and the label line the 20px below it, overflowing into the tile's own
+bottom padding exactly as a text tile does. The frame takes 14px of the box's
+height and 22px of its width in border and padding, and across the tile's own
+minimum width (`min-w-24`) the value box is 52px wide. So a node has 50px of
+height, beyond which the value box clips it rather than let it push the label
+out, and 30px of width before the tile widens toward `max-w-72` to carry it.
 
 ### The candidate strip's command chips
 
