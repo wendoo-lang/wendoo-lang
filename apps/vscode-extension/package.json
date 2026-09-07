@@ -154,13 +154,13 @@
         {
           "id": "wendoo.sessions",
           "name": "Wendoo",
-          "icon": "$(symbol-misc)",
+          "icon": "./assets/wendoo-mark.svg",
           "when": "wendoo.enabled && wendoo.webHost"
         },
         {
           "id": "wendoo.projectActions",
           "name": "Wendoo",
-          "icon": "$(symbol-misc)",
+          "icon": "./assets/wendoo-mark.svg",
           "when": "wendoo.enabled && !wendoo.webHost"
         }
       ]

@@ -1,3 +1,7 @@
+<div align="center">
+  <a href="https://wendoo.com"><img src="https://raw.githubusercontent.com/wendoo-lang/wendoo-lang/main/branding/wendoo-banner.png" alt="Wendoo" width="100%"></a>
+</div>
+
 **Wendoo** is a tile-based programming language for creative coding applications. Programs are built by arranging **tiles** -- typed, composable tokens -- into **rules**. A collection of rules forms a **brain**, which drives the behavior of systems ranging from video game characters to physical devices like robots.
 
 <div align="center">
@@ -79,3 +83,8 @@ For targets whose hardware is programmed by copying a firmware file to a USB dri
 |---|---|---|
 | `wendoo.bridgeUrl` | Web | URL of the bridge service used to pair with a running app |
 | `wendoo.devTarget` | Desktop | Author override of the hosted target app -- a local build (`appPath`) or a pinned published build (`appRef`) -- plus optional library and platform-target seeds for new projects |
+
+## Learn More
+
+- [wendoo.com](https://wendoo.com) -- the language's home
+- [Source on GitHub](https://github.com/wendoo-lang/wendoo-lang) -- report issues and contribute

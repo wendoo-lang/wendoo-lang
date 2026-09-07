@@ -1,3 +1,7 @@
+<div align="center">
+  <a href="https://wendoo.com"><img src="./branding/wendoo-banner.png" alt="Wendoo" width="100%"></a>
+</div>
+
 # Wendoo Language
 
 A tile-based programming language for creative coding applications.

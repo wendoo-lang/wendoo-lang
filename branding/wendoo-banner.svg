@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300">
+  <rect width="1200" height="300" fill="#12161d"/>
+  <g transform="translate(360 62) scale(6.15)" color="#f2f6f8">
+    <g stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M3 8V14.2a1.8 1.8 0 0 0 1.8 1.8h2.4a1.8 1.8 0 0 0 1.8-1.8V11V14.2a1.8 1.8 0 0 0 1.8 1.8h2.4a1.8 1.8 0 0 0 1.8-1.8V8"/><path d="M26 16h-5.2a1.8 1.8 0 0 1-1.8-1.8v-4.4a1.8 1.8 0 0 1 1.8-1.8h4.4a1.8 1.8 0 0 1 1.8 1.8V12H19"/><path d="M31 16V9.8a1.8 1.8 0 0 1 1.8-1.8h4.4a1.8 1.8 0 0 1 1.8 1.8V16"/><path d="M51 3V14.2a1.8 1.8 0 0 1-1.8 1.8h-4.4a1.8 1.8 0 0 1-1.8-1.8v-4.4a1.8 1.8 0 0 1 1.8-1.8H51"/></g>
+    <rect x="55" y="8" width="8" height="8" rx="1.8" stroke="currentColor" stroke-width="2" fill="none"/>
+    <circle cx="59.55" cy="11.6" r="1.9" fill="currentColor"/>
+    <path fill-rule="evenodd" fill="currentColor" d="M68.8 7h4.4a2.8 2.8 0 0 1 2.8 2.8v4.4a2.8 2.8 0 0 1-2.8 2.8h-4.4a2.8 2.8 0 0 1-2.8-2.8v-4.4a2.8 2.8 0 0 1 2.8-2.8ZM73.45 11.6a1.9 1.9 0 1 1-3.8 0a1.9 1.9 0 1 1 3.8 0Z"/>
+  </g>
+  <text x="600" y="236" text-anchor="middle" font-family="'M PLUS Rounded 1c', system-ui, -apple-system, 'Helvetica Neue', sans-serif" font-size="24" font-weight="500" fill="#f2f6f8" opacity="0.72">A language anyone can speak, a compiler can verify, and any machine can run.</text>
+</svg>
