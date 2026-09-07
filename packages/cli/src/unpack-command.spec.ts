@@ -94,7 +94,7 @@ describe("wendoo unpack", () => {
 
     assert.equal(result.code, 0, result.stderr);
     const manifest = await readManifest(target);
-    assert.deepEqual(manifest.targets, { "wendoo-lang/trg-ecosim": { packageVersion: "^0.1.0" } });
+    assert.deepEqual(manifest.targets, { "wendoo-lang/trg-ecosim": { packageVersion: "^0.1.5" } });
   });
 
   it("writes no targets section when the manifest declares no registry target", async () => {

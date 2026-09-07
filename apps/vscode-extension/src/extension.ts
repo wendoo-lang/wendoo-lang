@@ -15,10 +15,11 @@ import {
   registerFolderSessionSerializer,
   restoreFolderSessionForTest,
 } from "./services/folder-session";
+import { trackWorkspaceProjectPresence } from "./services/project-presence";
 import type { RemovableVolumeRoot } from "./services/removable-volume";
 import { installTestTargetAppTransport, testTargetAppTransportCalls } from "./services/target-app-cache-host";
 import { targetRegistryEntries } from "./services/target-registry";
-import { isWendooEnabled, setWendooEnabled } from "./state/context";
+import { isWendooEnabled } from "./state/context";
 import { ProjectActionsProvider } from "./views/projectActionsProvider";
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -36,13 +37,15 @@ export async function activate(context: vscode.ExtensionContext) {
     return;
   }
   registerFolderCommands(context);
-  // Apply the context the desktop view's when-clause reads before the view is
-  // created, so the view is present the moment it registers on every activation
-  // path -- including the onWebviewPanel restore path, where context keys reset
-  // on window reload and the extension activates early to restore the app tab.
-  // Awaiting removes the race where the Explorer evaluates the when-clause while
-  // the context set is still in flight; view presence never depends on reveal.
-  await setWendooEnabled(true);
+  // Resolve the context the desktop view's when-clause reads -- enabled only
+  // while a workspace folder carries a root wendoo.json -- before the view is
+  // created, so the view's presence is correct the moment it registers on every
+  // activation path -- including the onWebviewPanel restore path, where context
+  // keys reset on window reload and the extension activates early to restore
+  // the app tab. Awaiting removes the race where the Explorer evaluates the
+  // when-clause while the context set is still in flight; view presence never
+  // depends on reveal.
+  await trackWorkspaceProjectPresence(context);
   const projectActionsProvider = new ProjectActionsProvider();
   const projectActionsView = vscode.window.createTreeView("wendoo.projectActions", {
     treeDataProvider: projectActionsProvider,
@@ -103,14 +106,16 @@ const PROJECT_ACTIONS_VIEW_EXPANDED_KEY = "wendoo.projectActionsViewExpanded";
  * Expands the project actions view the first time it renders in a workspace.
  * The Explorer container starts contributed views collapsed regardless of the
  * declarative view visibility; a one-time reveal opens the view, after which
- * VS Code's persisted workspace view state carries the user's choice.
+ * VS Code's persisted workspace view state carries the user's choice. Does
+ * nothing while the view is hidden (no project in the workspace), leaving the
+ * one-time expansion for an activation that shows the view.
  */
 async function expandProjectActionsViewOnFirstRender(
   context: vscode.ExtensionContext,
   provider: ProjectActionsProvider,
   view: vscode.TreeView<vscode.TreeItem>
 ): Promise<void> {
-  if (context.workspaceState.get(PROJECT_ACTIONS_VIEW_EXPANDED_KEY)) {
+  if (!isWendooEnabled() || context.workspaceState.get(PROJECT_ACTIONS_VIEW_EXPANDED_KEY)) {
     return;
   }
   await context.workspaceState.update(PROJECT_ACTIONS_VIEW_EXPANDED_KEY, true);

@@ -4,18 +4,18 @@
     {
       "kind": "target",
       "coordinate": "wendoo-lang/trg-microbit-v2",
-      "ref": "gh:wendoo-lang/trg-microbit-v2@c6cfc18d88a6c475be7af63cd6529480d444d8e4",
+      "ref": "gh:wendoo-lang/trg-microbit-v2@45d0e5906ea8775e47a438d2836fac9c028aa91e",
       "name": "micro:bit v2",
-      "version": "0.9.2",
+      "version": "0.9.11",
       "description": "Program the BBC micro:bit (v2) with Wendoo.",
       "alias": "microbit-v2"
     },
     {
       "kind": "target",
       "coordinate": "wendoo-lang/trg-ecosim",
-      "ref": "gh:wendoo-lang/trg-ecosim@b1b21908ff17e62e520694a3eae336307ee12eb1",
-      "name": "Ecosystem Simulator",
-      "version": "0.1.0",
+      "ref": "gh:wendoo-lang/trg-ecosim@55ff1c65895116f6fdc170afc23f41946169fa34",
+      "name": "Ecosystem Demo",
+      "version": "0.1.5",
       "description": "Program the brains of carnivores, herbivores, and plants in a live 2D ecosystem with Wendoo.",
       "alias": "ecosim"
     }

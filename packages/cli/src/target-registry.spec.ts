@@ -9,7 +9,7 @@ import {
 } from "./target-registry.js";
 
 const MICROBIT_COORDINATE = "wendoo-lang/trg-microbit-v2";
-const MICROBIT_REF = "gh:wendoo-lang/trg-microbit-v2@c6cfc18d88a6c475be7af63cd6529480d444d8e4";
+const MICROBIT_REF = "gh:wendoo-lang/trg-microbit-v2@45d0e5906ea8775e47a438d2836fac9c028aa91e";
 
 const SHA_A = "1111111111111111111111111111111111111111";
 const SHA_B = "2222222222222222222222222222222222222222";

@@ -104,7 +104,11 @@ Central orchestrator (`src/services/project-manager.ts`). Owns the `Project` ins
 ### Context Key
 
 `setWendooEnabled()` in `state/context.ts` sets the `wendoo.enabled` context key,
-which controls visibility of the `wendoo.sessions` tree view.
+which gates both explorer views (`wendoo.sessions` on web, `wendoo.projectActions`
+on desktop). On desktop, `trackWorkspaceProjectPresence()` in
+`services/project-presence.ts` keeps the key aligned with project presence: enabled
+only while a workspace folder carries a root `wendoo.json`, recomputed on workspace
+folder changes and `wendoo.json` create/delete.
 
 ## Adding a Command
 
