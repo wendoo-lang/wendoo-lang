@@ -28,6 +28,7 @@
     "project-spark"
   ],
   "files": [
+    "bin",
     "dist",
     "README.md"
   ],
@@ -40,7 +41,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "wendoo-assemble-target-package": "dist/kit/assemble-target-package.js"
+    "wendoo-assemble-target-package": "bin/wendoo-assemble-target-package.mjs"
   },
   "exports": {
     ".": {
