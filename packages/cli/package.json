@@ -1,6 +1,6 @@
 {
   "name": "wendoo",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Command-line tools for Wendoo projects",
   "license": "MIT",
   "author": "wendoo-lang",
