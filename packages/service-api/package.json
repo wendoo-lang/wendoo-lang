@@ -1,6 +1,6 @@
 {
   "name": "@wendoo/service-api",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "description": "Request/response schemas, shared enums, error shapes, and serialization formats for the Wendoo backend service API",
   "license": "MIT",
   "type": "module",
