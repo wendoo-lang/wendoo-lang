@@ -47,7 +47,7 @@ describe("app settings", () => {
 
   it("loads the defaults when nothing is stored", () => {
     assert.deepEqual(loadAppSettings(), DEFAULT_APP_SETTINGS);
-    assert.equal(DEFAULT_APP_SETTINGS.assistantServiceUrl, "wendoo-assistant.sklanch.net");
+    assert.equal(DEFAULT_APP_SETTINGS.assistantServiceUrl, "wendoo-assistant.playwendoo.com");
   });
 
   it("gives a stored blob written without the assistant field its default", () => {
@@ -59,6 +59,18 @@ describe("app settings", () => {
     assert.equal(loaded.assistantServiceUrl, DEFAULT_APP_SETTINGS.assistantServiceUrl);
     assert.equal(loaded.vscodeBridgeUrl, "bridge.example.net");
     assert.equal(loaded.showBridgePanel, false);
+  });
+
+  it("migrates stored legacy default addresses to the current defaults", () => {
+    for (const legacyBridge of ["vscode-bridge.wendoo-lang.org", "vscode-bridge.mindcraft-lang.org"]) {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ vscodeBridgeUrl: legacyBridge, assistantServiceUrl: "wendoo-assistant.sklanch.net" })
+      );
+      const loaded = loadAppSettings();
+      assert.equal(loaded.vscodeBridgeUrl, DEFAULT_APP_SETTINGS.vscodeBridgeUrl, legacyBridge);
+      assert.equal(loaded.assistantServiceUrl, DEFAULT_APP_SETTINGS.assistantServiceUrl, legacyBridge);
+    }
   });
 
   it("round-trips a persisted assistant address", () => {

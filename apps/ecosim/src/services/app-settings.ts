@@ -19,17 +19,31 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   showBridgePanel: true,
 };
 
+/** Default addresses shipped by earlier releases, replaced by the current defaults on load. */
+const LEGACY_DEFAULT_ADDRESSES: Record<"vscodeBridgeUrl" | "assistantServiceUrl", readonly string[]> = {
+  vscodeBridgeUrl: ["vscode-bridge.wendoo-lang.org", "vscode-bridge.mindcraft-lang.org"],
+  assistantServiceUrl: ["wendoo-assistant.sklanch.net"],
+};
+
 /**
  * Reads the persisted settings, layered over {@link DEFAULT_APP_SETTINGS}, so a
- * stored blob missing a field gets that field's default. Returns the defaults
- * when nothing is stored or the stored value is corrupt.
+ * stored blob missing a field gets that field's default. A stored address still
+ * pointing at a retired default host is upgraded to the current default.
+ * Returns the defaults when nothing is stored or the stored value is corrupt.
  */
 export function loadAppSettings(): AppSettings {
   try {
     const raw = localStorage.getItem(APP_SETTINGS_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<AppSettings>;
-      return { ...DEFAULT_APP_SETTINGS, ...parsed };
+      const settings = { ...DEFAULT_APP_SETTINGS, ...parsed };
+      if (LEGACY_DEFAULT_ADDRESSES.vscodeBridgeUrl.includes(settings.vscodeBridgeUrl)) {
+        settings.vscodeBridgeUrl = DEFAULT_APP_SETTINGS.vscodeBridgeUrl;
+      }
+      if (LEGACY_DEFAULT_ADDRESSES.assistantServiceUrl.includes(settings.assistantServiceUrl)) {
+        settings.assistantServiceUrl = DEFAULT_APP_SETTINGS.assistantServiceUrl;
+      }
+      return settings;
     }
   } catch {
     // corrupted data -- fall through to defaults

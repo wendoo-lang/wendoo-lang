@@ -170,7 +170,7 @@
       "properties": {
         "wendoo.bridgeUrl": {
           "type": "string",
-          "default": "vscode-bridge.wendoo-lang.org",
+          "default": "vscode-bridge.playwendoo.com",
           "description": "Web only: URL of the Wendoo bridge service the web editor pairs with. Has no effect in desktop VS Code."
         },
         "wendoo.devTarget": {

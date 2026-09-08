@@ -14,6 +14,10 @@ const BINDING_TOKEN_KEY = "wendoo.bindingToken";
 const PROJECT_NAME_KEY = "wendoo.projectName";
 const DEFAULT_WORKSPACE_FOLDER_NAME = "Wendoo";
 
+// Bridge hosts shipped as wendoo.bridgeUrl defaults by earlier releases. A
+// configured value matching one is read as the current manifest default.
+const LEGACY_BRIDGE_URLS: readonly string[] = ["vscode-bridge.wendoo-lang.org", "vscode-bridge.mindcraft-lang.org"];
+
 // Deduplication key for pending changes: same action + path overwrites the
 // previous pending entry so only the latest write/delete is sent after reconnect.
 // Import has no key (always appended) since imports are full-state snapshots.
@@ -115,7 +119,11 @@ export class ProjectManager implements vscode.Disposable {
   connect(joinCode?: string, savedToken?: string): void {
     this.disconnectActive();
 
-    const bridgeUrl = vscode.workspace.getConfiguration("wendoo").get<string>("bridgeUrl", "");
+    const configuration = vscode.workspace.getConfiguration("wendoo");
+    let bridgeUrl = configuration.get<string>("bridgeUrl", "");
+    if (LEGACY_BRIDGE_URLS.includes(bridgeUrl)) {
+      bridgeUrl = configuration.inspect<string>("bridgeUrl")?.defaultValue ?? bridgeUrl;
+    }
     if (!bridgeUrl) {
       throw new Error("wendoo.bridgeUrl is not configured");
     }
