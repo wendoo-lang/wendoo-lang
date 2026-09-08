@@ -1,6 +1,6 @@
 {
   "name": "@wendoo/vscode-bridge",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "description": "VSCode bridge server for TypeScript authoring in Wendoo",
   "type": "module",
