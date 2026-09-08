@@ -1,6 +1,6 @@
 {
   "name": "@wendoo/app-host",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "Project management and project file storage for Wendoo apps",
   "license": "MIT",
   "type": "module",
