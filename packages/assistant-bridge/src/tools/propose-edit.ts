@@ -1,5 +1,5 @@
 import type { IBrainTileDef, ITileCatalog, RuleSide, RuleTriggerMode } from "@wendoo/core/brain";
-import { isVariableFactoryTileId, mkPageTileId } from "@wendoo/core/brain";
+import { isDisplayFormat, isVariableFactoryTileId, mkPageTileId } from "@wendoo/core/brain";
 import type { BrainCommand, BrainDef, BrainPageDef, BrainRuleDef } from "@wendoo/core/brain/model";
 import {
   AddPageCommand,
@@ -96,13 +96,16 @@ export interface ProposalUnresolved {
   /**
    * `invalid_mint_input` reports a factory tile named without the input it
    * mints from, or with an input the factory makes no tile of.
-   * `rule_nesting_too_deep` reports a parent rule the document cannot nest
-   * another rule under. `unknown_batch_reference` reports a `#N` naming no
-   * command of the batch that creates a rule before this one runs.
-   * `page_limit_reached` reports a document already holding as many pages as a
-   * brain may have. `last_page` reports an attempt to remove the only page a
-   * brain has left. `page_still_referenced` reports a page other rules still
-   * switch to, and names them under {@link referencedBy}.
+   * `invalid_display_format` reports a mint whose `displayFormat` is outside the
+   * format grammar, and names the format. `unnamed_literal` reports a mint of a
+   * literal that carries an identity of its own without the name it has to read
+   * by, and names the factory tile. `rule_nesting_too_deep` reports a parent
+   * rule the document cannot nest another rule under. `unknown_batch_reference`
+   * reports a `#N` naming no command of the batch that creates a rule before
+   * this one runs. `page_limit_reached` reports a document already holding as
+   * many pages as a brain may have. `last_page` reports an attempt to remove the
+   * only page a brain has left. `page_still_referenced` reports a page other
+   * rules still switch to, and names them under {@link referencedBy}.
    */
   readonly error:
     | "unknown_rule"
@@ -110,12 +113,14 @@ export interface ProposalUnresolved {
     | "unknown_tile"
     | "position_out_of_range"
     | "invalid_mint_input"
+    | "invalid_display_format"
+    | "unnamed_literal"
     | "rule_nesting_too_deep"
     | "unknown_batch_reference"
     | "page_limit_reached"
     | "last_page"
     | "page_still_referenced";
-  /** The rule id, page id, page index, tile id, position, or limit the request ran into. */
+  /** The rule id, page id, page index, tile id, position, display format, or limit the request ran into. */
   readonly named: string;
   /** Durable ids of the rules still naming what the request asked to remove. */
   readonly referencedBy?: readonly string[];
@@ -574,7 +579,8 @@ type TileMint = Exclude<TileRunEntry, string>;
  * an equivalent tile the catalog already holds. An entry of the form `#N.page`
  * names the page tile of the page `madePages` records the batch's command at
  * index N as having made. Returns `invalid_mint_input` when the entry names a
- * factory without the input that factory mints from, and
+ * factory without the input that factory mints from, the code the literal mint
+ * refused the entry under (see {@link ProposalUnresolved.error}), and
  * `unknown_batch_reference` for a `#N.page` naming no command of the batch that
  * makes a page before this one runs.
  */
@@ -605,14 +611,27 @@ export function resolveRunEntry(
   return minted;
 }
 
-/** The literal `factoryTileDef` mints from `mint`, or undefined when the entry carries no value. */
+/**
+ * The literal `factoryTileDef` mints from `mint`, registered in `catalog` under
+ * the name the entry gives it. Returns `undefined` when the entry carries no
+ * value or the factory makes no tile of it, `invalid_display_format` for a
+ * format outside the grammar, and `unnamed_literal` for a literal minted with an
+ * identity of its own but no name, which would read by its raw identity.
+ */
 function mintLiteral(
   factoryTileDef: BrainTileFactoryDef,
   catalog: ITileCatalog,
   mint: TileMint
-): IBrainTileDef | undefined {
+): IBrainTileDef | ProposalUnresolved | undefined {
   if (mint.value === undefined) return undefined;
-  return manufactureLiteralTile(factoryTileDef, catalog, mint.value, mint.displayFormat);
+  if (mint.displayFormat !== undefined && !isDisplayFormat(mint.displayFormat)) {
+    return { ok: false, error: "invalid_display_format", named: mint.displayFormat };
+  }
+  const minted = manufactureLiteralTile(factoryTileDef, catalog, mint.value, mint.displayFormat, mint.name);
+  if (minted && minted.uniqueId !== undefined && minted.displayName === undefined) {
+    return { ok: false, error: "unnamed_literal", named: mint.tileId };
+  }
+  return minted;
 }
 
 /** Tile ids `catalog` holds right now. */

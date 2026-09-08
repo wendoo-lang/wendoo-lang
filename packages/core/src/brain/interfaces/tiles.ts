@@ -179,6 +179,40 @@ export function timeMsFormat(decimals: number): LiteralDisplayFormat {
   return `time_ms:${decimals}`;
 }
 
+/** The display formats that take no decimal count. */
+const kBareDisplayFormats: string[] = ["default", "percent", "thousands", "time_seconds", "time_ms"];
+
+/** The display formats that take a decimal count, each up to and including the colon before it. */
+const kCountedDisplayFormatPrefixes: string[] = ["percent:", "fixed:", "time_seconds:", "time_ms:"];
+
+const ZERO_CHAR_CODE = 48; // "0"
+const NINE_CHAR_CODE = 57; // "9"
+
+/** True when `text` is a run of one or more decimal digits. */
+function isDigitRun(text: string): boolean {
+  const len = SU.length(text);
+  if (len === 0) return false;
+  for (let i = 0; i < len; i++) {
+    const code = SU.charCodeAt(text, i);
+    if (code < ZERO_CHAR_CODE || code > NINE_CHAR_CODE) return false;
+  }
+  return true;
+}
+
+/**
+ * True when `fmt` is one of the display formats {@link LiteralDisplayFormat}
+ * defines: a format that takes no decimal count, or one that does followed by a
+ * whole number of decimal places. Any other text, the empty string included,
+ * reads false.
+ */
+export function isDisplayFormat(fmt: LiteralDisplayFormat): boolean {
+  if (kBareDisplayFormats.includes(fmt)) return true;
+  for (const prefix of kCountedDisplayFormatPrefixes) {
+    if (SU.startsWith(fmt, prefix)) return isDigitRun(SU.substring(fmt, SU.length(prefix)));
+  }
+  return false;
+}
+
 /** Parse a display format string into its kind and optional precision. */
 export function parseDisplayFormat(fmt: LiteralDisplayFormat): { kind: string; decimals?: number } {
   if (SU.startsWith(fmt, "percent:")) {
@@ -398,7 +432,6 @@ export enum CoreVariableFactoryId {
 }
 
 export enum CoreLiteralFactoryId {
-  Boolean = "boolean",
   Number = "number",
   String = "string",
 }
@@ -418,7 +451,6 @@ export function isVariableFactoryTileId(tileId: string): boolean {
 }
 
 export const CoreLiteralFactoryTileIds: string[] = [
-  mkLiteralFactoryTileId(CoreLiteralFactoryId.Boolean),
   mkLiteralFactoryTileId(CoreLiteralFactoryId.Number),
   mkLiteralFactoryTileId(CoreLiteralFactoryId.String),
 ];

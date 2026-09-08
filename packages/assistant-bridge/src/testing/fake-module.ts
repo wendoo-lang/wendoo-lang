@@ -9,6 +9,7 @@ import type {
   WendooModuleApi,
 } from "@wendoo/core/app";
 import {
+  BrainTileLiteralDef,
   bag,
   CoreParameterId,
   CoreTypeIds,
@@ -18,6 +19,7 @@ import {
   getSlotId,
   isNilValue,
   mkCallDef,
+  mkLiteralFactoryTileId,
   mkNumberValue,
   mod,
   optional,
@@ -28,6 +30,8 @@ import {
   TRUE_VALUE,
   VOID_VALUE,
 } from "@wendoo/core/app";
+import { mintDocumentId } from "@wendoo/core/brain/model";
+import { BrainTileFactoryDef } from "@wendoo/core/brain/tiles";
 import type { HandleId } from "@wendoo/core/runtime";
 import type { OperationEndingReport } from "../kit/index.js";
 import { DispatchOutcome } from "../target/adapter.js";
@@ -228,14 +232,46 @@ const ringActuator = {
   metadata: { label: "ring" },
 } satisfies CreateHostActuatorOptions;
 
+/** Factory id of the fake target's literal factory minting values of its own identity. */
+export const FAKE_SWATCH_LITERAL_FACTORY_ID = "swatch";
+
+/**
+ * Registers the fake target's `swatch` literal factory: each manufacture mints a
+ * literal carrying the submitted text under a freshly minted unique identity, as
+ * a target's own value factories do, so two manufactures of identical text yield
+ * distinct tiles. A manufacture whose `value` option is not text mints nothing
+ * and returns `undefined`.
+ */
+function registerSwatchLiteralFactory(api: WendooModuleApi): void {
+  const services = api.brainServices;
+  api.registerTile(
+    new BrainTileFactoryDef(
+      mkLiteralFactoryTileId(FAKE_SWATCH_LITERAL_FACTORY_ID),
+      FAKE_SWATCH_LITERAL_FACTORY_ID,
+      (factoryTileDef, opts) => {
+        if (typeof opts.value !== "string") return undefined;
+        return new BrainTileLiteralDef(
+          factoryTileDef.producedDataType,
+          opts.value,
+          { uniqueId: mintDocumentId(services.app.rng) },
+          services
+        );
+      },
+      CoreTypeIds.String,
+      { metadata: { label: "create a swatch" } }
+    )
+  );
+}
+
 /**
  * The module the fake target installs: one boolean sensor reading the staged
  * signal, one synchronous actuator taking a modifier and a named parameter and
  * reporting a declared output, one asynchronous actuator taking an anonymous
- * number and settling at dispatch, and one asynchronous actuator that leases
- * the world's one bell. A rehearsal over it observes gates, both dispatch kinds
- * with their arguments, a declared output's value, a call whose lifecycle spans
- * thinks, and every operation ending a world publishes.
+ * number and settling at dispatch, one asynchronous actuator that leases the
+ * world's one bell, and one literal factory minting values of their own
+ * identity. A rehearsal over it observes gates, both dispatch kinds with their
+ * arguments, a declared output's value, a call whose lifecycle spans thinks, and
+ * every operation ending a world publishes.
  */
 export function createFakeModule(): WendooModule {
   return {
@@ -245,6 +281,7 @@ export function createFakeModule(): WendooModule {
       api.registerHostActuator(createHostActuator(emitActuator));
       api.registerHostActuator(createHostActuator(chimeActuator));
       api.registerHostActuator(createHostActuator(ringActuator));
+      registerSwatchLiteralFactory(api);
       api.registerModifiers([
         { id: FakeTileIds.Loudly, label: "loudly" },
         { id: FakeTileIds.Immediately, label: "immediately" },

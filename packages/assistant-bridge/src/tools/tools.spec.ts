@@ -1,11 +1,20 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
+import { mkLiteralFactoryTileId } from "@wendoo/core/brain";
+import type { BrainTileLiteralDef } from "@wendoo/core/brain/tiles";
 import { catalogDigest } from "../catalog/digest.js";
 import { ARGS_TRUNCATION_MARKER, CATALOG_TEXT_LIMITS, sanitizeArgsText } from "../catalog/sanitize.js";
 import { CatalogScope } from "../catalog/scope.js";
-import { createTargetAdapter, FAKE_INPUT_KIND, FAKE_LONG_UNIT, FAKE_SUBJECT, ruleIdAt } from "../testing/index.js";
+import {
+  createTargetAdapter,
+  FAKE_INPUT_KIND,
+  FAKE_LONG_UNIT,
+  FAKE_SUBJECT,
+  FAKE_SWATCH_LITERAL_FACTORY_ID,
+  ruleIdAt,
+} from "../testing/index.js";
 import { executeToolCall } from "./dispatch.js";
-import { proposeEdit } from "./propose-edit.js";
+import { proposeEdit, resolveRunEntry } from "./propose-edit.js";
 import type { CatalogTile } from "./read-catalog.js";
 import { catalogTiles, readCatalog } from "./read-catalog.js";
 import { readProject } from "./read-project.js";
@@ -401,5 +410,114 @@ describe("the bridge tools over a real target", () => {
       named: ["no-such-kind", "another-missing-kind"],
       kinds: [FAKE_INPUT_KIND],
     });
+  });
+});
+
+describe("the name and the format a mint carries", () => {
+  /** Tile id of the fake target's literal factory minting values of their own identity. */
+  const swatchFactory = mkLiteralFactoryTileId(FAKE_SWATCH_LITERAL_FACTORY_ID);
+
+  /** Every display format the grammar names, in the spellings a mint may carry. */
+  const displayFormats = [
+    "default",
+    "percent",
+    "percent:1",
+    "fixed:2",
+    "thousands",
+    "time_seconds",
+    "time_seconds:3",
+    "time_ms",
+    "time_ms:1",
+  ];
+
+  test("lists a minted literal in the document scope under the name it was given", () => {
+    const ws = workspace();
+
+    const minted = proposeEdit(ws, {
+      op: "placeTiles",
+      ruleId: ruleIdAt(ws.brainDef, "0/0"),
+      side: "when",
+      tileIds: [
+        { tileId: tiles.variableFactory, name: "hunger" },
+        "tile.op->gt",
+        { tileId: tiles.numberFactory, value: 3, name: "threshold" },
+      ],
+    });
+
+    assert.equal(minted.ok, true, JSON.stringify(minted));
+    const listed = catalogTiles(readCatalog(ws, { filter: "threshold" }));
+    assert.deepEqual(
+      listed.map((tile) => tile.label),
+      ["threshold"]
+    );
+    assert.deepEqual(
+      readCatalog(ws, { filter: "threshold" }).groups.map((group) => group.scope),
+      [CatalogScope.Document]
+    );
+  });
+
+  test("names a minted literal that carries an identity of its own", () => {
+    const ws = workspace();
+
+    const minted = resolveRunEntry(ws, { tileId: swatchFactory, value: "carmine", name: "rock" });
+
+    assert.ok(!("ok" in minted), "the named mint resolves to a tile");
+    assert.equal((minted as BrainTileLiteralDef).displayName, "rock");
+    assert.deepEqual(
+      catalogTiles(readCatalog(ws, { filter: "rock" })).map((tile) => tile.tileId),
+      [minted.tileId]
+    );
+  });
+
+  test("refuses a mint of a literal of its own identity that carries no name", () => {
+    const ws = workspace();
+    const held = ws.brainDef.catalog().getAll().size();
+
+    const refused = proposeEdit(ws, {
+      op: "placeTile",
+      ruleId: ruleIdAt(ws.brainDef, "0/0"),
+      side: "do",
+      tileId: { tileId: swatchFactory, value: "carmine" },
+    });
+
+    assert.deepEqual(refused, { ok: false, error: "unnamed_literal", named: swatchFactory });
+    assert.equal(ws.brainDef.catalog().getAll().size(), held, "the refused mint left the document catalog as it was");
+  });
+
+  test("refuses a display format the grammar does not name, minting nothing", () => {
+    const ws = workspace();
+    const held = ws.brainDef.catalog().getAll().size();
+
+    const refused = proposeEdit(ws, {
+      op: "placeTile",
+      ruleId: ruleIdAt(ws.brainDef, "0/0"),
+      side: "do",
+      tileId: { tileId: tiles.numberFactory, value: 50, displayFormat: "percent:x" },
+    });
+
+    assert.deepEqual(refused, { ok: false, error: "invalid_display_format", named: "percent:x" });
+    assert.equal(ws.brainDef.catalog().getAll().size(), held, "the refused mint left the document catalog as it was");
+  });
+
+  test("mints under every display format the grammar names", () => {
+    for (const displayFormat of displayFormats) {
+      const ws = workspace();
+      const placed = proposeEdit(ws, {
+        op: "placeTile",
+        ruleId: ruleIdAt(ws.brainDef, "0/0"),
+        side: "do",
+        tileId: tiles.asyncActuator,
+      });
+      assert.equal(placed.ok, true, JSON.stringify(placed));
+
+      const minted = proposeEdit(ws, {
+        op: "placeTile",
+        ruleId: ruleIdAt(ws.brainDef, "0/0"),
+        side: "do",
+        tileId: { tileId: tiles.numberFactory, value: 2, displayFormat },
+      });
+
+      assert.equal(minted.ok, true, `${displayFormat}: ${JSON.stringify(minted)}`);
+    }
   });
 });
