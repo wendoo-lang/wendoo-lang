@@ -1,7 +1,7 @@
 {
   "name": "@wendoo/ecosim",
   "description": "Ecosystem Simulation App for Wendoo",
-  "version": "1.2.18",
+  "version": "1.2.19",
   "private": true,
   "type": "module",
   "author": "wendoo-lang",
