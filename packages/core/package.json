@@ -1,6 +1,6 @@
 {
   "name": "@wendoo/core",
-  "version": "0.2.19",
+  "version": "0.2.20",
   "description": "Core implementation of the Wendoo tile-based visual programming language",
   "license": "MIT",
   "author": "wendoo-lang",
