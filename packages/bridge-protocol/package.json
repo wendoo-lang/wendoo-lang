@@ -1,6 +1,6 @@
 {
   "name": "@wendoo/bridge-protocol",
-  "version": "0.2.11",
+  "version": "0.2.12",
   "description": "WebSocket protocol types and schemas for the Wendoo VS Code Bridge",
   "license": "MIT",
   "type": "module",
