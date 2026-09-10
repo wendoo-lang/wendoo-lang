@@ -13,6 +13,7 @@ pnpm-debug.log*
 dist/
 build/
 out/
+.wireit/
 *.tsbuildinfo
 
 # ------------------------------------------------------------------

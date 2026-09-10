@@ -41,15 +41,15 @@
 // command whose file the dependency has not built yet cannot be linked while it
 // is absent, so that one gap waits for the build and the driver links it after.
 //
-// A package whose build output already reflects its sources is skipped, as
-// judged by the dependency-freshness oracle the platform ships. A package is
-// built anyway when anything it depends on was built in the same run, and every
-// package is built when the oracle cannot be loaded.
+// Each buildable package wraps its build script in a wireit block declaring
+// that script's inputs and outputs. The driver runs every step; wireit skips a
+// step whose declared output already reflects its declared inputs. Steps run
+// with wireit's local cache disabled, so wireit judges a step in place and
+// never restores output from a cache directory.
 
 const { execSync } = require("node:child_process");
 const { readdirSync, readFileSync, existsSync, statSync } = require("node:fs");
 const { join, resolve, relative } = require("node:path");
-const { pathToFileURL } = require("node:url");
 
 /** package.json field a local package declares its build interface in. */
 const buildField = "wendooBuild";
@@ -283,28 +283,10 @@ function stepsFor(declaration, needed) {
   return steps;
 }
 
-/** Build output of the platform package holding the dependency-freshness oracle. */
-const oracleModule = join(__dirname, "..", "packages", "assistant-bridge", "dist", "kit", "dependency-freshness.js");
+/** Environment the driver runs each build step in. */
+const stepEnvironment = { ...process.env, WIREIT_CACHE: "none" };
 
-/**
- * Names of the packages a build started at `dir` would consume from a `dist`
- * that does not reflect their sources, or `undefined` when the oracle cannot be
- * loaded.
- */
-async function staleNames(dir) {
-  if (!existsSync(oracleModule)) return undefined;
-  try {
-    const { staleDependencyDists } = await import(pathToFileURL(oracleModule).href);
-    return new Set(staleDependencyDists(dir).map((finding) => finding.packageName));
-  } catch (error) {
-    console.log(
-      `Freshness oracle unavailable, building every package: ${error instanceof Error ? error.message : error}`
-    );
-    return undefined;
-  }
-}
-
-async function main(argv) {
+function main(argv) {
   const orderOnly = argv[0] === "--order";
   const dirs = (orderOnly ? argv.slice(1) : argv).map((dir) => resolve(process.cwd(), dir));
   if (dirs.length === 0 || (!orderOnly && dirs.length > 1)) {
@@ -337,38 +319,27 @@ async function main(argv) {
     );
   }
 
-  console.log(`Building ${buildable.length} package(s) in dependency order:`);
+  console.log(`Bringing ${buildable.length} package(s) up to date, in dependency order:`);
   for (const [, declaration] of buildable) console.log(`  ${declaration.name}`);
   if (needed.length > 0) console.log(`Variants requested: ${needed.join(", ")}`);
 
-  const stale = await staleNames(dirs[0]);
-  const built = new Set();
-
   for (const [dir, declaration] of buildable) {
-    const afterADependency = localDependencies(dir).some((dependency) => built.has(resolve(dependency.dir)));
-    if (stale !== undefined && !stale.has(declaration.name) && !afterADependency) {
-      console.log(`\n> Skipping ${declaration.name}, its output reflects its sources.`);
-      continue;
-    }
-    built.add(resolve(dir));
     for (const step of stepsFor(declaration, needed)) {
-      console.log(`\n> Building ${declaration.name} (npm run ${step.script})...`);
-      execSync(`npm run ${step.script}`, { stdio: "inherit", cwd: dir });
+      console.log(`\n> Bringing ${declaration.name} up to date (npm run ${step.script})...`);
+      execSync(`npm run ${step.script}`, { stdio: "inherit", cwd: dir, env: stepEnvironment });
       assertOutputsPresent(dir, declaration.name, step);
     }
   }
 
   if (pending.length > 0) linkBuiltCommands(pending);
 
-  console.log("\nAll packages built successfully.");
+  console.log("\nAll packages are up to date.");
   return 0;
 }
 
-main(process.argv.slice(2))
-  .then((code) => {
-    process.exitCode = code;
-  })
-  .catch((error) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  });
+try {
+  process.exitCode = main(process.argv.slice(2));
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+}

@@ -1,11 +1,9 @@
-import { assertDependencyDistsFresh, createTargetBuildStamp } from "@wendoo/assistant-bridge/kit/node";
+import { createTargetBuildStamp } from "@wendoo/assistant-bridge/kit/node";
 import path from "path";
 import { defineConfig } from "vite";
 import { rehearsalDefines } from "../src/rehearsal/source-content.ts";
 
 const appDir = process.cwd();
-
-assertDependencyDistsFresh(appDir);
 
 // Build output of packages linked into the app from this repository, which sits
 // outside node_modules.

@@ -1,11 +1,61 @@
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import type { CoreBuild, TargetBuildStamp } from "../target/adapter.js";
-import { localDependencyDir } from "./dependency-freshness.js";
 
 /** Name of the package whose build decides the semantics a rehearsed brain runs under. */
 const languagePackage = "@wendoo/core";
+
+/** Prefix of a dependency specifier naming a package by its location on disk. */
+const localSpecifier = "file:";
+
+/** The manifest fields a search through `file:` dependencies reads. */
+interface LinkedManifest {
+  readonly name?: string;
+  readonly dependencies?: Readonly<Record<string, string>>;
+  readonly devDependencies?: Readonly<Record<string, string>>;
+}
+
+/** Read the manifest of the package at `packageDir`. Throws when it is absent or unparsable. */
+function readManifest(packageDir: string): LinkedManifest {
+  return JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8")) as LinkedManifest;
+}
+
+/**
+ * Every package directory reachable from `packageDir` through `file:`
+ * dependencies, runtime and dev alike, transitively, excluding `packageDir`
+ * itself.
+ */
+function localDependencyDirs(packageDir: string): string[] {
+  const found: string[] = [];
+  const visited = new Set<string>();
+
+  const walk = (dir: string, isRoot: boolean): void => {
+    const resolved = resolve(dir);
+    if (visited.has(resolved)) return;
+    visited.add(resolved);
+    if (!isRoot) found.push(resolved);
+
+    const manifest = readManifest(resolved);
+    for (const specifier of Object.values({ ...manifest.dependencies, ...manifest.devDependencies })) {
+      if (!specifier.startsWith(localSpecifier)) continue;
+      const dependencyDir = resolve(resolved, specifier.slice(localSpecifier.length));
+      if (existsSync(join(dependencyDir, "package.json"))) walk(dependencyDir, false);
+    }
+  };
+
+  walk(packageDir, true);
+  return found;
+}
+
+/**
+ * Directory of the package named `packageName` that `packageDir` reaches
+ * through `file:` dependencies, runtime and dev alike, transitively;
+ * `undefined` when nothing it reaches declares that name.
+ */
+function localDependencyDir(packageDir: string, packageName: string): string | undefined {
+  return localDependencyDirs(packageDir).find((dir) => readManifest(dir).name === packageName);
+}
 
 /**
  * Output group of the language package a Node consumer imports and a headless
@@ -58,9 +108,8 @@ function digestOf(directory: string, paths: readonly string[]): string {
 
 /**
  * The language build the package at `packageDir` consumes, read from the
- * `@wendoo/core` it reaches through its `file:` dependencies. Call
- * `assertDependencyDistsFresh` first: this reads build output, and only that
- * assertion establishes the output reflects its sources.
+ * `@wendoo/core` it reaches through its `file:` dependencies. This reads build
+ * output, so run the package's `build:deps` script first.
  *
  * Throws when nothing the package reaches is `@wendoo/core`, and when that
  * package's Node build output is absent or empty.

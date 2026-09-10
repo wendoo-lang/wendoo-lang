@@ -2,7 +2,6 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { checkArtifactSelfContained } from "./conformance.js";
-import { assertDependencyDistsFresh, StaleDependencyError } from "./dependency-freshness.js";
 import { readTargetIdentity, targetManifestPath } from "./target-manifest.js";
 
 /**
@@ -71,13 +70,6 @@ const distDir = join(appDir, hostAppSource);
 const artifactPath = join(appDir, adapterSource);
 const bundleDir = join(packageDir, hostAppPath);
 const adapterDir = join(packageDir, dirname(adapterPath));
-
-try {
-  assertDependencyDistsFresh(appDir);
-} catch (cause) {
-  if (!(cause instanceof StaleDependencyError)) throw cause;
-  fail(cause.message);
-}
 
 if (!existsSync(manifestPath)) {
   fail(`no target manifest at ${manifestPath}.`);

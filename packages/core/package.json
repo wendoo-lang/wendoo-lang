@@ -464,11 +464,11 @@
   },
   "scripts": {
     "build": "npm run build:docs && npm run build:rbx && npm run build:node && npm run build:esm",
-    "build:prod": "npm run build:docs && npm run build:node && npm run build:esm",
+    "build:prod": "wireit",
     "build:docs": "node scripts/build-docs.js",
     "build:node": "tsc -p tsconfig.node.json && node scripts/post-build-node.js",
     "build:esm": "tsc --build tsconfig.esm.json && node scripts/post-build-esm.js",
-    "build:rbx": "rbxtsc --type package --project tsconfig.rbx.json && node scripts/post-build-rbx.js",
+    "build:rbx": "wireit",
     "pregenerate:ambient": "npm run build:node && npm run build:prod --prefix ../ts-compiler",
     "generate:ambient": "tsx --tsconfig scripts/tsconfig.json scripts/generate-ambient.ts",
     "pregenerate:localization": "npm run build:node",
@@ -489,6 +489,54 @@
     "release:minor": "node ../../scripts/release.js minor",
     "release:major": "node ../../scripts/release.js major"
   },
+  "wireit": {
+    "build:prod": {
+      "command": "npm run build:docs && npm run build:node && npm run build:esm",
+      "files": [
+        "src/**",
+        "!src/**/*.spec.ts",
+        "!src/**/*.rbx.ts",
+        "!src/**/__fixtures__/**",
+        "scripts/build-docs.js",
+        "scripts/build-utils.js",
+        "scripts/post-build-esm.js",
+        "scripts/post-build-node.js",
+        "tsconfig.node.json",
+        "tsconfig.esm.json",
+        "package-lock.json"
+      ],
+      "output": [
+        "dist/node/**",
+        "dist/esm/**",
+        ".platform-emit/node/**",
+        ".platform-emit/esm/**",
+        "tsconfig.esm.tsbuildinfo"
+      ],
+      "clean": true,
+      "packageLocks": []
+    },
+    "build:rbx": {
+      "command": "rbxtsc --type package --project tsconfig.rbx.json && node scripts/post-build-rbx.js",
+      "files": [
+        "src/**",
+        "!src/**/*.node.ts",
+        "!src/**/*.spec.ts",
+        "!src/**/__fixtures__/**/*.ts",
+        "!src/docs/**/*.ts",
+        "scripts/post-build-rbx.js",
+        "scripts/build-utils.js",
+        "tsconfig.rbx.json",
+        "default.project.json",
+        "package-lock.json"
+      ],
+      "output": [
+        "dist/rbx/**",
+        ".platform-emit/rbx/**"
+      ],
+      "clean": true,
+      "packageLocks": []
+    }
+  },
   "devDependencies": {
     "@biomejs/biome": "2.3.15",
     "@rbxts/compiler-types": "^3.0.0-types.0",
@@ -502,6 +550,7 @@
     "eslint-plugin-roblox-ts": "^1.3.1",
     "roblox-ts": "^3.0.0",
     "tsx": "^4.21.0",
-    "typescript": "~5.9.3"
+    "typescript": "~5.9.3",
+    "wireit": "^0.14.13"
   }
 }

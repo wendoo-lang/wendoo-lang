@@ -71,7 +71,7 @@
   },
   "scripts": {
     "build": "tsc --build",
-    "build:prod": "tsc --build tsconfig.prod.json",
+    "build:prod": "wireit",
     "clean": "rm -rf dist tsconfig.tsbuildinfo tsconfig.prod.tsbuildinfo",
     "watch": "tsc --build --watch",
     "lint:only": "biome lint ./src",
@@ -87,6 +87,31 @@
     "release:minor": "node ../../scripts/release.js minor",
     "release:major": "node ../../scripts/release.js major"
   },
+  "wireit": {
+    "build:prod": {
+      "command": "tsc --build tsconfig.prod.json",
+      "dependencies": [
+        "../app-host:build:prod",
+        "../bridge-client:build:prod",
+        "../bridge-protocol:build:prod",
+        "../core:build:prod",
+        "../ts-compiler:build:prod"
+      ],
+      "files": [
+        "src/**",
+        "!src/**/*.spec.ts",
+        "tsconfig.json",
+        "tsconfig.prod.json",
+        "package-lock.json"
+      ],
+      "output": [
+        "dist/**",
+        "tsconfig.prod.tsbuildinfo"
+      ],
+      "clean": true,
+      "packageLocks": []
+    }
+  },
   "dependencies": {
     "@wendoo/app-host": "file:../app-host",
     "@wendoo/bridge-client": "file:../bridge-client",
@@ -98,6 +123,7 @@
     "@biomejs/biome": "2.3.15",
     "@types/node": "^25.3.0",
     "tsx": "^4.21.0",
-    "typescript": "~5.9.3"
+    "typescript": "~5.9.3",
+    "wireit": "^0.14.13"
   }
 }

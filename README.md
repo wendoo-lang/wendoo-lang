@@ -68,6 +68,14 @@ npm install @wendoo/core @wendoo/ui @wendoo/docs
 
 For full setup instructions -- Vite config, TypeScript paths, Tailwind, and component usage -- see the [Integration Guide](INTEGRATION.md).
 
+## The Build System
+
+Working in this repository, `build:deps` is how anything is brought up to date. It runs [`scripts/build-packages.js`](scripts/build-packages.js), which walks the `file:` dependency graph from the package it is pointed at and builds everything it finds, dependencies first. Each app runs it from the hooks that need current dists (`predev`, `prebuild`, `prebuild:headless`, `prepackage`), and repositories that consume the platform as a git submodule bring their platform dists up to date through the same entry.
+
+Each buildable package wraps its build script in a [wireit](https://github.com/google/wireit) block declaring that script's input files and output paths. wireit hashes the declared inputs and skips the step when the recorded hashes still match -- content, not timestamps, so touching a file or rewriting it with the same bytes rebuilds nothing. A step declaring `clean: true` has its declared output deleted before it runs, so a build that must run never mixes fresh output with leftovers.
+
+wireit keeps its run state in a gitignored `.wireit/` directory beside each package, private to one checkout. The build driver runs every step with `WIREIT_CACHE=none`, so wireit judges each step where it stands and never restores output from a cache directory.
+
 ## Documentation
 
 Documentation is a work in progress. Browse the sim demo's [language documentation](https://ecosim.playwendoo.com/docs) online. See also the [core package README](packages/core/README.md) for language architecture, the [ui package README](packages/ui/README.md) for the shared React components, and the [docs package README](packages/docs/README.md) for the documentation system.

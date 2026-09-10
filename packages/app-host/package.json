@@ -56,7 +56,7 @@
   },
   "scripts": {
     "build": "tsc --build",
-    "build:prod": "tsc --build tsconfig.prod.json",
+    "build:prod": "wireit",
     "clean": "rm -rf dist tsconfig.tsbuildinfo tsconfig.prod.tsbuildinfo",
     "watch": "tsc --build --watch",
     "lint:only": "biome lint ./src",
@@ -72,11 +72,35 @@
     "release:minor": "node ../../scripts/release.js minor",
     "release:major": "node ../../scripts/release.js major"
   },
+  "wireit": {
+    "build:prod": {
+      "command": "tsc --build tsconfig.prod.json",
+      "dependencies": [
+        "../core:build:prod",
+        "../service-api:build:prod"
+      ],
+      "files": [
+        "src/**",
+        "!src/**/*.spec.ts",
+        "!src/test-support/**",
+        "tsconfig.json",
+        "tsconfig.prod.json",
+        "package-lock.json"
+      ],
+      "output": [
+        "dist/**",
+        "tsconfig.prod.tsbuildinfo"
+      ],
+      "clean": true,
+      "packageLocks": []
+    }
+  },
   "devDependencies": {
     "@biomejs/biome": "2.3.15",
     "fake-indexeddb": "^6.2.5",
     "tsx": "^4.21.0",
-    "typescript": "~5.9.3"
+    "typescript": "~5.9.3",
+    "wireit": "^0.14.13"
   },
   "dependencies": {
     "@wendoo/core": "file:../core",
