@@ -1321,6 +1321,18 @@ Sparse, optional, conditional, and repeated slots are represented by
 code that needs an omitted value to behave like a default must express
 that fallback explicitly, for example with `??`.
 
+**Sync host-call failure.** A synchronous host body reports failure
+instead of producing a result, and the failure escapes the dispatch
+before the call is observed. The calling fiber faults with the
+failure's `ErrorCode` -- `ScriptError` for a plain dispatch-time
+exception -- on the direct fault path, not through the fiber's `TRY`
+handlers: nothing is pushed, the pc does not advance, and no
+action-return event is emitted, so a `HOST_ACTION_CALL` that fails
+renders a `fault` record and no `action` record in an observable
+trace. The TS reference expresses the failure as a raise out of
+`exec`; an implementation whose sync bodies instead return an error
+value applies the same ordering, faulting before any observation.
+
 ### Operator monomorphization
 
 Arithmetic on primitive `NumberValue` (and other primitive) operands
