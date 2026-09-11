@@ -22,8 +22,12 @@ export interface ConformanceTiles {
   readonly deferFail: IBrainTileDef;
   /** DO-side actuator tile of `fault()`. */
   readonly fault: IBrainTileDef;
+  /** WHEN-side presence-gated sensor tile of `signal(period)`. */
+  readonly signal: IBrainTileDef;
   /** Parameter tile naming the `ticks` argument of a deferred call. */
   readonly ticks: IBrainTileDef;
+  /** Parameter tile naming the `period` argument of `signal`. */
+  readonly period: IBrainTileDef;
 }
 
 function requireTile(environment: WendooEnvironment, tileId: string): IBrainTileDef {
@@ -46,7 +50,9 @@ export function conformanceTiles(environment: WendooEnvironment): ConformanceTil
     deferEcho: requireTile(environment, mkActuatorTileId(ConformanceHostActions.DeferEcho.key)),
     deferFail: requireTile(environment, mkActuatorTileId(ConformanceHostActions.DeferFail.key)),
     fault: requireTile(environment, mkActuatorTileId(ConformanceHostActions.Fault.key)),
+    signal: requireTile(environment, mkSensorTileId(ConformanceHostActions.Signal.key)),
     ticks: requireTile(environment, mkParameterTileId(ConformanceParameterId.Ticks)),
+    period: requireTile(environment, mkParameterTileId(ConformanceParameterId.Period)),
   };
 }
 

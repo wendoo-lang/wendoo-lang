@@ -9,7 +9,9 @@ import type {
   WendooModuleApi,
 } from "@wendoo/core/app";
 import {
+  BitSet,
   bag,
+  CoreCapabilityBits,
   CoreParameterId,
   CoreTypeIds,
   createHostActuator,
@@ -18,6 +20,7 @@ import {
   isNumberValue,
   mkCallDef,
   mkNumberValue,
+  NIL_VALUE,
   param,
   TARGET_ACTION_ID_BASE,
   TARGET_FUNC_ID_BASE,
@@ -53,6 +56,8 @@ export const CONFORMANCE_SCHEDULER_CONFIG = {
 export const ConformanceParameterId = {
   /** Number of whole ticks a deferred call settles after. */
   Ticks: "conformance.ticks",
+  /** Whole-tick interval between two deliveries of a value-bearing sensor. */
+  Period: "conformance.period",
 } as const;
 
 /**
@@ -65,6 +70,7 @@ export const ConformanceActionKeys = {
   DeferEcho: "actuator.conformance.defer-echo",
   DeferFail: "actuator.conformance.defer-fail",
   Fault: "actuator.conformance.fault",
+  Signal: "sensor.conformance.signal",
 } as const;
 
 /**
@@ -87,24 +93,31 @@ export const ConformanceHostActions = {
     fnId: TARGET_FUNC_ID_BASE + 3,
   },
   Fault: { key: ConformanceActionKeys.Fault, actionId: TARGET_ACTION_ID_BASE + 4, fnId: TARGET_FUNC_ID_BASE + 4 },
+  Signal: { key: ConformanceActionKeys.Signal, actionId: TARGET_ACTION_ID_BASE + 5, fnId: TARGET_FUNC_ID_BASE + 5 },
 } as const;
 
 const AnonValue = param(CoreParameterId.AnonymousNumber, { name: "value", anonymous: true });
 const Ticks = param(ConformanceParameterId.Ticks, { name: "ticks", default: mkNumberValue(1) });
+const Period = param(ConformanceParameterId.Period, { name: "period", default: mkNumberValue(1) });
 
 const echoCallDef = mkCallDef(bag(AnonValue));
 const emitCallDef = mkCallDef(bag(AnonValue));
 const deferEchoCallDef = mkCallDef(bag(AnonValue, Ticks));
 const deferFailCallDef = mkCallDef(bag(Ticks));
 const faultCallDef = mkCallDef(bag());
+const signalCallDef = mkCallDef(bag(Period));
 
 const kEchoValueSlotId = getSlotId(echoCallDef, AnonValue);
 const kDeferEchoValueSlotId = getSlotId(deferEchoCallDef, AnonValue);
 const kDeferEchoTicksSlotId = getSlotId(deferEchoCallDef, Ticks);
 const kDeferFailTicksSlotId = getSlotId(deferFailCallDef, Ticks);
+const kSignalPeriodSlotId = getSlotId(signalCallDef, Period);
 
-/** Ticks a deferred call waits when its `ticks` argument is absent or not a number. */
-const DEFAULT_DEFER_TICKS = 1;
+/** Whole-tick count a deferred call waits, or a signal's period, when the argument carries none. */
+const DEFAULT_WHOLE_TICKS = 1;
+
+/** Value `signal` delivers on a tick it is present: falsy, so only a presence gate fires on it. */
+const SIGNAL_VALUE = mkNumberValue(0);
 
 /** Error code `deferFail` rejects its handle with. */
 const DEFER_FAIL_CODE = ErrorCode.HostError;
@@ -158,10 +171,10 @@ export class ConformanceWorld {
 }
 
 /** Whole-tick count carried by the argument at `slotId`, or the default when it carries none. */
-function ticksArg(args: ReadonlyList<Value>, slotId: number): number {
+function wholeTicksArg(args: ReadonlyList<Value>, slotId: number): number {
   const value = args.get(slotId);
   if (value === undefined || !isNumberValue(value)) {
-    return DEFAULT_DEFER_TICKS;
+    return DEFAULT_WHOLE_TICKS;
   }
   return value.v;
 }
@@ -186,7 +199,7 @@ function execDeferEcho(ctx: ExecutionContext, args: ReadonlyList<Value>, handle:
     handle.resolve(value);
     return;
   }
-  world.defer(ctx.currentTick, ticksArg(args, kDeferEchoTicksSlotId), () => {
+  world.defer(ctx.currentTick, wholeTicksArg(args, kDeferEchoTicksSlotId), () => {
     handle.resolve(value);
   });
 }
@@ -197,13 +210,18 @@ function execDeferFail(ctx: ExecutionContext, args: ReadonlyList<Value>, handle:
     handle.reject(DEFER_FAIL_CODE);
     return;
   }
-  world.defer(ctx.currentTick, ticksArg(args, kDeferFailTicksSlotId), () => {
+  world.defer(ctx.currentTick, wholeTicksArg(args, kDeferFailTicksSlotId), () => {
     handle.reject(DEFER_FAIL_CODE);
   });
 }
 
 function execFault(): Value {
   throw new Error("conformance fault");
+}
+
+function execSignal(ctx: ExecutionContext, args: ReadonlyList<Value>): Value {
+  const period = wholeTicksArg(args, kSignalPeriodSlotId);
+  return ctx.currentTick % period === 0 ? SIGNAL_VALUE : NIL_VALUE;
 }
 
 const echoSensor = {
@@ -257,6 +275,18 @@ const faultActuator = {
   metadata: { label: "fault" },
 } satisfies CreateHostActuatorOptions;
 
+const signalSensor = {
+  key: ConformanceHostActions.Signal.key,
+  actionId: ConformanceHostActions.Signal.actionId,
+  fnId: ConformanceHostActions.Signal.fnId,
+  callDef: signalCallDef,
+  fn: { exec: execSignal },
+  isAsync: false,
+  outputType: CoreTypeIds.Number,
+  capabilities: new BitSet().set(CoreCapabilityBits.PresenceGated),
+  metadata: { label: "signal" },
+} satisfies CreateHostSensorOptions;
+
 /**
  * The conformance host profile: the host surface every VM implements in its
  * test harness to replay the corpus.
@@ -270,20 +300,28 @@ const faultActuator = {
  *   `HostError` exactly `ticks` ticks after its dispatch.
  * - `fault()` -- synchronous actuator that faults the calling fiber with
  *   `ScriptError`.
+ * - `signal(period)` -- synchronous presence-gated sensor delivering the
+ *   number `0` on every think whose ordinal is a multiple of `period`, and
+ *   nil on every other think.
  *
  * Nothing here reads a clock, a random stream, or any state outside the
- * {@link ConformanceWorld} attached to the runtime.
+ * {@link ConformanceWorld} attached to the runtime and the think ordinal on
+ * the execution context.
  */
 export function conformanceModule(): WendooModule {
   return {
     id: CONFORMANCE_MODULE_ID,
     install(api: WendooModuleApi): void {
-      api.registerParameters([{ id: ConformanceParameterId.Ticks, dataType: CoreTypeIds.Number, label: "ticks" }]);
+      api.registerParameters([
+        { id: ConformanceParameterId.Ticks, dataType: CoreTypeIds.Number, label: "ticks" },
+        { id: ConformanceParameterId.Period, dataType: CoreTypeIds.Number, label: "period" },
+      ]);
       api.registerHostSensor(createHostSensor(echoSensor));
       api.registerHostActuator(createHostActuator(emitActuator));
       api.registerHostActuator(createHostActuator(deferEchoActuator));
       api.registerHostActuator(createHostActuator(deferFailActuator));
       api.registerHostActuator(createHostActuator(faultActuator));
+      api.registerHostSensor(createHostSensor(signalSensor));
     },
   };
 }

@@ -82,6 +82,10 @@
       "description": "A dispatch re-executed without a free handle for the contracted number of starved rounds faults StackOverflow."
     },
     {
+      "id": "handle-backpressure-spill",
+      "description": "An async dispatch with no free handle re-enqueues with its pc unchanged and re-executes identically on a later round, so breadth over maxHandles spills in bounded waves without loss or fault."
+    },
+    {
       "id": "handle-resume-next-round",
       "description": "A fiber made runnable by a settling handle runs in the next round, never the round the handle settled in."
     },
@@ -148,6 +152,10 @@
     {
       "id": "rule-trigger-then-abandoned",
       "description": "A `then` whose subject's cluster lost a fiber to a fault or a cancellation resolves as a skip."
+    },
+    {
+      "id": "rule-trigger-then-wait",
+      "description": "A `then` whose subject's cluster is in flight parks its arming handle in the subject's watcher slot, and the settle walk resolves it at the subject's terminal transition."
     },
     {
       "id": "rule-when-empty",

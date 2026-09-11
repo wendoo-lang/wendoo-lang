@@ -279,3 +279,37 @@ export function assertCompiledOps(
 export function traceLines(trace: string, prefix: string): string[] {
   return trace.split("\n").filter((line) => line.startsWith(prefix));
 }
+
+/**
+ * The event lines of `trace` grouped by the think they were emitted in, in
+ * tick order: entry `i` holds the lines between the `tick` line of ordinal
+ * `i + 1` and the next one. A think with no observable effect contributes an
+ * empty entry, and the header lines belong to no think.
+ *
+ * @param trace - Rendered observable trace to group.
+ */
+export function traceEventsByTick(trace: string): string[][] {
+  const ticks: string[][] = [];
+  for (const line of trace.split("\n")) {
+    if (line.startsWith("tick ")) {
+      ticks.push([]);
+      continue;
+    }
+    const current = ticks[ticks.length - 1];
+    if (line.length > 0 && current !== undefined) {
+      current.push(line);
+    }
+  }
+  return ticks;
+}
+
+/**
+ * The `<kind> <id>` prefix of each line: an event's identity -- `action` or
+ * `tile` plus the dispatched id, `fault` plus the fiber id -- with its
+ * arguments and result dropped.
+ *
+ * @param lines - Trace event lines, as grouped by {@link traceEventsByTick}.
+ */
+export function eventKinds(lines: readonly string[]): string[] {
+  return lines.map((line) => line.split(" ").slice(0, 2).join(" "));
+}

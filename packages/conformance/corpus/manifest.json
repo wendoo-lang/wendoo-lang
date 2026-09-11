@@ -64,6 +64,21 @@
       "schedule": [16, 16, 16, 16]
     },
     {
+      "id": "handle-pressure",
+      "source": "packages/conformance/src/cases/handle-pressure.spec.ts",
+      "summary": "More concurrent asynchronous dispatches than the profile's handle cap admits, spilling across thinks in bounded waves.",
+      "behaviors": [
+        "async-handle-resolve",
+        "fiber-await-park",
+        "fiber-fifo-round",
+        "handle-backpressure-spill",
+        "host-async-action-dispatch",
+        "root-rule-quiesce"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16, 16, 16]
+    },
+    {
       "id": "host-fault",
       "source": "packages/conformance/src/cases/host-fault.spec.ts",
       "summary": "A synchronous host body that raises, faulting its fiber with ScriptError while the sibling rule keeps running.",
@@ -84,6 +99,43 @@
       ],
       "precisions": ["f32", "f64"],
       "schedule": [16, 16]
+    },
+    {
+      "id": "presence-gate",
+      "source": "packages/conformance/src/cases/presence-gate.spec.ts",
+      "summary": "A bare presence-gated value sensor as the WHEN root of a rule and of its `otherwise` sibling, delivering a falsy value and nil in turn.",
+      "behaviors": [
+        "host-sync-sensor-result",
+        "rule-firing-record",
+        "rule-trigger-otherwise",
+        "rule-trigger-otherwise-chain-gate",
+        "rule-when-presence-gate"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16]
+    },
+    {
+      "id": "then-trigger-fires",
+      "source": "packages/conformance/src/cases/then-trigger-fires.spec.ts",
+      "summary": "A `then` rule whose subject fires and completes within one think, so its arming read resolves without suspending.",
+      "behaviors": ["root-rule-respawn", "rule-firing-record", "rule-trigger-then", "rule-when-gate-truthy"],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
+      "id": "then-trigger-pending",
+      "source": "packages/conformance/src/cases/then-trigger-pending.spec.ts",
+      "summary": "A `then` rule whose subject parks on an asynchronous action, so its arming handle waits in the subject's watcher slot until the settle walk resolves it.",
+      "behaviors": [
+        "async-handle-resolve",
+        "fiber-await-park",
+        "handle-resume-next-round",
+        "host-async-action-dispatch",
+        "root-rule-quiesce",
+        "rule-trigger-then-wait"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16, 16, 16]
     }
   ]
 }

@@ -304,7 +304,7 @@ function internValueStrings(value: Value, interner: StringInterner): void {
 ///////////////////////////
 
 /**
- * Serializes a linked brain program to the binary `.mcprogram` form: a 2-byte
+ * Serializes a linked brain program to the binary `.mcprogram` form: a 4-byte
  * magic, a 1-byte format version, the numeric profile id, a 1-byte presence
  * bitmask, then the positional sections `CSTR`, `TYPS`, `CNUM`, `CVAL`,
  * `FUNC`, `VARS`, the present optional sections (`ACTS`, `RULF`, `RANC`,

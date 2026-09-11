@@ -1,0 +1,29 @@
+mctrace 1
+profile 3e8
+precision f32
+tick 1 time 41800000 dt 00000000
+action 402 site 0 args 2 number 3f800000 number 40000000 async
+action 402 site 1 args 2 number 40000000 number 40000000 async
+action 402 site 2 args 2 number 40400000 number 40000000 async
+action 402 site 3 args 2 number 40800000 number 40000000 async
+action 402 site 4 args 2 number 40a00000 number 40000000 async
+action 402 site 5 args 2 number 40c00000 number 40000000 async
+action 402 site 6 args 2 number 40e00000 number 40000000 async
+action 402 site 7 args 2 number 41000000 number 40000000 async
+tick 2 time 42000000 dt 41800000
+tick 3 time 42400000 dt 41800000
+action 402 site 8 args 2 number 41100000 number 40000000 async
+action 402 site 9 args 2 number 41200000 number 40000000 async
+tick 4 time 42800000 dt 41800000
+action 402 site 0 args 2 number 3f800000 number 40000000 async
+action 402 site 1 args 2 number 40000000 number 40000000 async
+action 402 site 2 args 2 number 40400000 number 40000000 async
+action 402 site 3 args 2 number 40800000 number 40000000 async
+action 402 site 4 args 2 number 40a00000 number 40000000 async
+action 402 site 5 args 2 number 40c00000 number 40000000 async
+tick 5 time 42a00000 dt 41800000
+action 402 site 6 args 2 number 40e00000 number 40000000 async
+action 402 site 7 args 2 number 41000000 number 40000000 async
+tick 6 time 42c00000 dt 41800000
+action 402 site 8 args 2 number 41100000 number 40000000 async
+action 402 site 9 args 2 number 41200000 number 40000000 async
