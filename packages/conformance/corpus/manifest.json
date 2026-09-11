@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "traceFormatVersion": 1,
+  "profileId": 1000,
+  "cases": [
+    {
+      "id": "arithmetic-and-gate",
+      "source": "packages/conformance/src/cases/arithmetic-and-gate.spec.ts",
+      "summary": "Number arithmetic through the core operator host calls, behind a truthy and a falsy WHEN gate.",
+      "behaviors": [
+        "host-sync-action-call",
+        "host-sync-sensor-result",
+        "number-precision-profile",
+        "rule-when-empty",
+        "rule-when-gate-falsy",
+        "rule-when-gate-truthy",
+        "variable-slot-storage",
+        "when-result-capture"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16]
+    },
+    {
+      "id": "child-rule-cascade",
+      "source": "packages/conformance/src/cases/child-rule-cascade.spec.ts",
+      "summary": "A parent rule with two synchronous child rules beside a second root rule, pinning spawn order and cascade timing.",
+      "behaviors": [
+        "child-rule-spawn",
+        "child-rule-synchronous-cascade",
+        "fiber-fifo-round",
+        "root-rule-respawn",
+        "rule-when-gate-truthy"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
+      "id": "defer-echo-resolve",
+      "source": "packages/conformance/src/cases/defer-echo-resolve.spec.ts",
+      "summary": "An asynchronous action whose handle resolves two ticks later, parking its rule and resuming it after the settle.",
+      "behaviors": [
+        "async-handle-resolve",
+        "fiber-await-park",
+        "handle-resume-next-round",
+        "host-async-action-dispatch",
+        "root-rule-quiesce"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16, 16]
+    },
+    {
+      "id": "defer-fail-reject",
+      "source": "packages/conformance/src/cases/defer-fail-reject.spec.ts",
+      "summary": "An asynchronous action whose handle rejects one tick later, faulting the parked rule with HostError.",
+      "behaviors": [
+        "async-handle-reject",
+        "fault-host-error",
+        "fault-isolation",
+        "fiber-await-park",
+        "host-async-action-dispatch",
+        "root-rule-respawn"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16]
+    },
+    {
+      "id": "host-fault",
+      "source": "packages/conformance/src/cases/host-fault.spec.ts",
+      "summary": "A synchronous host body that raises, faulting its fiber with ScriptError while the sibling rule keeps running.",
+      "behaviors": ["fault-isolation", "fault-script-error", "root-rule-respawn"],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16]
+    },
+    {
+      "id": "otherwise-chain",
+      "source": "packages/conformance/src/cases/otherwise-chain.spec.ts",
+      "summary": "Two WHEN rules each followed by an `otherwise` sibling, pinning the chain gate against a subject that fires and one that does not.",
+      "behaviors": [
+        "rule-firing-record",
+        "rule-trigger-otherwise",
+        "rule-trigger-otherwise-chain-gate",
+        "rule-when-gate-falsy",
+        "rule-when-gate-truthy"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    }
+  ]
+}

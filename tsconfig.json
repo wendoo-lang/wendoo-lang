@@ -46,6 +46,8 @@
     { "path": "./packages/bridge-protocol/tsconfig.json" },
     { "path": "./packages/cli/tsconfig.json" },
     { "path": "./packages/cli/tsconfig.spec.json" },
+    { "path": "./packages/conformance/tsconfig.json" },
+    { "path": "./packages/conformance/tsconfig.spec.json" },
     { "path": "./packages/docs/tsconfig.json" },
     { "path": "./packages/docs/tsconfig.spec.json" },
     { "path": "./packages/service-api/tsconfig.json" },

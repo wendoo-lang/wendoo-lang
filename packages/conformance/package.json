@@ -1,0 +1,86 @@
+{
+  "name": "@wendoo/conformance",
+  "version": "0.0.0",
+  "description": "Cross-VM conformance corpus: the shared host profile, trace grammar, and minted goldens every Wendoo VM is verified against",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "author": "wendoo-lang",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wendoo-lang/wendoo-lang.git",
+    "directory": "packages/conformance"
+  },
+  "bugs": {
+    "url": "https://github.com/wendoo-lang/wendoo-lang/issues"
+  },
+  "homepage": "https://github.com/wendoo-lang/wendoo-lang/tree/main/packages/conformance#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./corpus/*": {
+      "default": "./corpus/*"
+    }
+  },
+  "wendooBuild": {
+    "script": "build:prod",
+    "outputs": [
+      "dist"
+    ],
+    "postProcessed": false
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "build:prod": "wireit",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo tsconfig.prod.tsbuildinfo",
+    "watch": "tsc --build --watch",
+    "lint:only": "biome lint ./src",
+    "check:only": "biome check ./src",
+    "format:only": "biome format ./src",
+    "lint": "biome lint ./src --write",
+    "check": "biome check ./src --write",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.spec.json",
+    "format": "biome format ./src --write",
+    "pretest": "npm run build:prod",
+    "test": "tsx --tsconfig tsconfig.spec.json --test $(find src -name '*.spec.ts')",
+    "mint": "WENDOO_REGENERATE_GOLDENS=1 npm test"
+  },
+  "wireit": {
+    "build:prod": {
+      "command": "tsc --build tsconfig.prod.json",
+      "dependencies": [
+        "../core:build:prod"
+      ],
+      "files": [
+        "src/**",
+        "!src/**/*.spec.ts",
+        "tsconfig.json",
+        "tsconfig.prod.json",
+        "package-lock.json"
+      ],
+      "output": [
+        "dist/**",
+        "tsconfig.prod.tsbuildinfo"
+      ],
+      "clean": true,
+      "packageLocks": []
+    }
+  },
+  "dependencies": {
+    "@wendoo/core": "file:../core"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.3.15",
+    "@types/node": "^25.3.0",
+    "tsx": "^4.21.0",
+    "typescript": "~5.9.3",
+    "wireit": "^0.14.13"
+  }
+}

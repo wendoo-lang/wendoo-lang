@@ -1,0 +1,321 @@
+{
+  "program": {
+    "version": 1,
+    "functions": [
+      {
+        "code": [
+          {
+            "op": 70
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 4,
+            "a": 0
+          },
+          {
+            "op": 6,
+            "a": 0
+          },
+          {
+            "op": 44,
+            "a": 1024,
+            "b": 1,
+            "c": 0
+          },
+          {
+            "op": 71,
+            "a": 13
+          },
+          {
+            "op": 72
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 4,
+            "a": 1
+          },
+          {
+            "op": 6,
+            "a": 1
+          },
+          {
+            "op": 4,
+            "a": 2
+          },
+          {
+            "op": 6,
+            "a": 0
+          },
+          {
+            "op": 40,
+            "a": 3,
+            "b": 2,
+            "c": 1
+          },
+          {
+            "op": 6,
+            "a": 0
+          },
+          {
+            "op": 44,
+            "a": 1025,
+            "b": 1,
+            "c": 2
+          },
+          {
+            "op": 73
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 31
+          }
+        ],
+        "numParams": 0
+      },
+      {
+        "code": [
+          {
+            "op": 70
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 4,
+            "a": 3
+          },
+          {
+            "op": 6,
+            "a": 0
+          },
+          {
+            "op": 44,
+            "a": 1024,
+            "b": 1,
+            "c": 3
+          },
+          {
+            "op": 71,
+            "a": 7
+          },
+          {
+            "op": 72
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 4,
+            "a": 4
+          },
+          {
+            "op": 6,
+            "a": 0
+          },
+          {
+            "op": 44,
+            "a": 1025,
+            "b": 1,
+            "c": 4
+          },
+          {
+            "op": 73
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 31
+          }
+        ],
+        "numParams": 0
+      },
+      {
+        "code": [
+          {
+            "op": 72
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 10,
+            "a": 0
+          },
+          {
+            "op": 6,
+            "a": 1
+          },
+          {
+            "op": 4,
+            "a": 1
+          },
+          {
+            "op": 6,
+            "a": 0
+          },
+          {
+            "op": 40,
+            "a": 3,
+            "b": 2,
+            "c": 5
+          },
+          {
+            "op": 2
+          },
+          {
+            "op": 11,
+            "a": 0
+          },
+          {
+            "op": 73
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 31
+          }
+        ],
+        "numParams": 0
+      },
+      {
+        "code": [
+          {
+            "op": 72
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 10,
+            "a": 0
+          },
+          {
+            "op": 6,
+            "a": 0
+          },
+          {
+            "op": 44,
+            "a": 1025,
+            "b": 1,
+            "c": 6
+          },
+          {
+            "op": 73
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 31
+          }
+        ],
+        "numParams": 0
+      }
+    ],
+    "constantPools": {
+      "numbers": [
+        1,
+        2,
+        3,
+        0,
+        9
+      ],
+      "strings": [],
+      "values": [
+        {
+          "t": 1
+        },
+        {
+          "t": 3,
+          "v": 0
+        }
+      ]
+    },
+    "types": [],
+    "variableNames": [
+      "count"
+    ],
+    "variableInitValues": [
+      1
+    ],
+    "entryPoint": 0,
+    "actions": [],
+    "ruleFuncIds": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "ruleAncestors": []
+  },
+  "pages": [
+    {
+      "pageIndex": 0,
+      "pageId": "1uQGngetiRKxqU5k",
+      "pageName": "Unnamed Page",
+      "rootRuleFuncIds": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "actionCallSites": [
+        {
+          "binding": "host",
+          "callSiteId": 0,
+          "actionId": 1024
+        },
+        {
+          "binding": "host",
+          "callSiteId": 2,
+          "actionId": 1025
+        },
+        {
+          "binding": "host",
+          "callSiteId": 3,
+          "actionId": 1024
+        },
+        {
+          "binding": "host",
+          "callSiteId": 4,
+          "actionId": 1025
+        },
+        {
+          "binding": "host",
+          "callSiteId": 6,
+          "actionId": 1025
+        }
+      ]
+    }
+  ]
+}

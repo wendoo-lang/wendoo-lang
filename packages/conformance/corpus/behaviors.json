@@ -1,0 +1,185 @@
+{
+  "version": 1,
+  "behaviors": [
+    {
+      "id": "action-callsite-state",
+      "description": "Per-callsite host state and state slots persist across thinks at one call site and survive page reactivation."
+    },
+    {
+      "id": "async-handle-cancel",
+      "description": "A cancelled handle throws Cancelled in the fiber awaiting it."
+    },
+    {
+      "id": "async-handle-reject",
+      "description": "A rejected handle throws an error carrying the rejection's code in the fiber awaiting it."
+    },
+    {
+      "id": "async-handle-resolve",
+      "description": "A resolved handle carries its value to the fiber awaiting it."
+    },
+    {
+      "id": "async-sensor-when-evaluation",
+      "description": "A WHEN section suspends on an asynchronous sensor and resumes at the same point once the handle settles."
+    },
+    {
+      "id": "bytecode-action-call",
+      "description": "A bytecode-bound action -- a compiled tile -- dispatches through the program's action table and returns its result."
+    },
+    {
+      "id": "bytecode-action-call-async",
+      "description": "An asynchronously dispatched bytecode-bound action runs its body in a child fiber and yields a pending handle."
+    },
+    {
+      "id": "child-rule-spawn",
+      "description": "A rule nested in a parent's DO section spawns its own fire-and-forget fiber at the parent's tail."
+    },
+    {
+      "id": "child-rule-synchronous-cascade",
+      "description": "Freshly spawned child rules drain depth-first within the spawning think, one subtree finishing before the next begins."
+    },
+    {
+      "id": "fault-host-error",
+      "description": "An async handle rejected without an explicit error faults the awaiting fiber with HostError."
+    },
+    {
+      "id": "fault-isolation",
+      "description": "A faulted fiber ends alone: the other fibers scheduled in the same think still run."
+    },
+    {
+      "id": "fault-script-error",
+      "description": "A dispatch-time exception raised by a host body faults the calling fiber with ScriptError."
+    },
+    {
+      "id": "fault-stack-overflow",
+      "description": "Crossing a per-fiber or global capacity cap faults the offending fiber with StackOverflow."
+    },
+    {
+      "id": "fault-throw-non-error",
+      "description": "THROW of a value that is not an error faults the fiber with ScriptError."
+    },
+    {
+      "id": "fiber-await-park",
+      "description": "AWAIT parks the fiber on a pending handle and runs nothing of that fiber until the handle settles."
+    },
+    {
+      "id": "fiber-budget-exhaustion",
+      "description": "A fiber that spends its instruction budget mid-slice re-enqueues and resumes in the next round."
+    },
+    {
+      "id": "fiber-cancellation-cascade",
+      "description": "Deactivating, restarting, or switching away from a page cancels its root-rule fibers and every live child beneath them."
+    },
+    {
+      "id": "fiber-fifo-round",
+      "description": "A tick snapshots the runnable queue and gives each fiber in it exactly one budget slice, in enqueue order."
+    },
+    {
+      "id": "fiber-yield",
+      "description": "YIELD suspends the fiber and re-enqueues it for the next round."
+    },
+    {
+      "id": "handle-backpressure-fault",
+      "description": "A dispatch re-executed without a free handle for the contracted number of starved rounds faults StackOverflow."
+    },
+    {
+      "id": "handle-resume-next-round",
+      "description": "A fiber made runnable by a settling handle runs in the next round, never the round the handle settled in."
+    },
+    {
+      "id": "host-async-action-dispatch",
+      "description": "An asynchronous host-bound action dispatch yields a pending handle and pushes no value."
+    },
+    {
+      "id": "host-sync-action-call",
+      "description": "A synchronous host-bound action receives its positional arg buffer, with an unsupplied slot filled by nil, and pushes its result."
+    },
+    {
+      "id": "host-sync-sensor-result",
+      "description": "The value a synchronous host sensor returns reaches the WHEN gate of the rule that read it."
+    },
+    {
+      "id": "implicit-conversion",
+      "description": "An implicit conversion fires at an assignment target, a struct field target, or a typed argument slot."
+    },
+    {
+      "id": "list-operations",
+      "description": "The list opcodes construct, read, write, and resize a list value."
+    },
+    {
+      "id": "map-operations",
+      "description": "The map opcodes construct, read, write, and delete entries of a map value."
+    },
+    {
+      "id": "number-precision-profile",
+      "description": "Brain-observable numbers compute and render at the profile's precision, f32 or f64."
+    },
+    {
+      "id": "page-lifecycle-hooks",
+      "description": "An action's initializer, activation, and deactivation hooks fire in their contracted order and lifetime."
+    },
+    {
+      "id": "page-switch",
+      "description": "A page change or restart request takes effect at the next think, after the current page deactivates."
+    },
+    {
+      "id": "root-rule-quiesce",
+      "description": "A root rule does not re-fire while any live fiber of its rule subtree is still in flight."
+    },
+    {
+      "id": "root-rule-respawn",
+      "description": "A completed or faulted root-rule fiber respawns on the next think; a fault kills the fiber, not the rule."
+    },
+    {
+      "id": "rule-firing-record",
+      "description": "A rule's WHEN evaluation records Evaluating, DidFire, or DidNotFire for the rules that read it."
+    },
+    {
+      "id": "rule-trigger-otherwise",
+      "description": "An `otherwise` rule fires on a think when no earlier rule at its own level fired."
+    },
+    {
+      "id": "rule-trigger-otherwise-chain-gate",
+      "description": "The chain gate variants of WHEN_END compute their own outcome and then write the chain value the `otherwise` subject lookup reads."
+    },
+    {
+      "id": "rule-trigger-then",
+      "description": "A `then` rule runs after its preceding sibling completes as a rule that fired."
+    },
+    {
+      "id": "rule-trigger-then-abandoned",
+      "description": "A `then` whose subject's cluster lost a fiber to a fault or a cancellation resolves as a skip."
+    },
+    {
+      "id": "rule-when-empty",
+      "description": "A rule with no WHEN section fires every think it is scheduled."
+    },
+    {
+      "id": "rule-when-gate-falsy",
+      "description": "A WHEN section evaluating falsy skips the rule's DO section by the gate's offset."
+    },
+    {
+      "id": "rule-when-gate-truthy",
+      "description": "A WHEN section evaluating truthy runs the rule's DO section in the same think."
+    },
+    {
+      "id": "rule-when-presence-gate",
+      "description": "The presence-gated WHEN boundary runs DO on any non-nil WHEN result and skips only on nil."
+    },
+    {
+      "id": "struct-field-access",
+      "description": "The struct opcodes construct a struct and read and write its fields by slot index."
+    },
+    {
+      "id": "try-catch-handler",
+      "description": "TRY installs a handler that catches a throw raised beneath it and resumes execution at the handler."
+    },
+    {
+      "id": "variable-slot-storage",
+      "description": "LOAD_VAR_SLOT and STORE_VAR_SLOT read and write brain-global variable slots, with a slot holding no value reading as nil."
+    },
+    {
+      "id": "when-result-capture",
+      "description": "A WHEN boundary captures the value its section evaluated to into the rule's reserved __whenResult variable."
+    }
+  ]
+}
