@@ -43,6 +43,37 @@
       "schedule": [16, 16]
     },
     {
+      "id": "async-operator-await",
+      "source": "packages/conformance/src/cases/async-operator-await.spec.ts",
+      "summary": "An asynchronous operator overload parking its rule mid-expression, beside a synchronous operator whose rule emits every think.",
+      "behaviors": [
+        "async-handle-resolve",
+        "fiber-await-park",
+        "host-async-function-call",
+        "operator-arithmetic-number",
+        "root-rule-respawn",
+        "rule-when-empty"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16]
+    },
+    {
+      "id": "async-sensor-when-gate",
+      "source": "packages/conformance/src/cases/async-sensor-when-gate.spec.ts",
+      "summary": "Two rules whose WHEN root is an asynchronous sensor, parking inside the WHEN section and resuming at the gate with a truthy and a falsy reading.",
+      "behaviors": [
+        "async-handle-resolve",
+        "async-sensor-when-evaluation",
+        "fiber-await-park",
+        "host-async-action-dispatch",
+        "root-rule-respawn",
+        "rule-when-gate-falsy",
+        "rule-when-gate-truthy"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16]
+    },
+    {
       "id": "boolean-logic",
       "source": "packages/conformance/src/cases/boolean-logic.spec.ts",
       "summary": "The core boolean operators over literal operands: `and` and `or` as branches over a duplicated operand, `not` and boolean equality as host calls.",
@@ -305,6 +336,24 @@
       ],
       "precisions": ["f32", "f64"],
       "schedule": [16, 16]
+    },
+    {
+      "id": "then-trigger-abandoned",
+      "source": "packages/conformance/src/cases/then-trigger-abandoned.spec.ts",
+      "summary": "A `then` rule armed on a subject whose cluster then loses a child fiber to a fault, so the settle walk resolves the parked arming handle false.",
+      "behaviors": [
+        "async-handle-resolve",
+        "child-rule-spawn",
+        "fault-script-error",
+        "fiber-await-park",
+        "host-async-action-dispatch",
+        "root-rule-respawn",
+        "rule-trigger-then-abandoned",
+        "rule-trigger-then-wait",
+        "rule-when-gate-truthy"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16, 16, 16]
     },
     {
       "id": "then-trigger-fires",

@@ -94,6 +94,10 @@
       "description": "An asynchronous host-bound action dispatch yields a pending handle and pushes no value."
     },
     {
+      "id": "host-async-function-call",
+      "description": "An asynchronous host function resolves its funcId in the host-function registry, receives an owned arg snapshot and a settle handle, and yields that pending handle in place of its arguments."
+    },
+    {
       "id": "host-sync-action-call",
       "description": "A synchronous host-bound action receives its positional arg buffer, with an unsupplied slot filled by nil, and pushes its result."
     },

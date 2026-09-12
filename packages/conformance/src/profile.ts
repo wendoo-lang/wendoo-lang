@@ -26,9 +26,11 @@ import {
   setCallSiteState,
   TARGET_ACTION_ID_BASE,
   TARGET_FUNC_ID_BASE,
+  TilePlacement,
   VOID_VALUE,
 } from "@wendoo/core/app";
-import { ErrorCode } from "@wendoo/core/runtime";
+import { BrainTileOperatorDef } from "@wendoo/core/brain/tiles";
+import { ErrorCode, safeNumBinary } from "@wendoo/core/runtime";
 
 /**
  * Numeric device-profile id written into the binary program envelope of every
@@ -75,6 +77,7 @@ export const ConformanceActionKeys = {
   Signal: "sensor.conformance.signal",
   Counter: "sensor.conformance.counter",
   DeferCancel: "actuator.conformance.defer-cancel",
+  DeferRead: "sensor.conformance.defer-read",
 } as const;
 
 /**
@@ -108,6 +111,22 @@ export const ConformanceHostActions = {
     actionId: TARGET_ACTION_ID_BASE + 7,
     fnId: TARGET_FUNC_ID_BASE + 7,
   },
+  DeferRead: {
+    key: ConformanceActionKeys.DeferRead,
+    actionId: TARGET_ACTION_ID_BASE + 8,
+    fnId: TARGET_FUNC_ID_BASE + 8,
+  },
+} as const;
+
+/**
+ * Operators the conformance host profile registers, each with the operator id
+ * its tile is built from and the stable funcId of its one overload. The funcIds
+ * continue the target partition offsets {@link ConformanceHostActions} uses, and
+ * serialized programs record them verbatim: append new records at the next free
+ * offset and never renumber or reuse one.
+ */
+export const ConformanceOperators = {
+  DeferAdd: { opId: "conformance.defer-add", fnId: TARGET_FUNC_ID_BASE + 9 },
 } as const;
 
 const AnonValue = param(CoreParameterId.AnonymousNumber, { name: "value", anonymous: true });
@@ -122,6 +141,7 @@ const faultCallDef = mkCallDef(bag());
 const signalCallDef = mkCallDef(bag(Period));
 const counterCallDef = mkCallDef(bag());
 const deferCancelCallDef = mkCallDef(bag(Ticks));
+const deferReadCallDef = mkCallDef(bag(AnonValue, Ticks));
 
 const kEchoValueSlotId = getSlotId(echoCallDef, AnonValue);
 const kDeferEchoValueSlotId = getSlotId(deferEchoCallDef, AnonValue);
@@ -129,6 +149,8 @@ const kDeferEchoTicksSlotId = getSlotId(deferEchoCallDef, Ticks);
 const kDeferFailTicksSlotId = getSlotId(deferFailCallDef, Ticks);
 const kSignalPeriodSlotId = getSlotId(signalCallDef, Period);
 const kDeferCancelTicksSlotId = getSlotId(deferCancelCallDef, Ticks);
+const kDeferReadValueSlotId = getSlotId(deferReadCallDef, AnonValue);
+const kDeferReadTicksSlotId = getSlotId(deferReadCallDef, Ticks);
 
 /** Whole-tick count a deferred call waits, or a signal's period, when the argument carries none. */
 const DEFAULT_WHOLE_TICKS = 1;
@@ -141,6 +163,9 @@ const DEFER_FAIL_CODE = ErrorCode.HostError;
 
 /** Count `counter` holds at a call site the activation hook has just reset; its first read returns one more. */
 const COUNTER_START = 0;
+
+/** Binding strength `defer plus` parses at. */
+const DEFER_ADD_PRECEDENCE = 120;
 
 /** One deferred settlement the world owes, held until its due tick. */
 interface PendingSettlement {
@@ -266,6 +291,31 @@ function execDeferCancel(ctx: ExecutionContext, args: ReadonlyList<Value>, handl
   });
 }
 
+function execDeferRead(ctx: ExecutionContext, args: ReadonlyList<Value>, handle: AsyncHandle): void {
+  const value = args.get(kDeferReadValueSlotId);
+  const world = worldOf(ctx);
+  if (!world) {
+    handle.resolve(value);
+    return;
+  }
+  world.defer(ctx.currentTick, wholeTicksArg(args, kDeferReadTicksSlotId), () => {
+    handle.resolve(value);
+  });
+}
+
+function execDeferAdd(ctx: ExecutionContext, args: ReadonlyList<Value>, handle: AsyncHandle): void {
+  const numerics = ctx.services.app.numerics;
+  const sum = safeNumBinary(args, (a, b) => numerics.round(a + b));
+  const world = worldOf(ctx);
+  if (!world) {
+    handle.resolve(sum);
+    return;
+  }
+  world.defer(ctx.currentTick, DEFAULT_WHOLE_TICKS, () => {
+    handle.resolve(sum);
+  });
+}
+
 const echoSensor = {
   key: ConformanceHostActions.Echo.key,
   actionId: ConformanceHostActions.Echo.actionId,
@@ -350,6 +400,17 @@ const deferCancelActuator = {
   metadata: { label: "defer cancel" },
 } satisfies CreateHostActuatorOptions;
 
+const deferReadSensor = {
+  key: ConformanceHostActions.DeferRead.key,
+  actionId: ConformanceHostActions.DeferRead.actionId,
+  fnId: ConformanceHostActions.DeferRead.fnId,
+  callDef: deferReadCallDef,
+  fn: { exec: execDeferRead },
+  isAsync: true,
+  outputType: CoreTypeIds.Number,
+  metadata: { label: "defer read" },
+} satisfies CreateHostSensorOptions;
+
 /**
  * The conformance host profile: the host surface every VM implements in its
  * test harness to replay the corpus.
@@ -373,6 +434,13 @@ const deferCancelActuator = {
  *   runs no activation hook, leaves the count standing.
  * - `defer cancel(ticks)` -- asynchronous actuator whose handle is cancelled
  *   exactly `ticks` ticks after its dispatch.
+ * - `defer read(value, ticks)` -- asynchronous sensor whose handle resolves to
+ *   `value` exactly `ticks` ticks after its dispatch, so a section reading it
+ *   suspends until then.
+ * - `lhs defer plus rhs` -- asynchronous infix operator whose handle resolves
+ *   to the sum one tick after its dispatch, so the expression containing it
+ *   suspends until then. An operand carrying no number, and a sum that is not
+ *   a number, both resolve nil.
  *
  * Nothing here reads a clock, a random stream, or any state outside the
  * {@link ConformanceWorld} attached to the runtime, the think ordinal on the
@@ -394,6 +462,29 @@ export function conformanceModule(): WendooModule {
       api.registerHostSensor(createHostSensor(signalSensor));
       api.registerHostSensor(createHostSensor(counterSensor));
       api.registerHostActuator(createHostActuator(deferCancelActuator));
+      api.registerHostSensor(createHostSensor(deferReadSensor));
+      api.registerOperator({
+        spec: {
+          id: ConformanceOperators.DeferAdd.opId,
+          parse: { fixity: "infix", precedence: DEFER_ADD_PRECEDENCE, assoc: "left" },
+        },
+        overloads: [
+          {
+            argTypes: [CoreTypeIds.Number, CoreTypeIds.Number],
+            resultType: CoreTypeIds.Number,
+            fnId: ConformanceOperators.DeferAdd.fnId,
+            fn: { exec: execDeferAdd },
+            isAsync: true,
+          },
+        ],
+      });
+      api.registerTile(
+        new BrainTileOperatorDef(
+          ConformanceOperators.DeferAdd.opId,
+          { placement: TilePlacement.EitherSide, metadata: { label: "defer plus" } },
+          api.brainServices
+        )
+      );
     },
   };
 }

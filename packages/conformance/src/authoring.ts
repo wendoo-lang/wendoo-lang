@@ -7,13 +7,14 @@ import {
   mkActuatorTileId,
   mkControlFlowTileId,
   mkLiteralTileId,
+  mkOperatorTileId,
   mkParameterTileId,
   mkSensorTileId,
 } from "@wendoo/core/app";
 import { BrainDef, type BrainPageDef, type BrainRuleDef } from "@wendoo/core/brain/model";
 import { BrainTileOperatorDef, BrainTileVariableDef } from "@wendoo/core/brain/tiles";
 import type { TypeCodec, TypeId } from "@wendoo/core/runtime";
-import { ConformanceHostActions, ConformanceParameterId } from "./profile";
+import { ConformanceHostActions, ConformanceOperators, ConformanceParameterId } from "./profile";
 
 /** The tiles a conformance case authors its rules from. */
 export interface ConformanceTiles {
@@ -33,6 +34,10 @@ export interface ConformanceTiles {
   readonly counter: IBrainTileDef;
   /** DO-side actuator tile of `defer cancel(ticks)`. */
   readonly deferCancel: IBrainTileDef;
+  /** WHEN-side asynchronous sensor tile of `defer read(value, ticks)`. */
+  readonly deferRead: IBrainTileDef;
+  /** Operator tile of the asynchronous infix `lhs defer plus rhs`. */
+  readonly deferAdd: IBrainTileDef;
   /** Parameter tile naming the `ticks` argument of a deferred call. */
   readonly ticks: IBrainTileDef;
   /** Parameter tile naming the `period` argument of `signal`. */
@@ -76,6 +81,8 @@ export function conformanceTiles(environment: WendooEnvironment): ConformanceTil
     signal: requireTile(environment, mkSensorTileId(ConformanceHostActions.Signal.key)),
     counter: requireTile(environment, mkSensorTileId(ConformanceHostActions.Counter.key)),
     deferCancel: requireTile(environment, mkActuatorTileId(ConformanceHostActions.DeferCancel.key)),
+    deferRead: requireTile(environment, mkSensorTileId(ConformanceHostActions.DeferRead.key)),
+    deferAdd: requireTile(environment, mkOperatorTileId(ConformanceOperators.DeferAdd.opId)),
     ticks: requireTile(environment, mkParameterTileId(ConformanceParameterId.Ticks)),
     period: requireTile(environment, mkParameterTileId(ConformanceParameterId.Period)),
   };
