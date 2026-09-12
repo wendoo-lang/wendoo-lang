@@ -1,0 +1,45 @@
+mctrace 1
+profile 3e8
+precision f64
+tick 1 time 4030000000000000 dt 0000000000000000
+action 406 site 0 args 0 result number 3ff0000000000000
+action 401 site 1 args 1 number 3ff0000000000000 result void
+action 405 site 2 args 1 number 4000000000000000 result nil
+action 405 site 6 args 1 number 4008000000000000 result nil
+tick 2 time 4040000000000000 dt 4030000000000000
+action 406 site 0 args 0 result number 4000000000000000
+action 401 site 1 args 1 number 3ff0000000000000 result void
+action 405 site 2 args 1 number 4000000000000000 result number 0000000000000000
+action 401 site 3 args 1 number 4000000000000000 result void
+action 406 site 4 args 0 result number 3ff0000000000000
+action 401 site 5 args 1 number 4008000000000000 result void
+action 405 site 6 args 1 number 4008000000000000 result nil
+tick 3 time 4048000000000000 dt 4030000000000000
+action 406 site 0 args 0 result number 4008000000000000
+action 401 site 1 args 1 number 3ff0000000000000 result void
+action 405 site 2 args 1 number 4000000000000000 result nil
+action 405 site 6 args 1 number 4008000000000000 result number 0000000000000000
+action 0 site 7 args 2 number 4000000000000000 nil result void
+tick 4 time 4050000000000000 dt 4030000000000000
+action 406 site 8 args 0 result number 3ff0000000000000
+action 401 site 9 args 1 number 4010000000000000 result void
+action 405 site a args 1 number 4000000000000000 result number 0000000000000000
+action 0 site b args 2 number 3ff0000000000000 nil result void
+tick 5 time 4054000000000000 dt 4030000000000000
+action 406 site 0 args 0 result number 3ff0000000000000
+action 401 site 1 args 1 number 3ff0000000000000 result void
+action 405 site 2 args 1 number 4000000000000000 result nil
+action 405 site 6 args 1 number 4008000000000000 result nil
+tick 6 time 4058000000000000 dt 4030000000000000
+action 406 site 0 args 0 result number 4000000000000000
+action 401 site 1 args 1 number 3ff0000000000000 result void
+action 405 site 2 args 1 number 4000000000000000 result number 0000000000000000
+action 401 site 3 args 1 number 4000000000000000 result void
+action 406 site 4 args 0 result number 3ff0000000000000
+action 401 site 5 args 1 number 4008000000000000 result void
+action 405 site 6 args 1 number 4008000000000000 result number 0000000000000000
+action 0 site 7 args 2 number 4000000000000000 nil result void
+tick 7 time 405c000000000000 dt 4030000000000000
+action 406 site 8 args 0 result number 3ff0000000000000
+action 401 site 9 args 1 number 4010000000000000 result void
+action 405 site a args 1 number 4000000000000000 result nil

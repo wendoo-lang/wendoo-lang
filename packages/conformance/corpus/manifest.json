@@ -4,6 +4,20 @@
   "profileId": 1000,
   "cases": [
     {
+      "id": "action-callsite-state",
+      "source": "packages/conformance/src/cases/action-callsite-state.spec.ts",
+      "summary": "Three call sites of one host sensor counting independently across thinks, each returned to its starting count by its page's activation hook.",
+      "behaviors": [
+        "action-callsite-state",
+        "child-rule-spawn",
+        "page-activation-hook",
+        "page-switch",
+        "rule-when-presence-gate"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16, 16, 16, 16]
+    },
+    {
       "id": "arithmetic-and-gate",
       "source": "packages/conformance/src/cases/arithmetic-and-gate.spec.ts",
       "summary": "Number arithmetic through the core operator host calls, behind a truthy and a falsy WHEN gate.",
@@ -42,6 +56,20 @@
       "schedule": [16, 16]
     },
     {
+      "id": "budget-exhaustion",
+      "source": "packages/conformance/src/cases/budget-exhaustion.spec.ts",
+      "summary": "A chain of `and` gates longer than one slice of the profile's instruction budget, re-enqueued mid-evaluation and finished in the next round.",
+      "behaviors": [
+        "fiber-budget-exhaustion",
+        "fiber-fifo-round",
+        "operator-logical-short-circuit",
+        "root-rule-respawn",
+        "rule-when-gate-truthy"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16]
+    },
+    {
       "id": "child-rule-cascade",
       "source": "packages/conformance/src/cases/child-rule-cascade.spec.ts",
       "summary": "A parent rule with two synchronous child rules beside a second root rule, pinning spawn order and cascade timing.",
@@ -54,6 +82,28 @@
       ],
       "precisions": ["f32", "f64"],
       "schedule": [16, 16]
+    },
+    {
+      "id": "deep-expression-overflow",
+      "source": "packages/conformance/src/cases/deep-expression-overflow.spec.ts",
+      "summary": "An addition nested past the profile's value-stack cap, faulting the evaluating fiber with StackOverflow before any operator runs.",
+      "behaviors": ["fault-isolation", "fault-stack-overflow", "root-rule-respawn", "rule-when-empty"],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16]
+    },
+    {
+      "id": "defer-cancel-handle",
+      "source": "packages/conformance/src/cases/defer-cancel-handle.spec.ts",
+      "summary": "An asynchronous action whose handle is cancelled two ticks later, throwing Cancelled at the parked rule's await point.",
+      "behaviors": [
+        "async-handle-cancel",
+        "fault-isolation",
+        "fiber-await-park",
+        "host-async-action-dispatch",
+        "root-rule-respawn"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16]
     },
     {
       "id": "defer-echo-resolve",
@@ -141,6 +191,58 @@
       ],
       "precisions": ["f32", "f64"],
       "schedule": [16, 16]
+    },
+    {
+      "id": "page-identity-read",
+      "source": "packages/conformance/src/cases/page-identity-read.spec.ts",
+      "summary": "Two pages switching to each other every think, each comparing the current-page and previous-page identity sensors.",
+      "behaviors": [
+        "operator-string-compare",
+        "page-identity-read",
+        "page-switch",
+        "rule-when-gate-falsy",
+        "rule-when-gate-truthy"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16]
+    },
+    {
+      "id": "page-restart",
+      "source": "packages/conformance/src/cases/page-restart.spec.ts",
+      "summary": "A page restarting itself every think, pinning that the restart respawns the root rules without running the page's activation hooks again.",
+      "behaviors": [
+        "action-callsite-state",
+        "page-activation-hook",
+        "page-restart",
+        "root-rule-respawn",
+        "rule-when-gate-falsy",
+        "rule-when-gate-truthy"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16]
+    },
+    {
+      "id": "page-switch-cancellation",
+      "source": "packages/conformance/src/cases/page-switch-cancellation.spec.ts",
+      "summary": "A page switched away from while a grandchild rule fiber is parked on an unsettled handle, so only the cancellation cascade reaches it.",
+      "behaviors": [
+        "child-rule-spawn",
+        "fiber-await-park",
+        "fiber-cancellation-cascade",
+        "host-async-action-dispatch",
+        "page-switch",
+        "root-rule-quiesce"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16, 16]
+    },
+    {
+      "id": "page-switch-cycle",
+      "source": "packages/conformance/src/cases/page-switch-cycle.spec.ts",
+      "summary": "A three-page brain walking to its last page, one switch per page, pinning that a switch is served at the start of the next think.",
+      "behaviors": ["page-switch", "root-rule-respawn", "rule-when-empty"],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16, 16]
     },
     {
       "id": "presence-gate",

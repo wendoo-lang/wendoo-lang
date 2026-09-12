@@ -2,6 +2,7 @@ import type { IBrainTileDef, WendooEnvironment } from "@wendoo/core/app";
 import {
   BrainTileLiteralDef,
   CoreControlFlowId,
+  CoreHostActions,
   CoreTypeIds,
   mkActuatorTileId,
   mkControlFlowTileId,
@@ -28,10 +29,28 @@ export interface ConformanceTiles {
   readonly fault: IBrainTileDef;
   /** WHEN-side presence-gated sensor tile of `signal(period)`. */
   readonly signal: IBrainTileDef;
+  /** WHEN-side sensor tile of `counter()`. */
+  readonly counter: IBrainTileDef;
+  /** DO-side actuator tile of `defer cancel(ticks)`. */
+  readonly deferCancel: IBrainTileDef;
   /** Parameter tile naming the `ticks` argument of a deferred call. */
   readonly ticks: IBrainTileDef;
   /** Parameter tile naming the `period` argument of `signal`. */
   readonly period: IBrainTileDef;
+}
+
+/** The core page tiles a conformance case authors its page lifecycle from. */
+export interface CorePageTiles {
+  /** DO-side actuator tile of `switch page <number>`, taking the 1-based page ordinal. */
+  readonly switchPage: IBrainTileDef;
+  /** DO-side actuator tile of `restart page`. */
+  readonly restartPage: IBrainTileDef;
+  /** WHEN-side sensor tile of `current page`, reading the active page's stable id. */
+  readonly currentPage: IBrainTileDef;
+  /** WHEN-side sensor tile of `previous page`, reading the most recently deactivated page's stable id. */
+  readonly previousPage: IBrainTileDef;
+  /** WHEN-side sensor tile of `on page entered`, true on the first read after each activation. */
+  readonly onPageEntered: IBrainTileDef;
 }
 
 function requireTile(environment: WendooEnvironment, tileId: string): IBrainTileDef {
@@ -55,8 +74,25 @@ export function conformanceTiles(environment: WendooEnvironment): ConformanceTil
     deferFail: requireTile(environment, mkActuatorTileId(ConformanceHostActions.DeferFail.key)),
     fault: requireTile(environment, mkActuatorTileId(ConformanceHostActions.Fault.key)),
     signal: requireTile(environment, mkSensorTileId(ConformanceHostActions.Signal.key)),
+    counter: requireTile(environment, mkSensorTileId(ConformanceHostActions.Counter.key)),
+    deferCancel: requireTile(environment, mkActuatorTileId(ConformanceHostActions.DeferCancel.key)),
     ticks: requireTile(environment, mkParameterTileId(ConformanceParameterId.Ticks)),
     period: requireTile(environment, mkParameterTileId(ConformanceParameterId.Period)),
+  };
+}
+
+/**
+ * Looks up the core module's page-lifecycle tiles in `environment`.
+ *
+ * @param environment - Environment the core module is installed in.
+ */
+export function corePageTiles(environment: WendooEnvironment): CorePageTiles {
+  return {
+    switchPage: requireTile(environment, mkActuatorTileId(CoreHostActions.SwitchPage.key)),
+    restartPage: requireTile(environment, mkActuatorTileId(CoreHostActions.RestartPage.key)),
+    currentPage: requireTile(environment, mkSensorTileId(CoreHostActions.CurrentPage.key)),
+    previousPage: requireTile(environment, mkSensorTileId(CoreHostActions.PreviousPage.key)),
+    onPageEntered: requireTile(environment, mkSensorTileId(CoreHostActions.OnPageEntered.key)),
   };
 }
 
@@ -80,6 +116,30 @@ export function newBrain(environment: WendooEnvironment, name: string): Authored
   const brainDef = BrainDef.emptyBrainDef(environment.brainServices, name);
   const page = brainDef.pages().get(0)! as BrainPageDef;
   return { brainDef, page, firstRule: page.children().get(0)! as BrainRuleDef };
+}
+
+/** A page appended to an existing brain and the empty rule created with it. */
+export interface AuthoredPage {
+  /** The appended page. */
+  readonly page: BrainPageDef;
+  /** The page's first rule, created with the page. */
+  readonly firstRule: BrainRuleDef;
+}
+
+/**
+ * Appends a page to `brainDef`. The `switch page` ordinal of the new page is
+ * one more than the number of pages the brain held before the call.
+ *
+ * @param brainDef - Brain to append the page to.
+ * @throws When the brain is already at its page limit.
+ */
+export function appendPage(brainDef: BrainDef): AuthoredPage {
+  const appended = brainDef.appendNewPage();
+  if (!appended.success) {
+    throw new Error(`brain '${brainDef.name()}' refused another page: ${appended.error.message}`);
+  }
+  const page = appended.value.page;
+  return { page, firstRule: page.children().get(0)! as BrainRuleDef };
 }
 
 /**

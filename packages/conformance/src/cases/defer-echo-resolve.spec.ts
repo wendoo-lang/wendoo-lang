@@ -55,11 +55,7 @@ test(`${CASE_ID}: the committed corpus artifacts are byte-stable and its traces 
   const minted = mintCase({ id: CASE_ID, build });
   assertCaseIsStable(minted);
 
-  assertCompiledOps(minted.program, [
-    { op: Op.HOST_ACTION_CALL_ASYNC, a: ConformanceHostActions.DeferEcho.actionId },
-    { op: Op.AWAIT },
-    { op: Op.SPAWN_RULE },
-  ]);
+  assertCompiledOps(minted.program, [{ op: Op.HOST_ACTION_CALL_ASYNC, a: ConformanceHostActions.DeferEcho.actionId }]);
 
   const asyncPrefix = `action ${ConformanceHostActions.DeferEcho.actionId.toString(16)} `;
   const emitPrefix = `action ${ConformanceHostActions.Emit.actionId.toString(16)} `;

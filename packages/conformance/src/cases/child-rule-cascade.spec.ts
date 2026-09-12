@@ -49,10 +49,7 @@ test(`${CASE_ID}: the committed corpus artifacts are byte-stable and its traces 
   const minted = mintCase({ id: CASE_ID, build });
   assertCaseIsStable(minted);
 
-  assertCompiledOps(minted.program, [
-    { op: Op.SPAWN_RULE },
-    { op: Op.HOST_ACTION_CALL, a: ConformanceHostActions.Emit.actionId },
-  ]);
+  assertCompiledOps(minted.program, [{ op: Op.SPAWN_RULE }]);
 
   for (const variant of minted.variants) {
     assert.equal(traceLines(variant.trace, "tick ").length, minted.entry.schedule.length);

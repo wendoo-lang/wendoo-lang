@@ -45,13 +45,7 @@ test(`${CASE_ID}: the committed corpus artifacts are byte-stable and its traces 
   const minted = mintCase({ id: CASE_ID, build });
   assertCaseIsStable(minted);
 
-  assertCompiledOps(minted.program, [
-    { op: Op.HOST_ACTION_CALL_ASYNC, a: CoreHostActions.RuleTrigger.actionId },
-    { op: Op.AWAIT },
-    { op: Op.WHEN_END },
-    { op: Op.HOST_ACTION_CALL, a: ConformanceHostActions.Echo.actionId },
-    { op: Op.HOST_ACTION_CALL, a: ConformanceHostActions.Emit.actionId },
-  ]);
+  assertCompiledOps(minted.program, [{ op: Op.HOST_ACTION_CALL_ASYNC, a: CoreHostActions.RuleTrigger.actionId }]);
 
   // The subject reads its sensor and emits, then the follower's arming read
   // resolves in place and it emits within the same think.

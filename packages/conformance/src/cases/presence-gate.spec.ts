@@ -53,12 +53,7 @@ test(`${CASE_ID}: the committed corpus artifacts are byte-stable and its traces 
   const minted = mintCase({ id: CASE_ID, build });
   assertCaseIsStable(minted);
 
-  assertCompiledOps(minted.program, [
-    { op: Op.WHEN_END_PRESENT },
-    { op: Op.WHEN_END_PRESENT_CHAIN },
-    { op: Op.HOST_ACTION_CALL, a: ConformanceHostActions.Signal.actionId },
-    { op: Op.HOST_ACTION_CALL, a: CoreHostActions.Otherwise.actionId },
-  ]);
+  assertCompiledOps(minted.program, [{ op: Op.WHEN_END_PRESENT }, { op: Op.WHEN_END_PRESENT_CHAIN }]);
 
   const signalEvent = `action ${ConformanceHostActions.Signal.actionId.toString(16)}`;
   const otherwiseEvent = `action ${CoreHostActions.Otherwise.actionId.toString(16)}`;

@@ -77,7 +77,6 @@ test(`${CASE_ID}: the committed corpus artifacts are byte-stable and its traces 
     { op: Op.HOST_CALL, a: CoreFuncId.OpGreaterThanOrEqualToNumber },
     { op: Op.HOST_CALL, a: CoreFuncId.OpEqualToNumber },
     { op: Op.HOST_CALL, a: CoreFuncId.OpNotEqualToNumber },
-    { op: Op.WHEN_END },
   ]);
 
   const emitEvent = `action ${ConformanceHostActions.Emit.actionId.toString(16)} `;

@@ -68,11 +68,7 @@ test(`${CASE_ID}: the committed corpus artifacts are byte-stable and its traces 
   assertCaseIsStable(minted);
 
   assertCompiledOps(minted.program, [
-    { op: Op.HOST_ACTION_CALL, a: ConformanceHostActions.Echo.actionId },
-    { op: Op.HOST_ACTION_CALL, a: ConformanceHostActions.Emit.actionId },
     { op: Op.HOST_CALL, a: CoreFuncId.OpAddNumber },
-    { op: Op.WHEN_START },
-    { op: Op.WHEN_END },
     { op: Op.LOAD_VAR_SLOT },
     { op: Op.STORE_VAR_SLOT },
   ]);

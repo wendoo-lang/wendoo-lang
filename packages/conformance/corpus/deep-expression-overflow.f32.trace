@@ -1,0 +1,12 @@
+mctrace 1
+profile 3e8
+precision f32
+tick 1 time 41800000 dt 00000000
+fault 1 5
+action 401 site 101 args 1 number 40000000 result void
+tick 2 time 42000000 dt 41800000
+fault 3 5
+action 401 site 101 args 1 number 40000000 result void
+tick 3 time 42400000 dt 41800000
+fault 5 5
+action 401 site 101 args 1 number 40000000 result void

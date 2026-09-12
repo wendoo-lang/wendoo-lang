@@ -142,12 +142,24 @@
       "description": "String concatenation and string equality operate on string operands."
     },
     {
+      "id": "page-activation-hook",
+      "description": "An action's page-activation hook runs once per activation of the page its call site belongs to, before that page's root rules spawn, and does not run on a page restart."
+    },
+    {
+      "id": "page-identity-read",
+      "description": "The current-page sensor reads the active page's stable id and the previous-page sensor the most recently deactivated page's, falling back to the current page's id while none has been deactivated."
+    },
+    {
       "id": "page-lifecycle-hooks",
       "description": "An action's initializer, activation, and deactivation hooks fire in their contracted order and lifetime."
     },
     {
+      "id": "page-restart",
+      "description": "A restart request cancels the page's fibers and respawns its root rules at the next think, leaving the page active throughout so no deactivation or activation hook runs."
+    },
+    {
       "id": "page-switch",
-      "description": "A page change or restart request takes effect at the next think, after the current page deactivates."
+      "description": "A page change request takes effect at the next think: the current page deactivates and the requested one activates before that think's rules run."
     },
     {
       "id": "root-rule-quiesce",

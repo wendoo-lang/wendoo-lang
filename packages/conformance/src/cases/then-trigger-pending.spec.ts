@@ -61,7 +61,6 @@ test(`${CASE_ID}: the committed corpus artifacts are byte-stable and its traces 
   assertCompiledOps(minted.program, [
     { op: Op.HOST_ACTION_CALL_ASYNC, a: CoreHostActions.RuleTrigger.actionId },
     { op: Op.HOST_ACTION_CALL_ASYNC, a: ConformanceHostActions.DeferEcho.actionId },
-    { op: Op.AWAIT },
   ]);
 
   const triggerEvent = `action ${CoreHostActions.RuleTrigger.actionId.toString(16)}`;

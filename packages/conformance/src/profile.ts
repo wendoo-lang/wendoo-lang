@@ -16,12 +16,14 @@ import {
   CoreTypeIds,
   createHostActuator,
   createHostSensor,
+  getCallSiteState,
   getSlotId,
   isNumberValue,
   mkCallDef,
   mkNumberValue,
   NIL_VALUE,
   param,
+  setCallSiteState,
   TARGET_ACTION_ID_BASE,
   TARGET_FUNC_ID_BASE,
   VOID_VALUE,
@@ -71,6 +73,8 @@ export const ConformanceActionKeys = {
   DeferFail: "actuator.conformance.defer-fail",
   Fault: "actuator.conformance.fault",
   Signal: "sensor.conformance.signal",
+  Counter: "sensor.conformance.counter",
+  DeferCancel: "actuator.conformance.defer-cancel",
 } as const;
 
 /**
@@ -94,6 +98,16 @@ export const ConformanceHostActions = {
   },
   Fault: { key: ConformanceActionKeys.Fault, actionId: TARGET_ACTION_ID_BASE + 4, fnId: TARGET_FUNC_ID_BASE + 4 },
   Signal: { key: ConformanceActionKeys.Signal, actionId: TARGET_ACTION_ID_BASE + 5, fnId: TARGET_FUNC_ID_BASE + 5 },
+  Counter: {
+    key: ConformanceActionKeys.Counter,
+    actionId: TARGET_ACTION_ID_BASE + 6,
+    fnId: TARGET_FUNC_ID_BASE + 6,
+  },
+  DeferCancel: {
+    key: ConformanceActionKeys.DeferCancel,
+    actionId: TARGET_ACTION_ID_BASE + 7,
+    fnId: TARGET_FUNC_ID_BASE + 7,
+  },
 } as const;
 
 const AnonValue = param(CoreParameterId.AnonymousNumber, { name: "value", anonymous: true });
@@ -106,12 +120,15 @@ const deferEchoCallDef = mkCallDef(bag(AnonValue, Ticks));
 const deferFailCallDef = mkCallDef(bag(Ticks));
 const faultCallDef = mkCallDef(bag());
 const signalCallDef = mkCallDef(bag(Period));
+const counterCallDef = mkCallDef(bag());
+const deferCancelCallDef = mkCallDef(bag(Ticks));
 
 const kEchoValueSlotId = getSlotId(echoCallDef, AnonValue);
 const kDeferEchoValueSlotId = getSlotId(deferEchoCallDef, AnonValue);
 const kDeferEchoTicksSlotId = getSlotId(deferEchoCallDef, Ticks);
 const kDeferFailTicksSlotId = getSlotId(deferFailCallDef, Ticks);
 const kSignalPeriodSlotId = getSlotId(signalCallDef, Period);
+const kDeferCancelTicksSlotId = getSlotId(deferCancelCallDef, Ticks);
 
 /** Whole-tick count a deferred call waits, or a signal's period, when the argument carries none. */
 const DEFAULT_WHOLE_TICKS = 1;
@@ -121,6 +138,9 @@ const SIGNAL_VALUE = mkNumberValue(0);
 
 /** Error code `deferFail` rejects its handle with. */
 const DEFER_FAIL_CODE = ErrorCode.HostError;
+
+/** Count `counter` holds at a call site the activation hook has just reset; its first read returns one more. */
+const COUNTER_START = 0;
 
 /** One deferred settlement the world owes, held until its due tick. */
 interface PendingSettlement {
@@ -224,6 +244,28 @@ function execSignal(ctx: ExecutionContext, args: ReadonlyList<Value>): Value {
   return ctx.currentTick % period === 0 ? SIGNAL_VALUE : NIL_VALUE;
 }
 
+function counterPageEntered(ctx: ExecutionContext): void {
+  setCallSiteState(ctx, COUNTER_START);
+}
+
+function execCounter(ctx: ExecutionContext): Value {
+  const stored = getCallSiteState<number>(ctx);
+  const next = (stored === undefined ? COUNTER_START : stored) + 1;
+  setCallSiteState(ctx, next);
+  return mkNumberValue(next);
+}
+
+function execDeferCancel(ctx: ExecutionContext, args: ReadonlyList<Value>, handle: AsyncHandle): void {
+  const world = worldOf(ctx);
+  if (!world) {
+    handle.cancel();
+    return;
+  }
+  world.defer(ctx.currentTick, wholeTicksArg(args, kDeferCancelTicksSlotId), () => {
+    handle.cancel();
+  });
+}
+
 const echoSensor = {
   key: ConformanceHostActions.Echo.key,
   actionId: ConformanceHostActions.Echo.actionId,
@@ -287,6 +329,27 @@ const signalSensor = {
   metadata: { label: "signal" },
 } satisfies CreateHostSensorOptions;
 
+const counterSensor = {
+  key: ConformanceHostActions.Counter.key,
+  actionId: ConformanceHostActions.Counter.actionId,
+  fnId: ConformanceHostActions.Counter.fnId,
+  callDef: counterCallDef,
+  fn: { onPageEntered: counterPageEntered, exec: execCounter },
+  isAsync: false,
+  outputType: CoreTypeIds.Number,
+  metadata: { label: "counter" },
+} satisfies CreateHostSensorOptions;
+
+const deferCancelActuator = {
+  key: ConformanceHostActions.DeferCancel.key,
+  actionId: ConformanceHostActions.DeferCancel.actionId,
+  fnId: ConformanceHostActions.DeferCancel.fnId,
+  callDef: deferCancelCallDef,
+  fn: { exec: execDeferCancel },
+  isAsync: true,
+  metadata: { label: "defer cancel" },
+} satisfies CreateHostActuatorOptions;
+
 /**
  * The conformance host profile: the host surface every VM implements in its
  * test harness to replay the corpus.
@@ -303,10 +366,17 @@ const signalSensor = {
  * - `signal(period)` -- synchronous presence-gated sensor delivering the
  *   number `0` on every think whose ordinal is a multiple of `period`, and
  *   nil on every other think.
+ * - `counter()` -- synchronous sensor returning how many times it has been
+ *   read at its own call site since that call site's page was last activated.
+ *   The count lives in per-callsite host state and its page-activation hook
+ *   resets it, so two call sites count independently and a page restart, which
+ *   runs no activation hook, leaves the count standing.
+ * - `defer cancel(ticks)` -- asynchronous actuator whose handle is cancelled
+ *   exactly `ticks` ticks after its dispatch.
  *
  * Nothing here reads a clock, a random stream, or any state outside the
- * {@link ConformanceWorld} attached to the runtime and the think ordinal on
- * the execution context.
+ * {@link ConformanceWorld} attached to the runtime, the think ordinal on the
+ * execution context, and the per-callsite host state of `counter`.
  */
 export function conformanceModule(): WendooModule {
   return {
@@ -322,6 +392,8 @@ export function conformanceModule(): WendooModule {
       api.registerHostActuator(createHostActuator(deferFailActuator));
       api.registerHostActuator(createHostActuator(faultActuator));
       api.registerHostSensor(createHostSensor(signalSensor));
+      api.registerHostSensor(createHostSensor(counterSensor));
+      api.registerHostActuator(createHostActuator(deferCancelActuator));
     },
   };
 }
