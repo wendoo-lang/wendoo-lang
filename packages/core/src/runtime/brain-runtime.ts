@@ -624,11 +624,11 @@ export class BrainRuntime implements IBrainRuntime {
 
   /**
    * Request a page change by zero-based page index. If `pageIndex` equals the
-   * current page, triggers a restart instead.
+   * current page, triggers a restart instead. An index outside the brain's
+   * pages is a no-op: the current page stays active and no request is pending.
    */
   requestPageChange(pageIndex: number): void {
     if (pageIndex < 0 || pageIndex >= this.pageMetadata.size()) {
-      this.desiredPageIndex = -1;
       return;
     }
     if (pageIndex === this.currentPageIndex) {
@@ -639,7 +639,10 @@ export class BrainRuntime implements IBrainRuntime {
     this.cancelActiveFibers();
   }
 
-  /** Request a page change by stable page identifier (UUID). */
+  /**
+   * Request a page change by stable page identifier (UUID), falling back to a
+   * page-name lookup. A no-op when no page carries the identifier or the name.
+   */
   requestPageChangeByPageId(pageId: string): void {
     const idx = this.pageIdToIndex.get(pageId);
     if (idx !== undefined) {
@@ -649,14 +652,12 @@ export class BrainRuntime implements IBrainRuntime {
     this.requestPageChangeByName(pageId);
   }
 
-  /** Request a page change by page name. */
+  /** Request a page change by page name. A no-op when no page carries the name. */
   requestPageChangeByName(name: string): void {
     const idx = this.pageNameToIndex.get(name);
     if (idx !== undefined) {
       this.requestPageChange(idx);
-      return;
     }
-    this.requestPageChange(-1);
   }
 
   /** Request that the current page restart at the next tick. */

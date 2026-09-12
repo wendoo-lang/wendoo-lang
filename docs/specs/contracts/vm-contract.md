@@ -267,7 +267,13 @@ These id-keyed members live under `services.brain`:
   firing. All three are runtime-internal: never serialized, never traced.
 - `pages` -- `getCurrentPageId()`, `getPreviousPageId()`,
   `requestPageChange(pageIndex)`, `requestPageChangeByPageId(pageId)`,
-  `requestPageRestart()`.
+  `requestPageRestart()`. A page change takes effect at the next think, and
+  requesting the active page restarts it instead. A request that names no page
+  -- a `pageIndex` outside the program's pages, or a `pageId` no page carries
+  -- is a **no-op**: nothing is pending, the active page stays active, and no
+  fiber of it is cancelled. A `switch page` reading nil in every argument slot
+  -- the buffer an unsupplied argument leaves behind -- is a
+  `requestPageRestart()` of the active page, not a page change.
 - `callsite` -- `ensure(id)`, `reset(id)`, `getSlot(id, slotIdx)`,
   `setSlot(id, slotIdx, value)`, `getHostState(id)`, `setHostState(id,
   value)`, `clearHostState(id)`.

@@ -162,6 +162,14 @@
       "description": "A page change request takes effect at the next think: the current page deactivates and the requested one activates before that think's rules run."
     },
     {
+      "id": "page-switch-missing-argument",
+      "description": "A switch-page call reading nil in every argument slot, the buffer an unsupplied argument leaves behind, restarts the active page rather than changing to another one."
+    },
+    {
+      "id": "page-switch-out-of-range",
+      "description": "A page change request naming no page -- an index outside the program's pages, or an id no page carries -- is a no-op: the active page stays active, keeps running, and loses no fiber."
+    },
+    {
       "id": "root-rule-quiesce",
       "description": "A root rule does not re-fire while any live fiber of its rule subtree is still in flight."
     },

@@ -245,6 +245,41 @@
       "schedule": [16, 16, 16, 16, 16]
     },
     {
+      "id": "page-switch-no-arg",
+      "source": "packages/conformance/src/cases/page-switch-no-arg.spec.ts",
+      "summary": "A one-page brain calling switch page with nothing in either argument slot on every think, pinning that the empty argument buffer is the restart shorthand.",
+      "behaviors": [
+        "fiber-await-park",
+        "fiber-cancellation-cascade",
+        "host-async-action-dispatch",
+        "host-sync-action-call",
+        "page-activation-hook",
+        "page-restart",
+        "page-switch-missing-argument",
+        "root-rule-respawn",
+        "rule-when-empty",
+        "rule-when-gate-falsy",
+        "rule-when-gate-truthy"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16]
+    },
+    {
+      "id": "page-switch-out-of-range",
+      "source": "packages/conformance/src/cases/page-switch-out-of-range.spec.ts",
+      "summary": "A one-page brain requesting a page it does not have on every think, pinning that the request is a no-op and the page it is on keeps running.",
+      "behaviors": [
+        "page-activation-hook",
+        "page-switch-out-of-range",
+        "root-rule-respawn",
+        "rule-when-empty",
+        "rule-when-gate-falsy",
+        "rule-when-gate-truthy"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16]
+    },
+    {
       "id": "presence-gate",
       "source": "packages/conformance/src/cases/presence-gate.spec.ts",
       "summary": "A bare presence-gated value sensor as the WHEN root of a rule and of its `otherwise` sibling, delivering a falsy value and nil in turn.",

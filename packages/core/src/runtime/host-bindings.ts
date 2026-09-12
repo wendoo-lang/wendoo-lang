@@ -275,12 +275,16 @@ export interface IBrainRuntime {
   isInterrupted(): boolean;
   /**
    * Request a page change by zero-based page index. If `pageIndex` equals the
-   * current page, triggers a restart instead.
+   * current page, triggers a restart instead. An index outside the brain's
+   * pages is a no-op: the current page stays active.
    */
   requestPageChange(pageIndex: number): void;
-  /** Request a page change by stable page identifier (UUID). */
+  /**
+   * Request a page change by stable page identifier (UUID), falling back to a
+   * page-name lookup. A no-op when no page carries the identifier or the name.
+   */
   requestPageChangeByPageId(pageId: string): void;
-  /** Request a page change by page name. */
+  /** Request a page change by page name. A no-op when no page carries the name. */
   requestPageChangeByName(name: string): void;
   /** Request that the current page restart at the next tick. */
   requestPageRestart(): void;

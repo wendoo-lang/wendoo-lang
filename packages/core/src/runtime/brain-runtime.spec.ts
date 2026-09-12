@@ -109,6 +109,24 @@ describe("BrainRuntime", () => {
     assert.strictEqual(runtime.getCurrentPageId(), page2Id);
   });
 
+  test("a page change request naming no page is a no-op on every route", () => {
+    const page1Id = "page-1-id";
+    const pages = List.from([makePageMeta(0, page1Id, "page-1"), makePageMeta(1, "page-2-id", "page-2")]);
+    const runtime = new BrainRuntime(makeProgram(), pages, makeHostServices());
+    runtime.startup();
+
+    for (const request of [
+      () => runtime.requestPageChange(-1),
+      () => runtime.requestPageChange(pages.size()),
+      () => runtime.requestPageChangeByName("no-such-page"),
+      () => runtime.requestPageChangeByPageId("no-such-page-id"),
+    ]) {
+      request();
+      runtime.think(1.0);
+      assert.strictEqual(runtime.getCurrentPageId(), page1Id);
+    }
+  });
+
   test("hot-reload carry-forward preserves variable values by name", () => {
     const pages = List.from([makePageMeta(0, "p0", "page-1")]);
 
