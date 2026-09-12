@@ -1,13 +1,17 @@
 import type { IBrainTileDef, WendooEnvironment } from "@wendoo/core/app";
 import {
   BrainTileLiteralDef,
+  CoreControlFlowId,
   CoreTypeIds,
   mkActuatorTileId,
+  mkControlFlowTileId,
+  mkLiteralTileId,
   mkParameterTileId,
   mkSensorTileId,
 } from "@wendoo/core/app";
 import { BrainDef, type BrainPageDef, type BrainRuleDef } from "@wendoo/core/brain/model";
 import { BrainTileOperatorDef, BrainTileVariableDef } from "@wendoo/core/brain/tiles";
+import type { TypeCodec, TypeId } from "@wendoo/core/runtime";
 import { ConformanceHostActions, ConformanceParameterId } from "./profile";
 
 /** The tiles a conformance case authors its rules from. */
@@ -90,6 +94,65 @@ export function numberLiteral(environment: WendooEnvironment, brainDef: BrainDef
   const literal = new BrainTileLiteralDef(CoreTypeIds.Number, value, {}, environment.brainServices);
   brainDef.catalog().registerTileDef(literal);
   return literal;
+}
+
+/**
+ * Mints a String literal tile and registers it in `brainDef`'s catalog, as a
+ * document-scoped tile must be to survive serialization.
+ *
+ * @param environment - Environment supplying the brain services and id stream.
+ * @param brainDef - Document the literal belongs to.
+ * @param value - Text the literal carries.
+ */
+export function stringLiteral(environment: WendooEnvironment, brainDef: BrainDef, value: string): IBrainTileDef {
+  const literal = new BrainTileLiteralDef(CoreTypeIds.String, value, {}, environment.brainServices);
+  brainDef.catalog().registerTileDef(literal);
+  return literal;
+}
+
+/** The core-registered literal tile of `value` at `valueType`. Throws when the catalog holds none. */
+function wellKnownLiteral(environment: WendooEnvironment, valueType: TypeId, value: unknown): IBrainTileDef {
+  const typeDef = environment.brainServices.runtime.types.get(valueType);
+  if (!typeDef) {
+    throw new Error(`core registered no type '${valueType}'`);
+  }
+  return requireTile(environment, mkLiteralTileId(valueType, (typeDef.codec as TypeCodec).stringify(value)));
+}
+
+/**
+ * The core-registered `true` or `false` literal tile. Throws when the core
+ * module registered no Boolean literal for `value`.
+ *
+ * @param environment - Environment the core module is installed in.
+ * @param value - Which of the two tiles to take.
+ */
+export function booleanLiteral(environment: WendooEnvironment, value: boolean): IBrainTileDef {
+  return wellKnownLiteral(environment, CoreTypeIds.Boolean, value);
+}
+
+/**
+ * The core-registered `nil` literal tile, the one authored operand whose
+ * static type is Nil.
+ *
+ * @param environment - Environment the core module is installed in.
+ */
+export function nilLiteral(environment: WendooEnvironment): IBrainTileDef {
+  return wellKnownLiteral(environment, CoreTypeIds.Nil, undefined);
+}
+
+/**
+ * `tiles` wrapped in the core parenthesis tiles, so the sequence binds as one
+ * operand of the surrounding expression.
+ *
+ * @param environment - Environment the core module is installed in.
+ * @param tiles - Tiles to group, in order.
+ */
+export function grouped(environment: WendooEnvironment, ...tiles: IBrainTileDef[]): IBrainTileDef[] {
+  return [
+    requireTile(environment, mkControlFlowTileId(CoreControlFlowId.OpenParen)),
+    ...tiles,
+    requireTile(environment, mkControlFlowTileId(CoreControlFlowId.CloseParen)),
+  ];
 }
 
 /**

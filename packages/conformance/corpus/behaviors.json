@@ -118,6 +118,30 @@
       "description": "Brain-observable numbers compute and render at the profile's precision, f32 or f64."
     },
     {
+      "id": "operator-arithmetic-number",
+      "description": "The number arithmetic operator host calls return their result at the profile's precision, and evaluate nil when the operation produces no number."
+    },
+    {
+      "id": "operator-boolean-logic",
+      "description": "Logical negation and boolean equality dispatch their host functions over boolean operands."
+    },
+    {
+      "id": "operator-comparison-number",
+      "description": "The number ordering and equality operator host calls return a boolean, and evaluate false when an operand is not a number."
+    },
+    {
+      "id": "operator-equality-nil",
+      "description": "Equality and inequality with a nil operand decide by nil-ness, in both operand orders, against nil, number, boolean, and string."
+    },
+    {
+      "id": "operator-logical-short-circuit",
+      "description": "Logical `and` and `or` evaluate as a branch over a duplicated left operand rather than a host call, and leave the operand that decided the result on the stack."
+    },
+    {
+      "id": "operator-string-compare",
+      "description": "String concatenation and string equality operate on string operands."
+    },
+    {
       "id": "page-lifecycle-hooks",
       "description": "An action's initializer, activation, and deactivation hooks fire in their contracted order and lifetime."
     },
@@ -172,6 +196,10 @@
     {
       "id": "rule-when-presence-gate",
       "description": "The presence-gated WHEN boundary runs DO on any non-nil WHEN result and skips only on nil."
+    },
+    {
+      "id": "string-constant-push",
+      "description": "PUSH_CONST_STR pushes the string at its index in the program's string constant pool."
     },
     {
       "id": "struct-field-access",

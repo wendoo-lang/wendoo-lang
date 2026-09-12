@@ -21,6 +21,27 @@
       "schedule": [16, 16, 16]
     },
     {
+      "id": "arithmetic-operators",
+      "source": "packages/conformance/src/cases/arithmetic-operators.spec.ts",
+      "summary": "One rule per core number arithmetic operator beyond addition, emitting each result, and a division by zero that evaluates nil.",
+      "behaviors": ["host-sync-action-call", "operator-arithmetic-number", "rule-when-empty"],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
+      "id": "boolean-logic",
+      "source": "packages/conformance/src/cases/boolean-logic.spec.ts",
+      "summary": "The core boolean operators over literal operands: `and` and `or` as branches over a duplicated operand, `not` and boolean equality as host calls.",
+      "behaviors": [
+        "operator-boolean-logic",
+        "operator-logical-short-circuit",
+        "rule-when-gate-falsy",
+        "rule-when-gate-truthy"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
       "id": "child-rule-cascade",
       "source": "packages/conformance/src/cases/child-rule-cascade.spec.ts",
       "summary": "A parent rule with two synchronous child rules beside a second root rule, pinning spawn order and cascade timing.",
@@ -87,6 +108,27 @@
       "schedule": [16, 16, 16]
     },
     {
+      "id": "nil-equality-lattice",
+      "source": "packages/conformance/src/cases/nil-equality-lattice.spec.ts",
+      "summary": "Every core equality overload with a nil operand: nil against nil, and against a number, a boolean, and a string in both operand orders.",
+      "behaviors": ["operator-equality-nil", "rule-when-gate-falsy", "rule-when-gate-truthy"],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
+      "id": "number-comparisons",
+      "source": "packages/conformance/src/cases/number-comparisons.spec.ts",
+      "summary": "The six core number comparisons as WHEN gates over literals, plus one whose left operand is an absent sensor reading on half the thinks.",
+      "behaviors": [
+        "host-sync-sensor-result",
+        "operator-comparison-number",
+        "rule-when-gate-falsy",
+        "rule-when-gate-truthy"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
       "id": "otherwise-chain",
       "source": "packages/conformance/src/cases/otherwise-chain.spec.ts",
       "summary": "Two WHEN rules each followed by an `otherwise` sibling, pinning the chain gate against a subject that fires and one that does not.",
@@ -113,6 +155,19 @@
       ],
       "precisions": ["f32", "f64"],
       "schedule": [16, 16, 16, 16]
+    },
+    {
+      "id": "string-operators",
+      "source": "packages/conformance/src/cases/string-operators.spec.ts",
+      "summary": "String concatenation and string equality over literals drawn from the program's string constant pool.",
+      "behaviors": [
+        "operator-string-compare",
+        "rule-when-gate-falsy",
+        "rule-when-gate-truthy",
+        "string-constant-push"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
     },
     {
       "id": "then-trigger-fires",

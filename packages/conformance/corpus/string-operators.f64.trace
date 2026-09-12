@@ -1,0 +1,11 @@
+mctrace 1
+profile 3e8
+precision f64
+tick 1 time 4030000000000000 dt 0000000000000000
+action 401 site 1 args 1 number 3ff0000000000000 result void
+action 401 site 3 args 1 number 4000000000000000 result void
+action 401 site 6 args 1 number 4008000000000000 result void
+tick 2 time 4040000000000000 dt 4030000000000000
+action 401 site 1 args 1 number 3ff0000000000000 result void
+action 401 site 3 args 1 number 4000000000000000 result void
+action 401 site 6 args 1 number 4008000000000000 result void
