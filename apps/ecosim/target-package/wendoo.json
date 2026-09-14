@@ -83,7 +83,7 @@
       "app/assets/brain/icons/wander.svg",
       "app/assets/fonts/latinmodern-math.woff2",
       "app/assets/main-BGylXWOf.css",
-      "app/assets/main-DlY-WnaI.js",
+      "app/assets/main-QbboLXtb.js",
       "app/assets/phaser-BG365Q_w.js",
       "app/favicon.png",
       "app/favicon.svg",
@@ -97,5 +97,8 @@
   "rehearsalAdapter": {
     "path": "rehearsal/adapter.js"
   },
-  "buildVersion": "0.1.5"
+  "buildVersion": "0.1.5",
+  "declaredSurface": {
+    "path": "declared-surface.json"
+  }
 }

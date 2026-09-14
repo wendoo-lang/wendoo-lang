@@ -146,6 +146,15 @@ reactively. Patterns to avoid proactively:
   skipped and leave residual infos. Never rely on `--write` to clean up code
   you wrote.
 
+### Lockfiles Follow package.json
+
+After editing the dependency list of any `package.json`, run
+`npm run lockfiles:sync` from the repository root. Release workflows install
+with `npm ci`, which fails when a lockfile no longer records the resolution its
+`package.json` asks for, and CI runs `npm run lockfiles:check` on every push.
+The check reports which lockfiles are out of step and leaves the working tree
+exactly as it found it.
+
 ## Tests Never Key on Display Prose
 
 Static display chrome -- placeholders, labels, button captions, tooltips,

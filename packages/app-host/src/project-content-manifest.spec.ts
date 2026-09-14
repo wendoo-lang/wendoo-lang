@@ -402,6 +402,40 @@ describe("parseProjectContentManifest", () => {
     assert.strictEqual(result.ok, false);
     assert.deepStrictEqual(errorCodes(result), [ProjectContentManifestErrorCode.FILE_ESCAPES_ROOT]);
   });
+
+  it("carries a declared surface through and omits it when absent", () => {
+    const result = parseProjectContentManifest(
+      JSON.stringify({ name: "P", version: "0.1.0", declaredSurface: { path: "declared-surface.json" } })
+    );
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.deepStrictEqual(result.manifest.declaredSurface, { path: "declared-surface.json" });
+    }
+    const absent = parseProjectContentManifest(JSON.stringify({ name: "P", version: "0.1.0" }));
+    assert.strictEqual(absent.ok, true);
+    if (absent.ok) {
+      assert.strictEqual("declaredSurface" in absent.manifest, false);
+    }
+  });
+
+  it("rejects a malformed declaredSurface with INVALID_DECLARED_SURFACE", () => {
+    const cases: unknown[] = ["not-an-object", {}, { path: "" }, { path: 7 }];
+    for (const declaredSurface of cases) {
+      const result = validateProjectContentManifest({ name: "P", version: "0.1.0", declaredSurface });
+      assert.strictEqual(result.ok, false, `Expected rejection for ${JSON.stringify(declaredSurface)}`);
+      assert.deepStrictEqual(errorCodes(result), [ProjectContentManifestErrorCode.INVALID_DECLARED_SURFACE]);
+    }
+  });
+
+  it("rejects a declaredSurface path that escapes the project root", () => {
+    const result = validateProjectContentManifest({
+      name: "P",
+      version: "0.1.0",
+      declaredSurface: { path: "../declared-surface.json" },
+    });
+    assert.strictEqual(result.ok, false);
+    assert.deepStrictEqual(errorCodes(result), [ProjectContentManifestErrorCode.FILE_ESCAPES_ROOT]);
+  });
 });
 
 describe("validateProjectContentManifest", () => {
@@ -704,6 +738,22 @@ describe("serializeProjectContentManifest", () => {
     }
     const without = serializeProjectContentManifest({ name: "P", version: "0.1.0", extensions: {} });
     assert.strictEqual(without.includes("rehearsalAdapter"), false);
+  });
+
+  it("round-trips a declared surface and omits it when absent", () => {
+    const manifest: ProjectContentManifest = {
+      name: "P",
+      version: "0.1.0",
+      extensions: {},
+      declaredSurface: { path: "declared-surface.json" },
+    };
+    const result = parseProjectContentManifest(serializeProjectContentManifest(manifest));
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.deepStrictEqual(result.manifest, manifest);
+    }
+    const without = serializeProjectContentManifest({ name: "P", version: "0.1.0", extensions: {} });
+    assert.strictEqual(without.includes("declaredSurface"), false);
   });
 
   it("round-trips extras byte-faithfully after the schema fields", () => {

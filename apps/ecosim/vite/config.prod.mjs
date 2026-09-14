@@ -20,7 +20,7 @@ const phasermsg = () => {
 };
 
 export default defineConfig({
-  base: "/",
+  base: "./",
   plugins: [react(), uiPlugin(), sitemapPlugin(), phasermsg(), embeddedExtensions()],
   define: rehearsalDefines(),
   resolve: {

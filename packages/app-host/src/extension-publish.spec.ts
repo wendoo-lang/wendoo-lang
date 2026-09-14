@@ -698,6 +698,45 @@ describe("publishExtensionVersion for a target (hostApp)", () => {
     );
   });
 
+  it("ships the declared surface the manifest declares", async () => {
+    const { backend, applied } = memoryBackend();
+    const source = memorySource({
+      "wendoo.json": manifestText({
+        name: "Microbit V2",
+        version: "0.9.1",
+        hostApp: { path: "app", files: ["app/index.html"] },
+        declaredSurface: { path: "declared-surface.json" },
+      }),
+      "app/index.html": "<!doctype html>",
+      "declared-surface.json": '{"formatVersion":1}',
+    });
+
+    const result = await publishExtensionVersion({ coordinate: COORDINATE, source, backend });
+
+    assert.equal(result.ok, true);
+    assert.ok(
+      applied[0].files.some((file) => file.path === "declared-surface.json"),
+      "the published tree carries the baked declared surface"
+    );
+  });
+
+  it("refuses a target whose declared surface is not in the project", async () => {
+    const source = memorySource({
+      "wendoo.json": manifestText({
+        name: "Microbit V2",
+        version: "0.9.1",
+        hostApp: { path: "app", files: ["app/index.html"] },
+        declaredSurface: { path: "declared-surface.json" },
+      }),
+      "app/index.html": "<!doctype html>",
+    });
+
+    const result = await publishExtensionVersion({ coordinate: COORDINATE, source, backend: memoryBackend().backend });
+
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.error.code, ExtensionPublishErrorCode.LISTED_FILE_MISSING);
+  });
+
   it("refuses a target whose declared rehearsal adapter is not in the project", async () => {
     const source = memorySource({
       "wendoo.json": manifestText({

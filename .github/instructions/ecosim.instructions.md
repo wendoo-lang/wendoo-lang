@@ -31,12 +31,12 @@ package's built output, so core changes require a rebuild.
 
 ```
 npm run dev         # build:deps, then Vite dev server
-npm run build       # install:packages + build:deps (prebuild), then Vite production build
+npm run build       # build:deps (prebuild), Vite production build, then build:headless (postbuild)
 npm run build:deps  # builds the file: package dependencies in dependency order
 npm run check       # Biome check (lint + format), autofix
 npm run check:only  # Biome, read-only -- must print only the summary line
 npm run typecheck   # tsc --noEmit over the app and its sibling tsconfigs
-npm test            # build:headless, then tsx --test over src/**/*.spec.ts
+npm test            # build:deps + build:headless, then tsx --test over src/**/*.spec.ts
 ```
 
 `build:deps` runs `scripts/build-packages.js`, which walks this app's `file:` dependencies and

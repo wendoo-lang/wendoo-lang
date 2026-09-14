@@ -1,0 +1,28 @@
+name: Lockfiles
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Every lockfile matches its package.json
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      # Regenerates each lockfile from its package.json and compares, leaving
+      # the working tree as it found it.
+      - name: Check the lockfiles
+        run: npm run lockfiles:check

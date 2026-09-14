@@ -1,49 +1,76 @@
 name: Deploy ecosim
 
 on:
-  push:
-    tags:
-      - "ecosim-v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Published target package version to deploy (x.y.z)"
+        required: true
+        type: string
 
 permissions:
   id-token: write
   contents: read
 
 env:
+  TRG_REPOSITORY: wendoo-lang/trg-ecosim
+  PACKAGE_DIR: trg-package
   S3_BUCKET: sim.mindcraft-lang.org
   AWS_REGION: us-east-1
   CLOUDFRONT_DISTRIBUTION_ID: E26PTP5MZD6SJC
 
+concurrency:
+  group: deploy-ecosim
+
 jobs:
-  build-and-deploy:
-    name: Build & Deploy
+  deploy:
+    name: Deploy
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-
-      - name: Install packages
-        run: npm run install:packages
-
-      - name: Install ecosim dependencies
-        working-directory: apps/ecosim
+      - name: Check the version names an exact release
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
-          rm -f package-lock.json
-          npm install
+          set -euo pipefail
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "version must be an exact x.y.z release."
+            exit 1
+          fi
 
-      - name: Build packages
-        working-directory: apps/ecosim
-        run: npm run build:deps
+      - name: Fetch the published target package
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ env.TRG_REPOSITORY }}
+          ref: v${{ inputs.version }}
+          path: ${{ env.PACKAGE_DIR }}
+          persist-credentials: false
 
-      - name: Build ecosim
-        working-directory: apps/ecosim
-        run: npm run build
+      # Rejects a fetched tree whose manifest declares a version other than the
+      # dispatched one, then exports HOST_APP as the host app subtree to sync.
+      - name: Locate the package's host app tree
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          PACKAGE_VERSION="$(node -p "require('./$PACKAGE_DIR/wendoo.json').version")"
+          if [ "$PACKAGE_VERSION" != "$VERSION" ]; then
+            echo "the fetched package declares version $PACKAGE_VERSION, not the dispatched $VERSION."
+            exit 1
+          fi
+          HOST_APP_PATH="$(node -p "require('./$PACKAGE_DIR/wendoo.json').hostApp.path")"
+          UNUSABLE=""
+          case "$HOST_APP_PATH" in
+            "" | "." | /*) UNUSABLE="1" ;;
+          esac
+          case "/$HOST_APP_PATH/" in
+            */../*) UNUSABLE="1" ;;
+          esac
+          if [ -n "$UNUSABLE" ]; then
+            echo "the package's hostApp.path \"$HOST_APP_PATH\" is not a subdirectory of the package."
+            exit 1
+          fi
+          echo "HOST_APP=$PACKAGE_DIR/$HOST_APP_PATH" >> "$GITHUB_ENV"
 
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
@@ -51,13 +78,45 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Sync build output to S3
+      # This sync's include/exclude set and the unhashed sync's below are an
+      # exact partition of the host app tree, and this set holds exactly the
+      # content-hash-named files.
+      - name: Upload hashed assets to S3
         run: |
-          aws s3 sync apps/ecosim/dist "s3://$S3_BUCKET" \
-            --delete
+          set -euo pipefail
+          aws s3 sync "$HOST_APP" "s3://$S3_BUCKET" \
+            --size-only \
+            --cache-control "public, max-age=31536000, immutable" \
+            --exclude "*" \
+            --include "assets/*" \
+            --exclude "assets/brain/*" \
+            --exclude "assets/fonts/*"
+
+      - name: Sync entry and unhashed files to S3
+        run: |
+          set -euo pipefail
+          aws s3 sync "$HOST_APP" "s3://$S3_BUCKET" \
+            --delete \
+            --cache-control "no-cache" \
+            --exclude "assets/*" \
+            --include "assets/brain/*" \
+            --include "assets/fonts/*"
 
       - name: Invalidate CloudFront cache
         run: |
+          set -euo pipefail
           aws cloudfront create-invalidation \
-            --distribution-id "${{ env.CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
             --paths "/*"
+
+      - name: Prune superseded hashed assets
+        run: |
+          set -euo pipefail
+          aws s3 sync "$HOST_APP" "s3://$S3_BUCKET" \
+            --delete \
+            --size-only \
+            --cache-control "public, max-age=31536000, immutable" \
+            --exclude "*" \
+            --include "assets/*" \
+            --exclude "assets/brain/*" \
+            --exclude "assets/fonts/*"

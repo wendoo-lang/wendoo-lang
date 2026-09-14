@@ -422,6 +422,7 @@ export async function publishExtensionVersion(options: ExtensionPublishOptions):
     ...(manifest.files ?? []),
     ...(manifest.hostApp?.files ?? []),
     ...(manifest.rehearsalAdapter === undefined ? [] : [manifest.rehearsalAdapter.path]),
+    ...(manifest.declaredSurface === undefined ? [] : [manifest.declaredSurface.path]),
   ];
   for (const path of listedPaths) {
     // The manifest serialized above is the published manifest; a files entry

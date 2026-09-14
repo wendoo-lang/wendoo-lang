@@ -167,6 +167,18 @@ export interface ProjectContentManifestRehearsalAdapter {
 }
 
 /**
+ * A project's baked declarative surface: the JSON document a target package
+ * carries stating what its adapter declares about the target, readable as data
+ * by a consumer that never loads the adapter module.
+ */
+export interface ProjectContentManifestDeclaredSurface {
+  /**
+   * Content-relative path of the JSON document carrying the declared surface.
+   */
+  readonly path: string;
+}
+
+/**
  * A project's content manifest: the portable identity data carried in
  * `wendoo.json` alongside host-specific fields.
  */
@@ -232,6 +244,12 @@ export interface ProjectContentManifest {
    */
   readonly rehearsalAdapter?: ProjectContentManifestRehearsalAdapter;
   /**
+   * The project's baked declarative surface. Present only when the project
+   * ships one; a package without one omits it. Its `path` publishes with the
+   * project's content.
+   */
+  readonly declaredSurface?: ProjectContentManifestDeclaredSurface;
+  /**
    * Root-level fields of the source document outside the manifest schema
    * (for example application-specific content), keyed by property name and
    * carried verbatim: a parse followed by a serialize preserves them. Present
@@ -253,6 +271,7 @@ const MANIFEST_SCHEMA_FIELDS: ReadonlySet<string> = new Set([
   "targets",
   "hostApp",
   "rehearsalAdapter",
+  "declaredSurface",
 ]);
 
 /** Stable identifiers for content manifest validation errors. */
@@ -268,6 +287,7 @@ export const ProjectContentManifestErrorCode = {
   INVALID_HOST_APP: "PROJECT_MANIFEST_INVALID_HOST_APP",
   HOST_APP_FILES_OVERLAP: "PROJECT_MANIFEST_HOST_APP_FILES_OVERLAP",
   INVALID_REHEARSAL_ADAPTER: "PROJECT_MANIFEST_INVALID_REHEARSAL_ADAPTER",
+  INVALID_DECLARED_SURFACE: "PROJECT_MANIFEST_INVALID_DECLARED_SURFACE",
   INVALID_EXTENSIONS: "PROJECT_MANIFEST_INVALID_EXTENSIONS",
   INVALID_EXTENSION_COORDINATE: "PROJECT_MANIFEST_INVALID_EXTENSION_COORDINATE",
   DUPLICATE_EXTENSION_COORDINATE: "PROJECT_MANIFEST_DUPLICATE_EXTENSION_COORDINATE",
@@ -451,23 +471,33 @@ export function validateProjectHostApp(
   };
 }
 
+/** A well-formed single-path declaration, or the one error that rejected it. */
+type PathDeclarationResult =
+  | { readonly path: string; readonly errors: readonly [] }
+  | { readonly path?: undefined; readonly errors: readonly ProjectContentManifestError[] };
+
 /**
- * Validate a rehearsal adapter declaration: an object carrying a non-empty
- * string `path` that stays within the project root. Returns the normalized
- * declaration with no errors when well-formed, or one error per rejected field.
+ * Validate a manifest field declaring one content file: an object carrying a
+ * non-empty string `path` that stays within the project root. Returns the
+ * declared path with no errors when well-formed, or the one error that rejected
+ * it.
+ *
+ * @param value - The field's value, as the source document carries it.
+ * @param field - Root-level field name, used to build the error paths.
+ * @param invalidCode - Error code reported when the field is not a `{ path }` object.
  */
-export function validateProjectRehearsalAdapter(
-  value: unknown
-):
-  | { readonly rehearsalAdapter: ProjectContentManifestRehearsalAdapter; readonly errors: readonly [] }
-  | { readonly rehearsalAdapter?: undefined; readonly errors: readonly ProjectContentManifestError[] } {
+function validatePathDeclaration(
+  value: unknown,
+  field: string,
+  invalidCode: ProjectContentManifestErrorCode
+): PathDeclarationResult {
   if (!isRecord(value)) {
     return {
       errors: [
         {
-          code: ProjectContentManifestErrorCode.INVALID_REHEARSAL_ADAPTER,
-          path: "$.rehearsalAdapter",
-          message: "$.rehearsalAdapter must be an object when present.",
+          code: invalidCode,
+          path: `$.${field}`,
+          message: `$.${field} must be an object when present.`,
         },
       ],
     };
@@ -476,9 +506,9 @@ export function validateProjectRehearsalAdapter(
     return {
       errors: [
         {
-          code: ProjectContentManifestErrorCode.INVALID_REHEARSAL_ADAPTER,
-          path: "$.rehearsalAdapter.path",
-          message: "$.rehearsalAdapter.path must be a non-empty string.",
+          code: invalidCode,
+          path: `$.${field}.path`,
+          message: `$.${field}.path must be a non-empty string.`,
         },
       ],
     };
@@ -488,13 +518,53 @@ export function validateProjectRehearsalAdapter(
       errors: [
         {
           code: ProjectContentManifestErrorCode.FILE_ESCAPES_ROOT,
-          path: "$.rehearsalAdapter.path",
-          message: `$.rehearsalAdapter.path must stay within the project root; "${value.path}" escapes it.`,
+          path: `$.${field}.path`,
+          message: `$.${field}.path must stay within the project root; "${value.path}" escapes it.`,
         },
       ],
     };
   }
-  return { rehearsalAdapter: { path: value.path }, errors: [] };
+  return { path: value.path, errors: [] };
+}
+
+/**
+ * Validate a rehearsal adapter declaration: an object carrying a non-empty
+ * string `path` that stays within the project root. Returns the normalized
+ * declaration with no errors when well-formed, or the one error that rejected
+ * it.
+ */
+export function validateProjectRehearsalAdapter(
+  value: unknown
+):
+  | { readonly rehearsalAdapter: ProjectContentManifestRehearsalAdapter; readonly errors: readonly [] }
+  | { readonly rehearsalAdapter?: undefined; readonly errors: readonly ProjectContentManifestError[] } {
+  const declaration = validatePathDeclaration(
+    value,
+    "rehearsalAdapter",
+    ProjectContentManifestErrorCode.INVALID_REHEARSAL_ADAPTER
+  );
+  if (declaration.path === undefined) return { errors: declaration.errors };
+  return { rehearsalAdapter: { path: declaration.path }, errors: [] };
+}
+
+/**
+ * Validate a declared surface declaration: an object carrying a non-empty
+ * string `path` that stays within the project root. Returns the normalized
+ * declaration with no errors when well-formed, or the one error that rejected
+ * it.
+ */
+export function validateProjectDeclaredSurface(
+  value: unknown
+):
+  | { readonly declaredSurface: ProjectContentManifestDeclaredSurface; readonly errors: readonly [] }
+  | { readonly declaredSurface?: undefined; readonly errors: readonly ProjectContentManifestError[] } {
+  const declaration = validatePathDeclaration(
+    value,
+    "declaredSurface",
+    ProjectContentManifestErrorCode.INVALID_DECLARED_SURFACE
+  );
+  if (declaration.path === undefined) return { errors: declaration.errors };
+  return { declaredSurface: { path: declaration.path }, errors: [] };
 }
 
 /**
@@ -647,6 +717,16 @@ export function validateProjectContentManifest(value: unknown): ProjectContentMa
     }
   }
 
+  let declaredSurface: ProjectContentManifestDeclaredSurface | undefined;
+  if (value.declaredSurface !== undefined) {
+    const surfaceResult = validateProjectDeclaredSurface(value.declaredSurface);
+    if (surfaceResult.errors.length > 0) {
+      errors.push(...surfaceResult.errors);
+    } else {
+      declaredSurface = surfaceResult.declaredSurface;
+    }
+  }
+
   if (files !== undefined && hostApp !== undefined) {
     const topLevelFiles = new Set(files);
     for (const path of hostApp.files) {
@@ -703,6 +783,7 @@ export function validateProjectContentManifest(value: unknown): ProjectContentMa
       ...(targets !== undefined ? { targets } : {}),
       ...(hostApp !== undefined ? { hostApp } : {}),
       ...(rehearsalAdapter !== undefined ? { rehearsalAdapter } : {}),
+      ...(declaredSurface !== undefined ? { declaredSurface } : {}),
       ...(extras !== undefined ? { extras } : {}),
     },
     errors: [],
@@ -729,6 +810,7 @@ export function projectContentManifestToJson(manifest: ProjectContentManifest): 
       : {}),
     ...(manifest.hostApp !== undefined ? { hostApp: manifest.hostApp } : {}),
     ...(manifest.rehearsalAdapter !== undefined ? { rehearsalAdapter: manifest.rehearsalAdapter } : {}),
+    ...(manifest.declaredSurface !== undefined ? { declaredSurface: manifest.declaredSurface } : {}),
     ...(manifest.extras !== undefined ? manifest.extras : {}),
   };
 }

@@ -38,7 +38,9 @@ jobs:
       - name: Install packages
         working-directory: .
         run: |
-          for dir in $(node scripts/build-packages.js --order apps/vscode-extension); do
+          set -euo pipefail
+          order="$(node scripts/build-packages.js --order apps/vscode-extension)"
+          for dir in $order; do
             (cd "$dir" && npm ci)
           done
 

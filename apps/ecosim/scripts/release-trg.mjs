@@ -1,36 +1,28 @@
 #!/usr/bin/env node
 /**
- * One-command release for the ecosim target package: bumps the target
- * manifest version, repackages the app bundle at the new version, then publishes
- * the target, stopping at the first step that fails. Run through
- * `npm run release-trg <patch|minor|major>`.
+ * The release steps for the ecosim target package, in two stages the caller
+ * runs in order, committing the bumped manifest to the source repository
+ * between them:
  *
- * The three steps mirror the manual release, each run from the app directory:
- *   1. wendoo version <bump> --dir target-package  (bump the manifest)
- *   2. npm run package                                 (rebuild dist + re-bake)
- *   3. wendoo publish --dir target-package          (ship it verbatim)
- * A nonzero exit from any step aborts the rest and becomes this script's exit
- * code. The `wendoo` binary resolves from the app's node_modules/.bin,
- * provided by the wendoo file: devDependency.
+ *   npm run release-trg -- prepare <patch|minor|major>
+ *     1. wendoo version <bump> --dir target-package  (bump the manifest)
+ *     2. npm run package                             (rebuild dist + re-bake)
+ *   npm run release-trg -- publish
+ *     3. wendoo publish --dir target-package         (ship it verbatim)
+ *
+ * Each step runs from the app directory. A nonzero exit from any step aborts
+ * the rest and becomes this script's exit code. The `wendoo` binary resolves
+ * from the app's node_modules/.bin, provided by the wendoo file: devDependency.
  */
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const VERSION_BUMPS = ["patch", "minor", "major"];
-const USAGE = "usage: npm run release-trg <patch|minor|major>";
-
-const bump = process.argv[2];
-if (bump === undefined) {
-  console.error("release: a version component (patch, minor, or major) is required.");
-  console.error(USAGE);
-  process.exit(1);
-}
-if (!VERSION_BUMPS.includes(bump)) {
-  console.error(`release: unknown version component "${bump}".`);
-  console.error(USAGE);
-  process.exit(1);
-}
+const USAGE = [
+  "usage: npm run release-trg -- prepare <patch|minor|major>",
+  "       npm run release-trg -- publish",
+].join("\n");
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), "..");
 const targetPackageDir = "target-package";
@@ -55,8 +47,34 @@ function runStep(command, args) {
   }
 }
 
-runStep(wendooBin, ["version", bump, "--dir", targetPackageDir]);
-runStep("npm", ["run", "package"]);
-runStep(wendooBin, ["publish", "--dir", targetPackageDir]);
+/** Prints `message` followed by the usage, and exits with a nonzero code. */
+function usageError(message) {
+  console.error(`release: ${message}`);
+  console.error(USAGE);
+  process.exit(1);
+}
 
-console.log(`release: ${bump} release complete.`);
+const stage = process.argv[2];
+const stageArgument = process.argv[3];
+
+if (stage === "prepare") {
+  if (stageArgument === undefined) {
+    usageError("prepare requires a version component (patch, minor, or major).");
+  }
+  if (!VERSION_BUMPS.includes(stageArgument)) {
+    usageError(`unknown version component "${stageArgument}".`);
+  }
+  runStep(wendooBin, ["version", stageArgument, "--dir", targetPackageDir]);
+  runStep("npm", ["run", "package"]);
+  console.log(`release: prepared the ${stageArgument} release.`);
+} else if (stage === "publish") {
+  if (stageArgument !== undefined) {
+    usageError(`unexpected argument "${stageArgument}".`);
+  }
+  runStep(wendooBin, ["publish", "--dir", targetPackageDir]);
+  console.log("release: publish complete.");
+} else if (stage === undefined) {
+  usageError("a stage (prepare or publish) is required.");
+} else {
+  usageError(`unknown stage "${stage}".`);
+}

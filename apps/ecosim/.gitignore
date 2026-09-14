@@ -16,6 +16,7 @@ dist-ssr
 # Generated target-package payload (manifest stays tracked)
 target-package/app
 target-package/rehearsal
+target-package/declared-surface.json
 
 # Editor directories and files
 .vscode/*

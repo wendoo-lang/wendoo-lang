@@ -47,6 +47,16 @@ describe("buildAppHostHtml", () => {
     assert.ok(baseAt < html.indexOf("./assets/"));
   });
 
+  it("injects its base ahead of a base the app document declares, leaving the app's own base inert", () => {
+    const appIndexHtml = APP_INDEX_HTML.replace("<head>", '<head>\n    <base href="/" />');
+    const html = buildAppHostHtml({ ...options, appIndexHtml });
+    const injectedAt = html.indexOf(`<base href="${BASE_URI}/">`);
+    const declaredAt = html.indexOf('<base href="/" />');
+    assert.notStrictEqual(injectedAt, -1);
+    assert.notStrictEqual(declaredAt, -1);
+    assert.ok(injectedAt < declaredAt);
+  });
+
   it("keeps a base uri that already ends with a slash", () => {
     const html = buildAppHostHtml({ ...options, appBaseUri: `${BASE_URI}/` });
     assert.notStrictEqual(html.indexOf(`<base href="${BASE_URI}/">`), -1);

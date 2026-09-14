@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
+import { readAdapterArtifact, readBuildStamp } from "../target/adapter.js";
+import { declaredSurfaceOf } from "../target/declared-surface.js";
 import { checkArtifactSelfContained } from "./conformance.js";
 import { readTargetIdentity, targetManifestPath } from "./target-manifest.js";
 
@@ -19,6 +22,9 @@ const adapterSource = join("dist-headless", "rehearsal", "adapter.js");
 /** Path inside the package the adapter artifact is copied to. */
 const adapterPath = "rehearsal/adapter.js";
 
+/** Path inside the package the adapter's declarative surface is baked to. */
+const declaredSurfacePath = "declared-surface.json";
+
 /** Directory of the app holding the ready-to-publish package. */
 const packageDirName = "target-package";
 
@@ -28,8 +34,8 @@ interface HostAppDeclaration {
   readonly files: readonly string[];
 }
 
-/** What the assembled manifest declares about the adapter artifact it carries. */
-interface RehearsalAdapterDeclaration {
+/** What the assembled manifest declares about a single file it carries. */
+interface FileDeclaration {
   readonly path: string;
 }
 
@@ -38,7 +44,8 @@ interface TargetManifestDocument extends Record<string, unknown> {
   version?: string;
   identity?: string;
   hostApp?: HostAppDeclaration;
-  rehearsalAdapter?: RehearsalAdapterDeclaration;
+  rehearsalAdapter?: FileDeclaration;
+  declaredSurface?: FileDeclaration;
   buildVersion?: string;
 }
 
@@ -107,7 +114,23 @@ cpSync(distDir, bundleDir, { recursive: true });
 
 rmSync(adapterDir, { recursive: true, force: true });
 mkdirSync(adapterDir, { recursive: true });
-cpSync(artifactPath, join(packageDir, adapterPath));
+const packagedArtifactPath = join(packageDir, adapterPath);
+cpSync(artifactPath, packagedArtifactPath);
+
+const artifactModule = await import(pathToFileURL(packagedArtifactPath).href);
+const artifact = readAdapterArtifact(artifactModule, { targetIdentity: identity });
+if (!artifact.ok) {
+  fail(`${artifact.nonconformance.code}: ${artifact.nonconformance.detail}`);
+}
+const buildStamp = readBuildStamp(artifactModule);
+if (buildStamp === undefined) {
+  fail(
+    `${packagedArtifactPath} publishes no build stamp.`,
+    "Build the adapter with a build stamp so the package states the language build it runs under."
+  );
+}
+const declaredSurface = declaredSurfaceOf(artifact.adapter, buildStamp);
+writeFileSync(join(packageDir, declaredSurfacePath), `${JSON.stringify(declaredSurface, null, 2)}\n`);
 
 // hostApp.files entries are content-relative: each bundle file is listed at
 // the path the published repository carries it, under the hostApp path.
@@ -117,9 +140,14 @@ const files = listFiles(bundleDir)
 
 manifest.hostApp = { path: hostAppPath, files };
 manifest.rehearsalAdapter = { path: adapterPath };
+manifest.declaredSurface = { path: declaredSurfacePath };
 // The version the bundle carries; publish requires it to match the declared version.
 manifest.buildVersion = version;
 writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
 console.log(`assembled target package: ${files.length} files under ${packageDirName}/${hostAppPath}/`);
 console.log(`${selfContained.code}: ${selfContained.detail}`);
+console.log(
+  `baked declared surface at ${packageDirName}/${declaredSurfacePath}: ` +
+    `format ${declaredSurface.formatVersion}, core ${declaredSurface.buildStamp.coreVersion}`
+);

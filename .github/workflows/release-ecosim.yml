@@ -1,0 +1,109 @@
+name: Release ecosim
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump level"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-ecosim
+
+jobs:
+  release:
+    name: Package & Publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      # Installs every package ecosim reaches, and ecosim itself, from the
+      # versions their lockfiles record. A lockfile that no longer matches its
+      # package.json fails here.
+      - name: Install the package graph
+        run: |
+          set -euo pipefail
+          order="$(node scripts/build-packages.js --order apps/ecosim)"
+          for dir in $order; do
+            (cd "$dir" && npm ci)
+          done
+
+      # Builds the dists the release steps run against, and links the commands
+      # this run built into node_modules/.bin.
+      - name: Build local packages
+        working-directory: apps/ecosim
+        run: npm run build:deps
+
+      # Bumps the manifest version, then rebuilds and re-bakes the package at
+      # that version.
+      - name: Prepare the release
+        working-directory: apps/ecosim
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          set -euo pipefail
+          npm run release-trg -- prepare "$BUMP"
+
+      # A lockfile rewritten between the checkout and here means a step
+      # installed something the lockfiles do not record.
+      - name: Assert the lockfiles are unchanged
+        run: |
+          set -euo pipefail
+          changed="$(git status --porcelain -- '*package-lock.json')"
+          if [ -n "$changed" ]; then
+            echo "A release step rewrote a lockfile, so this release is not reproducible from its tag:"
+            echo "$changed"
+            exit 1
+          fi
+
+      # Commits the bumped target manifest and pushes it to the branch this run
+      # was dispatched from.
+      - name: Commit & push the version bump
+        working-directory: apps/ecosim
+        env:
+          BRANCH: ${{ github.ref_name }}
+          GIT_CONFIG_COUNT: "2"
+          GIT_CONFIG_KEY_0: user.name
+          GIT_CONFIG_VALUE_0: "github-actions[bot]"
+          GIT_CONFIG_KEY_1: user.email
+          GIT_CONFIG_VALUE_1: "41898282+github-actions[bot]@users.noreply.github.com"
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./target-package/wendoo.json').version")"
+          git add target-package/wendoo.json
+          git commit -m "ecosim target package v$VERSION"
+          git push origin "HEAD:$BRANCH"
+
+      # Publishes the package as tag v<version> on the repository the manifest
+      # identity names.
+      - name: Publish the target package
+        working-directory: apps/ecosim
+        env:
+          TRG_PUBLISH_TOKEN: ${{ secrets.TRG_PUBLISH_TOKEN }}
+        run: |
+          set -euo pipefail
+          IDENTITY="$(node -p "require('./target-package/wendoo.json').identity")"
+          TRG_REMOTE="https://github.com/$IDENTITY.git"
+          export GIT_CONFIG_COUNT=3
+          export GIT_CONFIG_KEY_0="user.name"
+          export GIT_CONFIG_VALUE_0="github-actions[bot]"
+          export GIT_CONFIG_KEY_1="user.email"
+          export GIT_CONFIG_VALUE_1="41898282+github-actions[bot]@users.noreply.github.com"
+          export GIT_CONFIG_KEY_2="url.https://x-access-token:$TRG_PUBLISH_TOKEN@github.com/$IDENTITY.git.insteadOf"
+          export GIT_CONFIG_VALUE_2="$TRG_REMOTE"
+          npm run release-trg -- publish
