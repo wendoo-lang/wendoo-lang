@@ -97,13 +97,14 @@
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",
     "fake-indexeddb": "^6.2.5",
-    "wendoo": "file:../../packages/cli",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
     "terser": "^5.28.1",
+    "tsx": "^4.21.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.26.1",
     "vite": "^6.3.1",
+    "wendoo": "file:../../packages/cli",
     "wireit": "^0.14.13"
   }
 }
