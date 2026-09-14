@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import { describe, test } from "node:test";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { after, describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { ADAPTER_CONTRACT_VERSION, AdapterNonconformanceCode } from "../target/adapter.js";
 import {
@@ -9,6 +12,7 @@ import {
   FAKE_TARGET_IDENTITY,
   ruleIdAt,
 } from "../testing/index.js";
+import { STANDALONE_TARGET_IDENTITY } from "../testing/standalone-adapter.js";
 import { proposeEdit } from "../tools/propose-edit.js";
 import type { AuthoringWorkspace } from "../tools/workspace.js";
 import { createAuthoringWorkspace } from "../tools/workspace.js";
@@ -48,6 +52,34 @@ function checkOf(checks: readonly { code: string; ok: boolean; detail: string }[
   return check;
 }
 
+/** Directory the artifact fixtures stand in, removed once this file finishes. */
+const fixtureRoot = mkdtempSync(join(tmpdir(), "wendoo-artifact-fixture-"));
+
+after(() => {
+  rmSync(fixtureRoot, { recursive: true, force: true });
+});
+
+/** The built standalone adapter module the artifact fixtures are copied from. */
+const standaloneArtifactPath = fileURLToPath(new URL("../../dist/testing/standalone-adapter.js", import.meta.url));
+
+/** Re-export publishing the standalone module's stamp under the name a loader reads. */
+const stampExport = "export { standaloneBuildStamp as buildStamp };\n";
+
+/**
+ * Copy the built standalone adapter module into the fixture directory and
+ * return the copy's path. The copy bundles nothing and imports nothing, so it
+ * loads and rehearses wherever it is copied to.
+ *
+ * @param name Base name of the file to write, without an extension.
+ * @param stamped Whether the copy also publishes a build stamp.
+ */
+function writeArtifactFixture(name: string, stamped: boolean): string {
+  const path = join(fixtureRoot, `${name}.js`);
+  const source = readFileSync(standaloneArtifactPath, "utf8");
+  writeFileSync(path, stamped ? `${source}${stampExport}` : source, "utf8");
+  return path;
+}
+
 describe("the conformance suite", () => {
   test("passes an adapter built on the kit", async () => {
     const workspace = authoredWorkspace();
@@ -83,13 +115,43 @@ describe("the conformance suite", () => {
     assert.match(check.detail, new RegExp(AdapterNonconformanceCode.IdentityMismatch));
   });
 
-  test("refuses an artifact that only loads beside the packages it left unbundled", async () => {
-    const check = await checkArtifactSelfContained(fileURLToPath(artifactUrl), {
+  test("reports an artifact that only loads beside the packages it left unbundled as impure", async () => {
+    const result = await checkArtifactSelfContained(fileURLToPath(artifactUrl), {
       targetIdentity: FAKE_TARGET_IDENTITY,
     });
 
-    assert.equal(check.ok, false, check.detail);
-    assert.equal(check.code, ConformanceCheckCode.SelfContainment);
+    assert.equal(result.ok, false, JSON.stringify(result.checks));
+    assert.equal(checkOf(result.checks, ConformanceCheckCode.HeadlessPurity).ok, false);
+    assert.equal(
+      result.checks.some((check) => check.code === ConformanceCheckCode.SelfContainment),
+      false,
+      JSON.stringify(result.checks)
+    );
+  });
+
+  test("refuses a self-contained artifact that publishes no build stamp", async () => {
+    const result = await checkArtifactSelfContained(writeArtifactFixture("unstamped", false), {
+      targetIdentity: STANDALONE_TARGET_IDENTITY,
+    });
+
+    assert.equal(result.ok, false, JSON.stringify(result.checks));
+    assert.equal(checkOf(result.checks, ConformanceCheckCode.SelfContainment).ok, true);
+    assert.equal(checkOf(result.checks, ConformanceCheckCode.BuildStamp).ok, false);
+  });
+
+  test("passes an artifact that loads, rehearses, and states its build away from its build tree", async () => {
+    const result = await checkArtifactSelfContained(writeArtifactFixture("stamped", true), {
+      targetIdentity: STANDALONE_TARGET_IDENTITY,
+    });
+
+    assert.equal(result.ok, true, JSON.stringify(result.checks));
+    for (const code of [
+      ConformanceCheckCode.HeadlessPurity,
+      ConformanceCheckCode.SelfContainment,
+      ConformanceCheckCode.BuildStamp,
+    ]) {
+      assert.equal(checkOf(result.checks, code).ok, true, code);
+    }
   });
 });
 

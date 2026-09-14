@@ -33,7 +33,7 @@
     "prebuild": "npm run build:deps",
     "build": "vite build --config vite/config.prod.mjs",
     "postbuild": "npm run build:headless",
-    "build:headless": "vite build --config vite/config.headless.mjs",
+    "build:headless": "wireit",
     "package": "npm run build && wendoo-assemble-target-package",
     "release-trg": "node scripts/release-trg.mjs",
     "pregenerate:ambient": "npm run generate:ambient --prefix ../../packages/core",
@@ -51,6 +51,25 @@
     "format": "biome format ./src ./vite --write",
     "build:deps": "node ../../scripts/build-packages.js .",
     "release": "node scripts/release-dispatch.mjs"
+  },
+  "wireit": {
+    "build:headless": {
+      "command": "vite build --config vite/config.headless.mjs",
+      "files": [
+        "src/**",
+        "vite/**",
+        "tsconfig*.json",
+        "package.json",
+        "target-package/wendoo.json",
+        "../../packages/*/package.json",
+        "../../packages/*/dist/**",
+        "../../packages/docs/src/**",
+        "../../packages/ui/src/**"
+      ],
+      "output": [
+        "dist-headless/**"
+      ]
+    }
   },
   "dependencies": {
     "@wendoo/app-host": "file:../../packages/app-host",
@@ -84,6 +103,7 @@
     "terser": "^5.28.1",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.26.1",
-    "vite": "^6.3.1"
+    "vite": "^6.3.1",
+    "wireit": "^0.14.13"
   }
 }

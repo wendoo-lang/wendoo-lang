@@ -1,15 +1,14 @@
 #!/usr/bin/env node
-import { execFileSync, spawnSync } from "node:child_process";
 /**
- * Dispatches the "Release ecosim" GitHub workflow and watches the run it
- * started, exiting with the run's own status. Extra arguments are passed to
+ * Dispatches this app's release workflow, then watches the run it started and
+ * exits with that run's own status. Sends a random marker as the workflow's
+ * dispatch-id input, which the workflow puts in its run name, and polls the
+ * run list until a run carries that marker. Extra arguments are passed to
  * `gh workflow run`, so `npm run release -- -f bump=minor` works.
- *
- * The dispatch API returns no run id, so the script sends a random marker as
- * the workflow's dispatch-id input, which the workflow embeds in its run
- * name; the run is then found by that marker and watched.
  */
+import { execFileSync, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 
 const REPO = "wendoo-lang/wendoo-lang";
 const WORKFLOW = "Release ecosim";
@@ -23,27 +22,8 @@ function ghJson(args) {
   return JSON.parse(execFileSync("gh", args, { encoding: "utf8" }));
 }
 
-function sleep(seconds) {
-  spawnSync("sleep", [String(seconds)]);
-}
-
-const dispatchId = randomUUID();
-const extraArgs = process.argv.slice(2);
-
-console.log(`dispatching "${WORKFLOW}" on ${REPO} (marker ${dispatchId})`);
-execFileSync("gh", ["workflow", "run", WORKFLOW, "-R", REPO, "-f", `dispatch-id=${dispatchId}`, ...extraArgs], {
-  stdio: "inherit",
-});
-
-let runId;
-const deadline = Date.now() + APPEAR_TIMEOUT_S * 1000;
-while (runId === undefined) {
-  if (Date.now() > deadline) {
-    console.error(`no run carrying marker ${dispatchId} appeared within ${APPEAR_TIMEOUT_S}s.`);
-    console.error(`check the Actions tab of ${REPO} for the run.`);
-    process.exit(1);
-  }
-  sleep(POLL_INTERVAL_S);
+/** Id of the most recent run whose name carries `marker`, or `undefined` when none does yet. */
+function findRunId(marker) {
   const runs = ghJson([
     "run",
     "list",
@@ -56,7 +36,27 @@ while (runId === undefined) {
     "--json",
     "databaseId,displayTitle",
   ]);
-  runId = runs.find((run) => run.displayTitle.includes(dispatchId))?.databaseId;
+  return runs.find((run) => run.displayTitle.includes(marker))?.databaseId;
+}
+
+const dispatchId = randomUUID();
+const extraArgs = process.argv.slice(2);
+
+console.log(`dispatching "${WORKFLOW}" on ${REPO} (marker ${dispatchId})`);
+execFileSync("gh", ["workflow", "run", WORKFLOW, "-R", REPO, "-f", `dispatch-id=${dispatchId}`, ...extraArgs], {
+  stdio: "inherit",
+});
+
+let runId = findRunId(dispatchId);
+const deadline = Date.now() + APPEAR_TIMEOUT_S * 1000;
+while (runId === undefined) {
+  if (Date.now() > deadline) {
+    console.error(`no run carrying marker ${dispatchId} appeared within ${APPEAR_TIMEOUT_S}s.`);
+    console.error(`check the Actions tab of ${REPO} for the run.`);
+    process.exit(1);
+  }
+  await delay(POLL_INTERVAL_S * 1000);
+  runId = findRunId(dispatchId);
 }
 
 console.log(`watching run ${runId}`);

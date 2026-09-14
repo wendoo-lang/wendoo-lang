@@ -103,9 +103,15 @@ if (!existsSync(artifactPath)) {
   );
 }
 
-const selfContained = await checkArtifactSelfContained(artifactPath, { targetIdentity: identity });
-if (!selfContained.ok) {
-  fail(`${selfContained.code}: ${selfContained.detail}`);
+const checked = await checkArtifactSelfContained(artifactPath, { targetIdentity: identity });
+if (!checked.ok) {
+  fail(
+    checked.checks
+      .filter((check) => !check.ok)
+      .map((check) => `${check.code}: ${check.detail}`)
+      .join("\n"),
+    "Rebuild the adapter with `npm run build:headless`, then package again."
+  );
 }
 
 rmSync(bundleDir, { recursive: true, force: true });
@@ -117,19 +123,24 @@ mkdirSync(adapterDir, { recursive: true });
 const packagedArtifactPath = join(packageDir, adapterPath);
 cpSync(artifactPath, packagedArtifactPath);
 
-const artifactModule = await import(pathToFileURL(packagedArtifactPath).href);
-const artifact = readAdapterArtifact(artifactModule, { targetIdentity: identity });
-if (!artifact.ok) {
-  fail(`${artifact.nonconformance.code}: ${artifact.nonconformance.detail}`);
+const packagedModule: unknown = await import(pathToFileURL(packagedArtifactPath).href);
+const packaged = readAdapterArtifact(packagedModule, { targetIdentity: identity });
+if (!packaged.ok) {
+  fail(
+    `the packaged adapter at ${packagedArtifactPath} is not a conforming adapter: ` +
+      `${packaged.nonconformance.code}: ${packaged.nonconformance.detail}`,
+    "Rebuild the adapter with `npm run build:headless`, then package again."
+  );
 }
-const buildStamp = readBuildStamp(artifactModule);
+const buildStamp = readBuildStamp(packagedModule);
 if (buildStamp === undefined) {
   fail(
-    `${packagedArtifactPath} publishes no build stamp.`,
+    `the packaged adapter at ${packagedArtifactPath} publishes no build stamp.`,
     "Build the adapter with a build stamp so the package states the language build it runs under."
   );
 }
-const declaredSurface = declaredSurfaceOf(artifact.adapter, buildStamp);
+
+const declaredSurface = declaredSurfaceOf(packaged.adapter, buildStamp);
 writeFileSync(join(packageDir, declaredSurfacePath), `${JSON.stringify(declaredSurface, null, 2)}\n`);
 
 // hostApp.files entries are content-relative: each bundle file is listed at
@@ -146,7 +157,7 @@ manifest.buildVersion = version;
 writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
 console.log(`assembled target package: ${files.length} files under ${packageDirName}/${hostAppPath}/`);
-console.log(`${selfContained.code}: ${selfContained.detail}`);
+for (const check of checked.checks) console.log(`${check.code}: ${check.detail}`);
 console.log(
   `baked declared surface at ${packageDirName}/${declaredSurfacePath}: ` +
     `format ${declaredSurface.formatVersion}, core ${declaredSurface.buildStamp.coreVersion}`

@@ -12,6 +12,7 @@ import {
   adapterMethods,
   adapterNonconformance,
   readAdapterArtifact,
+  readBuildStamp,
 } from "../target/adapter.js";
 import { proposeEdit } from "../tools/propose-edit.js";
 import { createAuthoringWorkspace, isNestedRulePath, locateRules } from "../tools/workspace.js";
@@ -33,6 +34,8 @@ export const ConformanceCheckCode = {
   HeadlessPurity: "headless_purity",
   /** The built artifact documents its tiles and rehearses away from the tree that built it. */
   SelfContainment: "self_containment",
+  /** The built artifact publishes the language build it was built against. */
+  BuildStamp: "build_stamp",
 } as const;
 
 /** Which property of a rehearsal adapter a check covers. */
@@ -314,43 +317,56 @@ const selfContainmentSeed = 1;
 /** Fixed-step thinks the self-containment rehearsal covers. */
 const selfContainmentThinks = 20;
 
-/** A failed self-containment check carrying `detail`. */
-function notSelfContained(detail: string): ConformanceCheck {
-  return { code: ConformanceCheckCode.SelfContainment, ok: false, detail };
+/**
+ * A report carrying the self-containment check that failed with `detail`,
+ * behind the headless purity check when one was reached.
+ */
+function notSelfContained(loaded: ConformanceCheck | undefined, detail: string): ConformanceReport {
+  const selfContainment: ConformanceCheck = { code: ConformanceCheckCode.SelfContainment, ok: false, detail };
+  return report(loaded === undefined ? [selfContainment] : [loaded, selfContainment]);
 }
 
 /**
  * Copy the artifact file at `artifactPath` into a fresh directory outside every
  * build tree and exercise it there: load it in a plain Node process, read the
- * tile documentation it resolves, and rehearse an empty brain in its world.
- * Anything the artifact still reaches for beside its old location -- a package
- * it did not bundle, a documentation tree, a shipped asset -- is missing at the
- * copy, so the check fails. Only the artifact file itself is copied.
+ * tile documentation it resolves, rehearse an empty brain in its world, and
+ * read the build stamp it publishes. Anything the artifact still reaches for
+ * beside its old location -- a package it did not bundle, a documentation tree,
+ * a shipped asset -- is missing at the copy, so the check fails. Only the
+ * artifact file itself is copied.
+ *
+ * Reports the headless purity of the copy, its self-containment, and its build
+ * stamp. Nothing the copy loaded outlives the call: the copy and its module
+ * tree are removed before the report is returned.
  *
  * @param artifactPath Absolute path of the built ES module publishing the adapter.
  */
 export async function checkArtifactSelfContained(
   artifactPath: string,
   expectation: AdapterExpectation
-): Promise<ConformanceCheck> {
+): Promise<ConformanceReport> {
   const copyRoot = await mkdtemp(join(tmpdir(), "wendoo-artifact-"));
+  let loaded: ConformanceCheck | undefined;
   try {
     const copied = join(copyRoot, basename(artifactPath));
     await copyFile(artifactPath, copied);
     const copiedUrl = pathToFileURL(copied);
 
-    const loaded = await checkArtifactLoads(copiedUrl, expectation);
-    if (!loaded.ok) return notSelfContained(loaded.detail);
+    loaded = await checkArtifactLoads(copiedUrl, expectation);
+    if (!loaded.ok) return report([loaded]);
 
-    const result = readAdapterArtifact(await import(copiedUrl.href), expectation);
-    if (!result.ok) return notSelfContained(`${result.nonconformance.code}: ${result.nonconformance.detail}`);
+    const artifactModule: unknown = await import(copiedUrl.href);
+    const result = readAdapterArtifact(artifactModule, expectation);
+    if (!result.ok) {
+      return notSelfContained(loaded, `${result.nonconformance.code}: ${result.nonconformance.detail}`);
+    }
     const { adapter } = result;
 
     const documentedTiles = adapter.tileDocs().size;
-    if (documentedTiles === 0) return notSelfContained(`${copiedUrl.href} resolved no tile documentation`);
+    if (documentedTiles === 0) return notSelfContained(loaded, `${copiedUrl.href} resolved no tile documentation`);
 
     const subject = adapter.subjects()[0];
-    if (subject === undefined) return notSelfContained(`${copiedUrl.href} offers no subject to rehearse`);
+    if (subject === undefined) return notSelfContained(loaded, `${copiedUrl.href} offers no subject to rehearse`);
 
     const workspace = createAuthoringWorkspace(adapter, selfContainmentBrainName);
     await adapter.run({
@@ -359,13 +375,25 @@ export async function checkArtifactSelfContained(
       thinks: selfContainmentThinks,
     });
 
-    return {
-      code: ConformanceCheckCode.SelfContainment,
-      ok: true,
-      detail: `${basename(artifactPath)} documented ${documentedTiles} tiles and rehearsed ${subject} away from its build tree`,
-    };
+    const buildStamp = readBuildStamp(artifactModule);
+    return report([
+      loaded,
+      {
+        code: ConformanceCheckCode.SelfContainment,
+        ok: true,
+        detail: `${basename(artifactPath)} documented ${documentedTiles} tiles and rehearsed ${subject} away from its build tree`,
+      },
+      {
+        code: ConformanceCheckCode.BuildStamp,
+        ok: buildStamp !== undefined,
+        detail:
+          buildStamp === undefined
+            ? `${basename(artifactPath)} publishes no build stamp, so it states no language build`
+            : `built against core ${buildStamp.coreVersion} at ${buildStamp.builtAt}`,
+      },
+    ]);
   } catch (cause) {
-    return notSelfContained(`${artifactPath}: ${cause instanceof Error ? cause.message : String(cause)}`);
+    return notSelfContained(loaded, `${artifactPath}: ${cause instanceof Error ? cause.message : String(cause)}`);
   } finally {
     await rm(copyRoot, { recursive: true, force: true });
   }

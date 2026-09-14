@@ -1,5 +1,11 @@
 import { z } from "zod";
-import type { TargetAdapter, TargetBuildStamp } from "./adapter.js";
+import type {
+  ScenarioInputKind,
+  SubjectStateChannel,
+  TargetAdapter,
+  TargetBuildStamp,
+  TargetManifest,
+} from "./adapter.js";
 
 /**
  * Version of the declared-surface format {@link declaredSurfaceOf} writes.
@@ -13,20 +19,29 @@ const targetManifestSchema = z.object({
   target: z.string(),
   thing: z.string(),
   provides: z.array(z.string()),
-});
+}) satisfies z.ZodType<TargetManifest>;
 
-/** One named vocabulary entry with the sentence its target explains it by. */
-const namedEntrySchema = z.object({
+/** One scenario input kind, as {@link TargetAdapter.inputKinds} states it. */
+const scenarioInputKindSchema = z.object({
   name: z.string(),
   description: z.string(),
-});
+}) satisfies z.ZodType<ScenarioInputKind>;
+
+/**
+ * One subject state channel, as {@link TargetAdapter.stateChannels} states it,
+ * carrying the parts of it that are data.
+ */
+const subjectStateChannelSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+}) satisfies z.ZodType<SubjectStateChannel>;
 
 /** The language build an adapter artifact bundles, and the moment it was built. */
 const buildStampSchema = z.object({
   coreVersion: z.string(),
   coreDistHash: z.string(),
   builtAt: z.string(),
-});
+}) satisfies z.ZodType<TargetBuildStamp>;
 
 /**
  * The baked declarative surface of a target package: everything a consumer
@@ -48,9 +63,9 @@ export const declaredSurfaceSchema = z.object({
   /** Population roles a scenario may name as its subject. */
   subjects: z.array(z.string()),
   /** Scenario input kinds the target reads; empty when it scripts no percepts. */
-  inputKinds: z.array(namedEntrySchema),
+  inputKinds: z.array(scenarioInputKindSchema),
   /** State channels of the subject the target reports per think; empty when it reports none. */
-  stateChannels: z.array(namedEntrySchema),
+  stateChannels: z.array(subjectStateChannelSchema),
 });
 
 /** The baked declarative surface of a target package. */

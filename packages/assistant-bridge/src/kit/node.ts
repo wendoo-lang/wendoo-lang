@@ -9,11 +9,7 @@
  */
 
 export { createTargetBuildStamp, readCoreBuild } from "./build-stamp.js";
-export type {
-  AdapterConformanceOptions,
-  ConformanceCheck,
-  ConformanceReport,
-} from "./conformance.js";
+export type { AdapterConformanceOptions, ConformanceCheck, ConformanceReport } from "./conformance.js";
 export { ConformanceCheckCode, checkAdapterConformance, checkArtifactSelfContained } from "./conformance.js";
 export { readTargetIdentity, targetManifestPath } from "./target-manifest.js";
 export { readTileDocContent } from "./tile-doc-files.js";

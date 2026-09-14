@@ -61,6 +61,18 @@ jobs:
         working-directory: apps/ecosim
         run: npm run build:deps
 
+      - name: Lint & format check
+        working-directory: apps/ecosim
+        run: npm run check:only
+
+      - name: Typecheck
+        working-directory: apps/ecosim
+        run: npm run typecheck
+
+      - name: Run tests
+        working-directory: apps/ecosim
+        run: npm test
+
       # Bumps the manifest version, then rebuilds and re-bakes the package at
       # that version.
       - name: Prepare the release

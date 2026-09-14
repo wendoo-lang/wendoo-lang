@@ -45,8 +45,10 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "$REQUESTED" ]; then
+            # A repository carrying no vX.Y.Z tag yields an empty VERSION,
+            # which the check below reports.
             VERSION="$(git ls-remote --tags "https://github.com/$TRG_REPOSITORY.git" 'refs/tags/v*' \
-              | grep -Eo 'refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
+              | { grep -Eo 'refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' || true; } \
               | sed 's#refs/tags/v##' \
               | sort -V | tail -1)"
             if [ -z "$VERSION" ]; then
@@ -71,11 +73,17 @@ jobs:
           path: ${{ env.PACKAGE_DIR }}
           persist-credentials: false
 
-      # Rejects a fetched tree whose manifest declares a version other than the
-      # resolved one, then exports HOST_APP as the host app subtree to sync.
+      # Rejects a fetched tree whose manifest declares an identity or a version
+      # other than the ones this deploy resolved, then exports HOST_APP as the
+      # host app subtree to sync.
       - name: Locate the package's host app tree
         run: |
           set -euo pipefail
+          PACKAGE_IDENTITY="$(node -p "require('./$PACKAGE_DIR/wendoo.json').identity")"
+          if [ "$PACKAGE_IDENTITY" != "$TRG_REPOSITORY" ]; then
+            echo "the fetched package declares identity $PACKAGE_IDENTITY, not the deploy target $TRG_REPOSITORY."
+            exit 1
+          fi
           PACKAGE_VERSION="$(node -p "require('./$PACKAGE_DIR/wendoo.json').version")"
           if [ "$PACKAGE_VERSION" != "$VERSION" ]; then
             echo "the fetched package declares version $PACKAGE_VERSION, not the resolved $VERSION."
@@ -83,17 +91,25 @@ jobs:
           fi
           HOST_APP_PATH="$(node -p "require('./$PACKAGE_DIR/wendoo.json').hostApp.path")"
           UNUSABLE=""
+          # "undefined" is what node prints for a manifest carrying no
+          # hostApp.path. GITHUB_ENV reads each line as its own assignment, so
+          # a hostApp.path carrying a line break is unusable.
           case "$HOST_APP_PATH" in
-            "" | "." | /*) UNUSABLE="1" ;;
+            "" | "." | "undefined" | /*) UNUSABLE="1" ;;
+            *[$'\n\r']*) UNUSABLE="1" ;;
           esac
           case "/$HOST_APP_PATH/" in
             */../*) UNUSABLE="1" ;;
           esac
           if [ -n "$UNUSABLE" ]; then
-            echo "the package's hostApp.path \"$HOST_APP_PATH\" is not a subdirectory of the package."
+            echo "the package's hostApp.path \"$HOST_APP_PATH\" is not a usable subdirectory of the package."
             exit 1
           fi
-          echo "HOST_APP=$PACKAGE_DIR/$HOST_APP_PATH" >> "$GITHUB_ENV"
+          {
+            echo "HOST_APP<<HOST_APP_EOF"
+            echo "$PACKAGE_DIR/$HOST_APP_PATH"
+            echo "HOST_APP_EOF"
+          } >> "$GITHUB_ENV"
 
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
