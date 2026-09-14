@@ -1,8 +1,15 @@
 name: Release ecosim
 
+run-name: "Release ecosim: ${{ inputs.bump }} ${{ inputs.dispatch-id }}"
+
 on:
   workflow_dispatch:
     inputs:
+      dispatch-id:
+        description: "Caller-supplied marker shown in the run name, so a dispatching script can find this run"
+        required: false
+        type: string
+        default: ""
       bump:
         description: "Version bump level"
         type: choice
@@ -11,9 +18,10 @@ on:
           - minor
           - major
         default: patch
-
-permissions:
-  contents: write
+      deploy:
+        description: "Deploy the released version once the publish succeeds"
+        type: boolean
+        default: true
 
 concurrency:
   group: release-ecosim
@@ -22,6 +30,10 @@ jobs:
   release:
     name: Package & Publish
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
 
     steps:
       - name: Checkout
@@ -74,6 +86,7 @@ jobs:
       # Commits the bumped target manifest and pushes it to the branch this run
       # was dispatched from.
       - name: Commit & push the version bump
+        id: bump
         working-directory: apps/ecosim
         env:
           BRANCH: ${{ github.ref_name }}
@@ -88,6 +101,7 @@ jobs:
           git add target-package/wendoo.json
           git commit -m "ecosim target package v$VERSION"
           git push origin "HEAD:$BRANCH"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       # Publishes the package as tag v<version> on the repository the manifest
       # identity names.
@@ -107,3 +121,15 @@ jobs:
           export GIT_CONFIG_KEY_2="url.https://x-access-token:$TRG_PUBLISH_TOKEN@github.com/$IDENTITY.git.insteadOf"
           export GIT_CONFIG_VALUE_2="$TRG_REMOTE"
           npm run release-trg -- publish
+
+  deploy:
+    name: Deploy
+    needs: release
+    if: ${{ inputs.deploy }}
+    permissions:
+      id-token: write
+      contents: read
+    uses: ./.github/workflows/deploy-ecosim.yml
+    with:
+      version: ${{ needs.release.outputs.version }}
+    secrets: inherit

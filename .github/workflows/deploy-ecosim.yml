@@ -4,9 +4,17 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Published target package version to deploy (x.y.z)"
-        required: true
+        description: "Published target package version to deploy (x.y.z); empty deploys the latest published version"
+        required: false
         type: string
+        default: ""
+  workflow_call:
+    inputs:
+      version:
+        description: "Published target package version to deploy (x.y.z); empty deploys the latest published version"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   id-token: write
@@ -28,34 +36,49 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check the version names an exact release
+      # An empty dispatch input resolves to the highest published x.y.z tag on
+      # the target repository; a given version must name an exact release.
+      # Either way VERSION carries a gate-matched x.y.z for the later steps.
+      - name: Resolve the version to deploy
         env:
-          VERSION: ${{ inputs.version }}
+          REQUESTED: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "version must be an exact x.y.z release."
-            exit 1
+          if [ -z "$REQUESTED" ]; then
+            VERSION="$(git ls-remote --tags "https://github.com/$TRG_REPOSITORY.git" 'refs/tags/v*' \
+              | grep -Eo 'refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
+              | sed 's#refs/tags/v##' \
+              | sort -V | tail -1)"
+            if [ -z "$VERSION" ]; then
+              echo "no published x.y.z release found on $TRG_REPOSITORY."
+              exit 1
+            fi
+            echo "deploying the latest published version: $VERSION"
+          else
+            if ! printf '%s' "$REQUESTED" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "version must be an exact x.y.z release, or empty for the latest."
+              exit 1
+            fi
+            VERSION="$REQUESTED"
           fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Fetch the published target package
         uses: actions/checkout@v6
         with:
           repository: ${{ env.TRG_REPOSITORY }}
-          ref: v${{ inputs.version }}
+          ref: v${{ env.VERSION }}
           path: ${{ env.PACKAGE_DIR }}
           persist-credentials: false
 
       # Rejects a fetched tree whose manifest declares a version other than the
-      # dispatched one, then exports HOST_APP as the host app subtree to sync.
+      # resolved one, then exports HOST_APP as the host app subtree to sync.
       - name: Locate the package's host app tree
-        env:
-          VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
           PACKAGE_VERSION="$(node -p "require('./$PACKAGE_DIR/wendoo.json').version")"
           if [ "$PACKAGE_VERSION" != "$VERSION" ]; then
-            echo "the fetched package declares version $PACKAGE_VERSION, not the dispatched $VERSION."
+            echo "the fetched package declares version $PACKAGE_VERSION, not the resolved $VERSION."
             exit 1
           fi
           HOST_APP_PATH="$(node -p "require('./$PACKAGE_DIR/wendoo.json').hostApp.path")"

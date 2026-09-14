@@ -50,9 +50,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p src/rehearsal/tsconfig.json && tsc --noEmit -p tsconfig.spec.json && tsc --noEmit -p lib/tsconfig.ambient.json && tsc --noEmit -p scripts/tsconfig.json && tsc --noEmit -p lib/tsconfig.json && tsc --noEmit -p extensions/tsconfig.json",
     "format": "biome format ./src ./vite --write",
     "build:deps": "node ../../scripts/build-packages.js .",
-    "release:patch": "node ../../scripts/release.js patch --skip-deps",
-    "release:minor": "node ../../scripts/release.js minor --skip-deps",
-    "release:major": "node ../../scripts/release.js major --skip-deps"
+    "release": "node scripts/release-dispatch.mjs"
   },
   "dependencies": {
     "@wendoo/app-host": "file:../../packages/app-host",
