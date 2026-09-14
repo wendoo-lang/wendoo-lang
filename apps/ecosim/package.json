@@ -60,7 +60,7 @@
         "vite/**",
         "tsconfig*.json",
         "package.json",
-        "target-package/wendoo.json",
+        "wendoo.json",
         "../../packages/*/package.json",
         "../../packages/*/dist/**",
         "../../packages/docs/src/**",

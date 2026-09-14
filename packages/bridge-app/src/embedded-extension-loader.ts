@@ -17,13 +17,27 @@ function bundlePathFor(dir: string, entry: string): string {
 }
 
 /**
- * Read and parse the `files` list an extension declares in its own
- * `wendoo.json`. An extension must declare content `files` or a `hostApp`
- * bundle: a library names its content files, and a target (a `hostApp`) carries
- * no library content, so it resolves to an empty file list. A manifest that
- * declares neither is rejected.
+ * What an embedded extension contributes, which decides whether its manifest
+ * must name content files.
+ *
+ * - `library`: source content a consumer compiles against. Its manifest must
+ *   declare a `files` list naming that content, or a `hostApp` bundle.
+ * - `target`: a runnable platform, contributing identity and compatibility
+ *   metadata only. Its bundle is its manifest alone, so it needs neither.
  */
-function readManifestFiles(dir: string): { manifestText: string; files: readonly string[] } {
+export type EmbeddedExtensionKind = "library" | "target";
+
+/**
+ * Read and parse the `files` list an extension declares in its own
+ * `wendoo.json`. A library must declare content `files` or a `hostApp` bundle;
+ * a `target` extension, and any manifest declaring a `hostApp`, carries no
+ * library content and resolves to an empty file list. A library manifest
+ * declaring neither is rejected.
+ */
+function readManifestFiles(
+  dir: string,
+  kind: EmbeddedExtensionKind
+): { manifestText: string; files: readonly string[] } {
   const manifestPath = resolve(dir, WENDOO_JSON_PATH);
   if (!existsSync(manifestPath)) {
     throw new Error(`Embedded extension at ${dir} has no ${WENDOO_JSON_PATH}.`);
@@ -37,7 +51,7 @@ function readManifestFiles(dir: string): { manifestText: string; files: readonly
     );
   }
   if (parsed.manifest.files === undefined) {
-    if (parsed.manifest.hostApp !== undefined) {
+    if (kind === "target" || parsed.manifest.hostApp !== undefined) {
       return { manifestText, files: [] };
     }
     throw new Error(
@@ -55,9 +69,10 @@ function readManifestFiles(dir: string): { manifestText: string; files: readonly
  * error direction, a listed file the build cannot assemble.
  *
  * @param dir - Directory holding the extension's `wendoo.json`.
+ * @param kind - What the extension contributes; a `target` names no content files.
  */
-export function findMissingExtensionFiles(dir: string): readonly string[] {
-  const { files } = readManifestFiles(dir);
+export function findMissingExtensionFiles(dir: string, kind: EmbeddedExtensionKind = "library"): readonly string[] {
+  const { files } = readManifestFiles(dir, kind);
   return findMissingListedFiles(files, (entry) => existsSync(resolve(dir, entry)));
 }
 
@@ -67,9 +82,10 @@ export function findMissingExtensionFiles(dir: string): readonly string[] {
  * watches these so editing extension source refreshes the assembled bundle.
  *
  * @param dir - Directory holding the extension's `wendoo.json`.
+ * @param kind - What the extension contributes; a `target` names no content files.
  */
-export function extensionSourceFiles(dir: string): readonly string[] {
-  const { files } = readManifestFiles(dir);
+export function extensionSourceFiles(dir: string, kind: EmbeddedExtensionKind = "library"): readonly string[] {
+  const { files } = readManifestFiles(dir, kind);
   return [resolve(dir, WENDOO_JSON_PATH), ...files.map((entry) => resolve(dir, entry))];
 }
 
@@ -82,13 +98,18 @@ export function extensionSourceFiles(dir: string): readonly string[] {
  *
  * @param dir - Directory holding the extension's `wendoo.json`.
  * @param canonicalOrigin - The `<owner>/<repo>` coordinate the bundle is keyed under.
- * @throws {Error} when the manifest is missing, invalid, declares neither
- *   `files` nor a `hostApp` bundle, or names a file absent from disk.
+ * @param kind - What the extension contributes; a `target` names no content files.
+ * @throws {Error} when the manifest is missing, invalid, is a library declaring
+ *   neither `files` nor a `hostApp` bundle, or names a file absent from disk.
  */
-export function buildEmbeddedExtensionFromDir(dir: string, canonicalOrigin: string): EmbeddedExtension {
-  const { manifestText, files: declared } = readManifestFiles(dir);
+export function buildEmbeddedExtensionFromDir(
+  dir: string,
+  canonicalOrigin: string,
+  kind: EmbeddedExtensionKind = "library"
+): EmbeddedExtension {
+  const { manifestText, files: declared } = readManifestFiles(dir, kind);
 
-  const missing = findMissingExtensionFiles(dir);
+  const missing = findMissingExtensionFiles(dir, kind);
   if (missing.length > 0) {
     throw new Error(
       `Embedded extension "${canonicalOrigin}" at ${dir} declares files absent from disk: ${missing.join(", ")}.`

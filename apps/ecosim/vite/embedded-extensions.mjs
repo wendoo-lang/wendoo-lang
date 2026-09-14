@@ -5,7 +5,7 @@ import path from "path";
 // list of each comes from its own wendoo.json, so adding a file to an
 // extension needs no change here.
 const registrations = [
-  { coordinate: "wendoo-lang/trg-ecosim", dir: path.resolve(process.cwd(), "./target-package") },
+  { coordinate: "wendoo-lang/trg-ecosim", dir: path.resolve(process.cwd(), "."), kind: "target" },
   { coordinate: "wendoo-lang/lib-ecosim", dir: path.resolve(process.cwd(), "./lib") },
   { coordinate: "wendoo-lang/lib-core", dir: path.resolve(process.cwd(), "../../packages/core/lib") },
   {

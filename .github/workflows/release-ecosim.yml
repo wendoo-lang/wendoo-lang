@@ -95,8 +95,8 @@ jobs:
             exit 1
           fi
 
-      # Commits the bumped target manifest and pushes it to the branch this run
-      # was dispatched from.
+      # Commits the bumped source manifest -- the one tracked file the prepare
+      # stage writes -- and pushes it to the branch this run was dispatched from.
       - name: Commit & push the version bump
         id: bump
         working-directory: apps/ecosim
@@ -109,8 +109,8 @@ jobs:
           GIT_CONFIG_VALUE_1: "41898282+github-actions[bot]@users.noreply.github.com"
         run: |
           set -euo pipefail
-          VERSION="$(node -p "require('./target-package/wendoo.json').version")"
-          git add target-package/wendoo.json
+          VERSION="$(node -p "require('./wendoo.json').version")"
+          git add wendoo.json
           git commit -m "ecosim target package v$VERSION"
           git push origin "HEAD:$BRANCH"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -123,7 +123,7 @@ jobs:
           TRG_PUBLISH_TOKEN: ${{ secrets.TRG_PUBLISH_TOKEN }}
         run: |
           set -euo pipefail
-          IDENTITY="$(node -p "require('./target-package/wendoo.json').identity")"
+          IDENTITY="$(node -p "require('./wendoo.json').identity")"
           TRG_REMOTE="https://github.com/$IDENTITY.git"
           export GIT_CONFIG_COUNT=3
           export GIT_CONFIG_KEY_0="user.name"

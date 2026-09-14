@@ -108,6 +108,24 @@ unaffected; the ban is on deletion commands an agent writes.
   individually (`rm <exact-path>`) when done with it.
 - Never delete a file or directory you did not create this session.
 
+## Build Outputs Are Never Tracked
+
+A tracked file is authored by people or by a version bump, never by a build. No
+build output is checked in: not a compiled bundle, not a generated manifest, not
+a content hash or file list a packaging step computes.
+
+- Every directory a build writes into is gitignored in full, so a local build
+  never dirties the working tree and never conflicts with someone else's.
+- When a document fuses authored fields with built ones, split it: the authored
+  half is tracked source, and the build assembles the complete document into
+  generated output from that source plus the build.
+- Source is the build's input, never the other way round. A build step, a test,
+  or a tool configuration reads the tracked source file; reading a generated
+  file to learn an authored fact is a defect, because the fact then depends on
+  whether someone has built yet.
+- A version bump writes the tracked source file. Release automation commits that
+  file and nothing a build produced.
+
 ## Generated Files -- Do Not Read
 
 Never read `packages/ts-compiler/src/compiler/lib-dts.generated.ts` when

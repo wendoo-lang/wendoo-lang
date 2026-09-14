@@ -99,6 +99,43 @@ describe("buildEmbeddedExtensionFromDir -- an extension must declare files or a 
   });
 });
 
+describe("buildEmbeddedExtensionFromDir -- a target's source manifest carries no content files", () => {
+  let dir: string;
+  before(() => {
+    dir = mkdtempSync(join(tmpdir(), "wendoo-ext-"));
+    writeFileSync(
+      join(dir, "wendoo.json"),
+      JSON.stringify(
+        {
+          name: "Target",
+          version: "0.8.0",
+          identity: "test-owner/trg-target",
+          targets: { "test-owner/lib-dep": { packageVersion: "^0.1.0" } },
+        },
+        null,
+        2
+      )
+    );
+  });
+  after(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("a target manifest with neither files nor a hostApp assembles the manifest alone", () => {
+    const extension = buildEmbeddedExtensionFromDir(dir, "test-owner/trg-target", "target");
+    assert.equal(extension.canonicalOrigin, "test-owner/trg-target");
+    assert.deepEqual([...contentByPath(extension.files).keys()], ["wendoo.json"]);
+  });
+
+  test("findMissingExtensionFiles reports no drift for a target's source manifest", () => {
+    assert.deepEqual(findMissingExtensionFiles(dir, "target"), []);
+  });
+
+  test("the same manifest registered as a library is rejected", () => {
+    assert.throws(() => buildEmbeddedExtensionFromDir(dir, "test-owner/trg-target"), /files/);
+  });
+});
+
 describe("buildEmbeddedExtensionFromDir -- a hostApp target carries no content files", () => {
   let dir: string;
   before(() => {

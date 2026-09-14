@@ -13,10 +13,8 @@ dist-headless
 dist-ssr
 *.local
 
-# Generated target-package payload (manifest stays tracked)
-target-package/app
-target-package/rehearsal
-target-package/declared-surface.json
+# Assembled target package, generated in full from wendoo.json plus the build
+target-package/
 
 # Editor directories and files
 .vscode/*

@@ -1,3 +1,4 @@
+import type { EmbeddedExtensionKind } from "./embedded-extension-loader.js";
 import { buildEmbeddedExtensionFromDir, extensionSourceFiles } from "./embedded-extension-loader.js";
 import type { EmbeddedExtension } from "./embedded-extensions.js";
 
@@ -7,6 +8,11 @@ export interface EmbeddedExtensionRegistration {
   coordinate: string;
   /** Absolute path to the directory holding the extension's `wendoo.json`. */
   dir: string;
+  /**
+   * What the extension contributes; defaults to `library`. Register the host's
+   * own target as `target`, whose bundle is its manifest alone.
+   */
+  kind?: EmbeddedExtensionKind;
 }
 
 /**
@@ -50,13 +56,13 @@ export function embeddedExtensionsVitePlugin(
       if (id !== resolvedId) {
         return undefined;
       }
-      const bundles: EmbeddedExtension[] = registrations.map(({ coordinate, dir }) => {
+      const bundles: EmbeddedExtension[] = registrations.map(({ coordinate, dir, kind = "library" }) => {
         if (this.addWatchFile) {
-          for (const file of extensionSourceFiles(dir)) {
+          for (const file of extensionSourceFiles(dir, kind)) {
             this.addWatchFile(file);
           }
         }
-        return buildEmbeddedExtensionFromDir(dir, coordinate);
+        return buildEmbeddedExtensionFromDir(dir, coordinate, kind);
       });
       return `export default ${JSON.stringify(bundles)};`;
     },

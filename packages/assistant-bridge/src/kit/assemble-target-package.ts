@@ -2,7 +2,12 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { readTargetPackageVersion, TARGET_PACKAGE_DIR_NAME, targetManifestPath } from "@wendoo/app-host/tooling";
+import {
+  readTargetPackageVersion,
+  TARGET_PACKAGE_DIR_NAME,
+  targetPackageManifestPath,
+  targetSourceManifestPath,
+} from "@wendoo/app-host/tooling";
 import { readAdapterArtifact, readBuildStamp } from "../target/adapter.js";
 import { declaredSurfaceOf } from "../target/declared-surface.js";
 import { checkArtifactSelfContained } from "./conformance.js";
@@ -37,7 +42,7 @@ interface FileDeclaration {
   readonly path: string;
 }
 
-/** The manifest fields this assembly reads and rewrites. */
+/** The manifest fields this assembly carries through from the source manifest and writes. */
 interface TargetManifestDocument extends Record<string, unknown> {
   version?: string;
   identity?: string;
@@ -70,16 +75,17 @@ function listFiles(dir: string, prefix = ""): string[] {
 
 const appDir = process.cwd();
 const packageDir = join(appDir, TARGET_PACKAGE_DIR_NAME);
-const manifestPath = targetManifestPath(appDir);
+const sourceManifestPath = targetSourceManifestPath(appDir);
+const packageManifestPath = targetPackageManifestPath(appDir);
 const distDir = join(appDir, hostAppSource);
 const artifactPath = join(appDir, adapterSource);
 const bundleDir = join(packageDir, hostAppPath);
 const adapterDir = join(packageDir, dirname(adapterPath));
 
-if (!existsSync(manifestPath)) {
-  fail(`no target manifest at ${manifestPath}.`);
+if (!existsSync(sourceManifestPath)) {
+  fail(`no target source manifest at ${sourceManifestPath}.`);
 }
-const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as TargetManifestDocument;
+const manifest = JSON.parse(readFileSync(sourceManifestPath, "utf8")) as TargetManifestDocument;
 let identity: string;
 let version: string;
 try {
@@ -109,6 +115,8 @@ if (!checked.ok) {
     "Rebuild the adapter with `npm run build:headless`, then package again."
   );
 }
+
+mkdirSync(packageDir, { recursive: true });
 
 rmSync(bundleDir, { recursive: true, force: true });
 mkdirSync(bundleDir, { recursive: true });
@@ -150,7 +158,7 @@ manifest.rehearsalAdapter = { path: adapterPath };
 manifest.declaredSurface = { path: declaredSurfacePath };
 // The version the bundle carries; publish requires it to match the declared version.
 manifest.buildVersion = version;
-writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+writeFileSync(packageManifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
 console.log(`assembled target package: ${files.length} files under ${TARGET_PACKAGE_DIR_NAME}/${hostAppPath}/`);
 for (const check of checked.checks) console.log(`${check.code}: ${check.detail}`);

@@ -10,9 +10,8 @@ import { ConformanceCheckCode, checkArtifactSelfContained } from "@wendoo/assist
 const APP_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /** The identity this target's own manifest declares, which its artifact must report. */
-const targetIdentity = (
-  JSON.parse(readFileSync(join(APP_DIR, "target-package", "wendoo.json"), "utf8")) as { identity: string }
-).identity;
+const targetIdentity = (JSON.parse(readFileSync(join(APP_DIR, "wendoo.json"), "utf8")) as { identity: string })
+  .identity;
 
 /** The headless adapter artifact `npm run build:headless` produces. */
 const artifactPath = join(APP_DIR, "dist-headless", "rehearsal", "adapter.js");

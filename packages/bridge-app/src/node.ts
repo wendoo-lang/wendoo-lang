@@ -1,3 +1,4 @@
+export type { EmbeddedExtensionKind } from "./embedded-extension-loader.js";
 export {
   buildEmbeddedExtensionFromDir,
   extensionSourceFiles,

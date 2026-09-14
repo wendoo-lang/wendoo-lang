@@ -1,0 +1,11 @@
+{
+  "name": "Wendoo Ecosystem Simulator",
+  "version": "0.1.7",
+  "identity": "wendoo-lang/trg-ecosim",
+  "description": "Program the brains of carnivores, herbivores, and plants in a live 2D ecosystem.",
+  "targets": {
+    "wendoo-lang/lib-ecosim": {
+      "packageVersion": "^0.1.0"
+    }
+  }
+}
