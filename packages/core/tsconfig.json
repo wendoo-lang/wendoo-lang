@@ -4,6 +4,7 @@
     { "path": "./tsconfig.esm.json" },
     { "path": "./tsconfig.node.json" },
     { "path": "./tsconfig.rbx.json" },
+    { "path": "./tsconfig.tooling.json" },
     { "path": "./tsconfig.spec.json" }
   ]
 }

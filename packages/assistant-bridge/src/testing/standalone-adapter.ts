@@ -1,11 +1,6 @@
+import type { CoreBuild } from "@wendoo/core";
 import type { WendooModule } from "@wendoo/core/app";
-import type {
-  ADAPTER_CONTRACT_VERSION,
-  SimulationRun,
-  TargetAdapter,
-  TargetBuildStamp,
-  TargetManifest,
-} from "../target/adapter.js";
+import type { ADAPTER_CONTRACT_VERSION, SimulationRun, TargetAdapter, TargetManifest } from "../target/adapter.js";
 
 /** Wendoo identity the standalone adapter reports itself as. */
 export const STANDALONE_TARGET_IDENTITY = "example-org/trg-standalone";
@@ -34,13 +29,12 @@ const emptyRun: SimulationRun = {
 };
 
 /**
- * A build stamp for a copy of this module to republish under the `buildStamp`
- * name a loader reads.
+ * A language build for a copy of this module to republish under the
+ * `buildStamp` name a loader reads.
  */
-export const standaloneBuildStamp: TargetBuildStamp = {
+export const standaloneBuildStamp: CoreBuild = {
   coreVersion: "0.0.0-standalone",
   coreDistHash: "0".repeat(64),
-  builtAt: "2026-01-01T00:00:00.000Z",
 };
 
 const adapter: TargetAdapter = {

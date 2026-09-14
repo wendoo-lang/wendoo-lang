@@ -107,6 +107,26 @@ Current modules using this pattern: `dict`, `error`, `list`, `logger`, `math`,
 `stream`, `string`, `task`, `time`, `types`, `uniqueset`, `vector2`, and
 `vector3`.
 
+## Node-Only Tooling Subtrees
+
+A subtree under `src` may be Node-only when what it does is read this package's own build
+output or the manifest of a package that consumes it. `src/docs` and `src/tooling` are the
+two that exist. Such a subtree obeys all of these:
+
+- Every build target that cannot run Node excludes it. `tsconfig.esm.json` and
+  `tsconfig.rbx.json` exclude it by path, and `build:rbx`'s wireit `files` carries the
+  matching `!src/<subtree>/**` so an edit inside it does not invalidate the Roblox build.
+- It emits to its own `outDir`, outside every language-output directory. Nothing under
+  `dist/node` may be build tooling: `readCoreBuild` hashes that directory, so tooling
+  emitted into it would make the language hash change when only the hasher changed. A
+  spec asserts the separation on the real emitted layout.
+- It gets its own export entry, declaring `"browser": null` alongside the usual
+  conditions, so a browser bundle is refused rather than served Node code.
+- Its specs import their subject by relative path (`./core-build.js`), not by package
+  specifier. This is the one exception to the package-import rule under Testing above, and
+  it exists because the tooling entry emits separately from the language build the rest of
+  the specs resolve against.
+
 ## Type Organization
 
 **Co-locate types with their producers.** Interface types for serialization formats,
@@ -114,3 +134,12 @@ event payloads, and similar concerns belong in the same file as the class that c
 consumes them -- not in standalone type-only files. This keeps related code together and
 avoids single-purpose type modules that would be at odds with the project's organization
 patterns.
+
+**Exception: a serialization type whose producer is target-excluded.** When a type crosses
+between packages but the code that produces it lives in a Node-only subtree, the type
+belongs in a browser-safe module beside the package's other public types, not in the
+producer's file -- otherwise the whole barrel would have to reach into a subtree that two
+of the three build targets exclude. `src/build-identity.ts` holds `CoreBuild` and
+`ClientBuild` on this rule; `src/tooling/core-build.ts` produces them. Such a module
+imports nothing but types: a value import from it would be pulled into the tooling build's
+output as well.

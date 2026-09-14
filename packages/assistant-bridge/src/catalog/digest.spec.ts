@@ -132,6 +132,58 @@ describe("catalog digest", () => {
   });
 });
 
+describe("the order a digest line writes a tile's fields in", () => {
+  test("writes the catalog's own fields in one order, whatever order the tile spells them in", () => {
+    const declared = catalogDigest([
+      {
+        tileId: "a",
+        label: "signal",
+        kind: "sensor",
+        description: "senses light",
+        placement: ["when"],
+        requires: [],
+        provides: [],
+        outputs: [],
+      },
+    ]);
+    const spelledBackwards = catalogDigest([
+      {
+        outputs: [],
+        provides: [],
+        requires: [],
+        placement: ["when"],
+        description: "senses light",
+        kind: "sensor",
+        label: "signal",
+        tileId: "a",
+      },
+    ]);
+
+    assert.deepEqual(Object.keys(JSON.parse(declared.text) as object), [
+      "tileId",
+      "label",
+      "kind",
+      "description",
+      "placement",
+      "requires",
+      "provides",
+      "outputs",
+    ]);
+    assert.equal(spelledBackwards.text, declared.text);
+    assert.equal(spelledBackwards.hash, declared.hash);
+  });
+
+  test("carries a field the catalog does not declare, after the ones it does and in name order", () => {
+    const richer = { ...tile({ tileId: "a" }), zebra: 2, alpha: 1 } as CatalogTile;
+    const digest = catalogDigest([richer]);
+    const parsed = JSON.parse(digest.text) as Record<string, unknown>;
+
+    assert.equal(parsed.alpha, 1);
+    assert.equal(parsed.zebra, 2);
+    assert.deepEqual(Object.keys(parsed).slice(-2), ["alpha", "zebra"]);
+  });
+});
+
 describe("what the digest bounds in a tile's argument grammar", () => {
   test("cuts an args string the producer left over the limit", () => {
     const digest = catalogDigest([tile({ tileId: "a", args: `any-order(optional(x:string=${"q".repeat(3000)}))` })]);

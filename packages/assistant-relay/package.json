@@ -77,6 +77,9 @@
   "wireit": {
     "build:prod": {
       "command": "tsc --build tsconfig.prod.json",
+      "dependencies": [
+        "../core:build:prod"
+      ],
       "files": [
         "src/**",
         "!src/**/*.spec.ts",
@@ -93,6 +96,7 @@
     }
   },
   "dependencies": {
+    "@wendoo/core": "file:../core",
     "zod": "^4.3.6"
   },
   "devDependencies": {

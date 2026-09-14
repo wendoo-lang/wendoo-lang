@@ -45,6 +45,12 @@
       "types": "./dist/index.d.ts",
       "browser": "./dist/index.js",
       "import": "./dist/index.js"
+    },
+    "./tooling": {
+      "types": "./dist/tooling/index.d.ts",
+      "browser": null,
+      "import": "./dist/tooling/index.js",
+      "default": "./dist/tooling/index.js"
     }
   },
   "wendooBuild": {

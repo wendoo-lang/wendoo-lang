@@ -1,10 +1,10 @@
 import type { ProjectCollection, ProjectCollectionState, ProjectManifest } from "@wendoo/app-host";
 import { AppHostError } from "@wendoo/app-host";
+import { assistantToolManifest } from "@wendoo/assistant-bridge/relay";
 import type { EditedBrainWorkspaces } from "@wendoo/assistant-panel";
 import {
   AssistantProvider,
   assistantSessionUrl,
-  assistantToolManifest,
   createEditedBrainWorkspaces,
   createPersonActivity,
   createWebSocketConnect,
@@ -44,6 +44,7 @@ import { createDocsRegistry } from "./docs/docs-registry";
 import type { Playground, SceneBrainState } from "./game/scenes/Playground";
 import { PhaserGame } from "./PhaserGame";
 import { createTargetAdapter } from "./rehearsal/adapter";
+import { clientBuild } from "./services/client-build";
 import { ecosimEmbeddedExtensions } from "./services/ecosim-embedded-extensions";
 import {
   addEcosimLibrary,
@@ -228,6 +229,7 @@ function App() {
     const activity = createPersonActivity();
     return {
       manifest: assistantToolManifest(adapter),
+      clientBuild,
       activity,
       workspaces: createEditedBrainWorkspaces({
         environment: store.env,
@@ -828,6 +830,7 @@ function App() {
     <AssistantProvider
       connect={assistant.connect}
       manifest={assistant.manifest}
+      clientBuild={assistant.clientBuild}
       workspace={assistant.workspaces.workspaceFor}
       activity={assistant.activity}
     >

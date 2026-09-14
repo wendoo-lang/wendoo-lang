@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import type { CoreBuild, TargetBuildStamp } from "../target/adapter.js";
+import type { ClientBuild, CoreBuild } from "../build-identity.js";
 
 /** Name of the package whose build decides the semantics a rehearsed brain runs under. */
 const languagePackage = "@wendoo/core";
@@ -22,39 +22,33 @@ function readManifest(packageDir: string): LinkedManifest {
 }
 
 /**
- * Every package directory reachable from `packageDir` through `file:`
- * dependencies, runtime and dev alike, transitively, excluding `packageDir`
- * itself.
+ * Directory of the package named `packageName` that `packageDir` reaches
+ * through `file:` dependencies, runtime and dev alike, transitively;
+ * `undefined` when nothing it reaches declares that name. `packageDir` itself
+ * is walked but never returned.
  */
-function localDependencyDirs(packageDir: string): string[] {
-  const found: string[] = [];
+function localDependencyDir(packageDir: string, packageName: string): string | undefined {
   const visited = new Set<string>();
 
-  const walk = (dir: string, isRoot: boolean): void => {
+  const walk = (dir: string, isRoot: boolean): string | undefined => {
     const resolved = resolve(dir);
-    if (visited.has(resolved)) return;
+    if (visited.has(resolved)) return undefined;
     visited.add(resolved);
-    if (!isRoot) found.push(resolved);
 
     const manifest = readManifest(resolved);
+    if (!isRoot && manifest.name === packageName) return resolved;
+
     for (const specifier of Object.values({ ...manifest.dependencies, ...manifest.devDependencies })) {
       if (!specifier.startsWith(localSpecifier)) continue;
       const dependencyDir = resolve(resolved, specifier.slice(localSpecifier.length));
-      if (existsSync(join(dependencyDir, "package.json"))) walk(dependencyDir, false);
+      if (!existsSync(join(dependencyDir, "package.json"))) continue;
+      const found = walk(dependencyDir, false);
+      if (found !== undefined) return found;
     }
+    return undefined;
   };
 
-  walk(packageDir, true);
-  return found;
-}
-
-/**
- * Directory of the package named `packageName` that `packageDir` reaches
- * through `file:` dependencies, runtime and dev alike, transitively;
- * `undefined` when nothing it reaches declares that name.
- */
-function localDependencyDir(packageDir: string, packageName: string): string | undefined {
-  return localDependencyDirs(packageDir).find((dir) => readManifest(dir).name === packageName);
+  return walk(packageDir, true);
 }
 
 /**
@@ -66,7 +60,7 @@ const languageOutput = "dist/node";
 /** Suffix of the build output whose content decides those semantics. */
 const scriptSuffix = ".js";
 
-/** The one manifest field a build stamp reads. */
+/** The one manifest field a language build reads. */
 interface VersionedManifest {
   readonly version?: string;
 }
@@ -106,17 +100,36 @@ function digestOf(directory: string, paths: readonly string[]): string {
   return digest.digest("hex");
 }
 
+/** Language builds already read, keyed by the resolved directory that asked for one. */
+const readBuilds = new Map<string, CoreBuild>();
+
 /**
  * The language build the package at `packageDir` consumes, read from the
  * `@wendoo/core` it reaches through its `file:` dependencies. This reads build
- * output, so run the package's `build:deps` script first.
+ * output, so run the package's `build:deps` script first. The first read of a
+ * directory walks and hashes; every later read of the same directory in the
+ * same process returns that same result.
  *
  * Throws when nothing the package reaches is `@wendoo/core`, and when that
  * package's Node build output is absent or empty.
  *
+ * Hand the result to a bundler's `define` for an adapter artifact to republish
+ * as its `buildStamp` export.
+ *
  * @param packageDir Absolute path of the package whose language build to read.
  */
 export function readCoreBuild(packageDir: string): CoreBuild {
+  const asked = resolve(packageDir);
+  const read = readBuilds.get(asked);
+  if (read !== undefined) return read;
+
+  const build = hashCoreBuild(asked);
+  readBuilds.set(asked, build);
+  return build;
+}
+
+/** The language build the package at `packageDir` consumes, walked and hashed afresh. */
+function hashCoreBuild(packageDir: string): CoreBuild {
   const coreDir = localDependencyDir(packageDir, languagePackage);
   if (coreDir === undefined) {
     throw new Error(
@@ -140,15 +153,28 @@ export function readCoreBuild(packageDir: string): CoreBuild {
 }
 
 /**
- * The stamp an adapter artifact built from `packageDir` publishes: the language
- * build it bundles, and the moment it was built. Hand the result to a bundler's
- * `define` so the artifact carries it, and export it from the artifact as
- * `buildStamp`.
+ * What the host app bundle built from `packageDir` states of its own build: the
+ * version it is published under, and the language build it bundles. Hand the
+ * result to a bundler's `define` so the bundle carries it.
  *
  * Throws for the reasons {@link readCoreBuild} does.
  *
- * @param packageDir Absolute path of the package whose artifact is being built.
+ * @param packageDir Absolute path of the app whose bundle is being built.
+ * @param targetPackageVersion Version the bundle states for itself: the one its
+ *   target manifest declares for a release build, and core's
+ *   `DEV_TARGET_PACKAGE_VERSION` for any other.
  */
-export function createTargetBuildStamp(packageDir: string): TargetBuildStamp {
-  return { ...readCoreBuild(packageDir), builtAt: new Date().toISOString() };
+export function createClientBuild(packageDir: string, targetPackageVersion: string): ClientBuild {
+  return { targetPackageVersion, coreDistHash: readCoreBuild(packageDir).coreDistHash };
+}
+
+/** Characters of a dist hash a phrase quotes. */
+const quotedHashLength = 12;
+
+/**
+ * `build` as one phrase naming the language version and the head of its dist
+ * hash, for a diagnostic line a person reads.
+ */
+export function describeCoreBuild(build: CoreBuild): string {
+  return `core ${build.coreVersion} (dist ${build.coreDistHash.slice(0, quotedHashLength)})`;
 }

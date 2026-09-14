@@ -18,5 +18,5 @@
     "preserveSymlinks": true
   },
   "include": ["src"],
-  "exclude": ["**/*.node.ts", "**/*.spec.ts", "**/__fixtures__/**", "src/docs/**", "dist/**", "out/**"]
+  "exclude": ["src/tooling/**", "**/*.node.ts", "**/*.spec.ts", "**/__fixtures__/**", "src/docs/**", "dist/**", "out/**"]
 }

@@ -15,7 +15,7 @@ import {
   readCatalog,
   toolDefinitions,
 } from "@wendoo/assistant-bridge";
-import { assistantToolManifest } from "@wendoo/assistant-panel";
+import { assistantToolManifest } from "@wendoo/assistant-bridge/relay";
 import { createTargetAdapter } from "@/rehearsal/adapter";
 import { sourceRehearsalContent } from "@/rehearsal/source-content";
 

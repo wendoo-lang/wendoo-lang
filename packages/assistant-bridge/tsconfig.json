@@ -21,5 +21,5 @@
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist", "**/*.spec.ts"],
-  "references": [{ "path": "../assistant-relay/tsconfig.json" }]
+  "references": [{ "path": "../app-host/tsconfig.json" }, { "path": "../assistant-relay/tsconfig.json" }]
 }

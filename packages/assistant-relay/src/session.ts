@@ -1,3 +1,4 @@
+import type { ClientBuild } from "@wendoo/core";
 import { z } from "zod";
 import type { ConversationRecord } from "./conversation.js";
 
@@ -6,7 +7,7 @@ import type { ConversationRecord } from "./conversation.js";
  * end to end: the client declares the version it holds when it connects, and
  * the service admits only its own.
  */
-export const ASSISTANT_RELAY_PROTOCOL_VERSION = 2;
+export const ASSISTANT_RELAY_PROTOCOL_VERSION = 3;
 
 /**
  * Identifier of one relay session. The service mints it from a globally unique
@@ -37,11 +38,43 @@ export const relayToolManifestSchema = z.strictObject({
   catalogDigest: z.string().min(1),
 });
 
+/** Schema of the {@link ClientBuild} a connecting client states. */
+export const clientBuildSchema = z.strictObject({
+  targetPackageVersion: z.string().min(1),
+  coreDistHash: z.string().min(1),
+}) satisfies z.ZodType<ClientBuild>;
+
+/**
+ * The part of a connect every wire version spells the same way: which message
+ * this is, and which version the client speaks. Read it off a frame before the
+ * full upstream union, which admits only the current version's payload.
+ */
+export interface RelayConnectEnvelope {
+  readonly type: "session:connect";
+  /** Wire version the client holds, as {@link ASSISTANT_RELAY_PROTOCOL_VERSION} spells it. */
+  readonly protocolVersion: number;
+}
+
+/**
+ * Schema of {@link RelayConnectEnvelope}. It admits whatever else the frame
+ * carries, so a connect written by any wire version reads through it.
+ */
+export const relayConnectEnvelopeSchema = z.looseObject({
+  type: z.literal("session:connect"),
+  protocolVersion: z.number().int().positive(),
+});
+
 /** First message of a session: the wire version the client speaks and what it serves. */
 export interface RelayConnect {
   readonly type: "session:connect";
   /** Wire version the client holds, as {@link ASSISTANT_RELAY_PROTOCOL_VERSION} spells it. */
   readonly protocolVersion: number;
+  /**
+   * The build the client runs. The service holds it for the life of the session
+   * and reads nothing into either value: both are opaque strings it compares
+   * for equality.
+   */
+  readonly clientBuild: ClientBuild;
   readonly manifest: RelayToolManifest;
   /**
    * The conversation the client holds for the brain the session is for, which

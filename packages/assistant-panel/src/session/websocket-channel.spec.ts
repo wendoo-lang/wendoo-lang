@@ -12,6 +12,7 @@ import { after, describe, test } from "node:test";
 import { FAKE_TARGET_IDENTITY } from "@wendoo/assistant-bridge/testing";
 import type { RelayDownstreamMessage, RelayUpstreamMessage } from "@wendoo/assistant-relay";
 import { ASSISTANT_RELAY_PROTOCOL_VERSION, relayUpstreamMessageSchema } from "@wendoo/assistant-relay";
+import { __test__clientBuild } from "@wendoo/core/__test__";
 import type { WebSocket as ServerSocket } from "ws";
 import { WebSocketServer } from "ws";
 import type { AssistantChannel } from "./channel";
@@ -104,7 +105,12 @@ async function serviceStand(): Promise<Stand> {
 /** Open a channel to `stand` and hand back what a client drives it through. */
 async function connectTo(stand: Stand): Promise<AssistantChannel> {
   const channel = await createWebSocketConnect(stand.url)();
-  channel.send({ type: "session:connect", protocolVersion: ASSISTANT_RELAY_PROTOCOL_VERSION, manifest });
+  channel.send({
+    type: "session:connect",
+    protocolVersion: ASSISTANT_RELAY_PROTOCOL_VERSION,
+    clientBuild: __test__clientBuild,
+    manifest,
+  });
   return channel;
 }
 
@@ -128,6 +134,7 @@ describe("a relay session over a WebSocket", () => {
     assert.deepEqual(connect, {
       type: "session:connect",
       protocolVersion: ASSISTANT_RELAY_PROTOCOL_VERSION,
+      clientBuild: { ...__test__clientBuild },
       manifest: { ...manifest },
     });
     assert.deepEqual(await channel.next(), { type: "session:accepted", sessionId: "session-0" });

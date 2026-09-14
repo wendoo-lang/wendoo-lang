@@ -3,7 +3,7 @@
     "declaration": true,
     "declarationMap": true,
     "rootDir": "./src",
-    "outDir": "./dist/node",
+    "outDir": "./dist",
     "module": "commonjs",
     "target": "esnext",
     "lib": ["esnext"],
@@ -17,6 +17,6 @@
     "moduleDetection": "force",
     "preserveSymlinks": true
   },
-  "include": ["src"],
-  "exclude": ["src/tooling/**", "**/*.rbx.ts", "**/*.spec.ts", "**/__fixtures__/**", "dist/**", "out/**"]
+  "include": ["src/tooling"],
+  "exclude": ["**/*.spec.ts"]
 }

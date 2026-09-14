@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import type { AuthoringWorkspace } from "@wendoo/assistant-bridge";
 import { FAKE_TARGET_IDENTITY } from "@wendoo/assistant-bridge/testing";
 import type { RelayToolManifest } from "@wendoo/assistant-relay";
+import { __test__clientBuild } from "@wendoo/core/__test__";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AssistantProvider } from "./AssistantProvider";
 import { AssistantSurface, draftWithTakenBack } from "./AssistantSurface";
@@ -43,7 +44,12 @@ function renderBound(): { markup: string; connects: number } {
   };
 
   const markup = renderToStaticMarkup(
-    <AssistantProvider connect={connect} manifest={manifest} workspace={unreachedWorkspace}>
+    <AssistantProvider
+      connect={connect}
+      manifest={manifest}
+      clientBuild={__test__clientBuild}
+      workspace={unreachedWorkspace}
+    >
       <AssistantSurface name={entityName} />
     </AssistantProvider>
   );

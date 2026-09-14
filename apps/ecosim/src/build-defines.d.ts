@@ -21,9 +21,17 @@ declare const TILE_DOC_CONTENT: Readonly<Record<string, string>>;
 declare const SHIPPED_BRAIN_DEFS: Readonly<Record<string, string>>;
 
 /**
- * The language build the headless adapter artifact bundles and the moment it
- * was built, replaced at build time so a loader can compare the artifact's
- * vintage with its own. Undeclared in a source run and in every build but the
- * headless one, so read it through a `typeof` guard.
+ * The language build the headless adapter artifact bundles, replaced at build
+ * time so a loader can compare the artifact's vintage with its own. Undeclared
+ * in a source run and in every build but the headless one, so read it through a
+ * `typeof` guard.
  */
-declare const BUILD_STAMP: import("@wendoo/assistant-bridge").TargetBuildStamp;
+declare const BUILD_STAMP: import("@wendoo/core").CoreBuild;
+
+/**
+ * The target-package version this app bundle is published as and the language
+ * build it bundles, replaced at build time so the bundle states its own build
+ * to the assistant service. Declared by the production app build and undeclared
+ * in a dev server and a source run, so read it through a `typeof` guard.
+ */
+declare const CLIENT_BUILD: import("@wendoo/core").ClientBuild;

@@ -2,10 +2,11 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { readTargetPackageVersion, TARGET_PACKAGE_DIR_NAME, targetManifestPath } from "@wendoo/app-host/tooling";
 import { readAdapterArtifact, readBuildStamp } from "../target/adapter.js";
 import { declaredSurfaceOf } from "../target/declared-surface.js";
 import { checkArtifactSelfContained } from "./conformance.js";
-import { readTargetIdentity, targetManifestPath } from "./target-manifest.js";
+import { readTargetIdentity } from "./target-manifest.js";
 
 /**
  * Build output of the target app, copied into the package as the host-served
@@ -24,9 +25,6 @@ const adapterPath = "rehearsal/adapter.js";
 
 /** Path inside the package the adapter's declarative surface is baked to. */
 const declaredSurfacePath = "declared-surface.json";
-
-/** Directory of the app holding the ready-to-publish package. */
-const packageDirName = "target-package";
 
 /** What the assembled manifest declares about the app bundle it carries. */
 interface HostAppDeclaration {
@@ -71,7 +69,7 @@ function listFiles(dir: string, prefix = ""): string[] {
 }
 
 const appDir = process.cwd();
-const packageDir = join(appDir, packageDirName);
+const packageDir = join(appDir, TARGET_PACKAGE_DIR_NAME);
 const manifestPath = targetManifestPath(appDir);
 const distDir = join(appDir, hostAppSource);
 const artifactPath = join(appDir, adapterSource);
@@ -83,14 +81,12 @@ if (!existsSync(manifestPath)) {
 }
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as TargetManifestDocument;
 let identity: string;
+let version: string;
 try {
   identity = readTargetIdentity(appDir);
+  version = readTargetPackageVersion(appDir);
 } catch (cause) {
   fail(cause instanceof Error ? cause.message : String(cause));
-}
-const { version } = manifest;
-if (typeof version !== "string" || version.length === 0) {
-  fail(`${manifestPath} declares no version.`);
 }
 
 if (!existsSync(distDir) || readdirSync(distDir).length === 0) {
@@ -156,9 +152,9 @@ manifest.declaredSurface = { path: declaredSurfacePath };
 manifest.buildVersion = version;
 writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
-console.log(`assembled target package: ${files.length} files under ${packageDirName}/${hostAppPath}/`);
+console.log(`assembled target package: ${files.length} files under ${TARGET_PACKAGE_DIR_NAME}/${hostAppPath}/`);
 for (const check of checked.checks) console.log(`${check.code}: ${check.detail}`);
 console.log(
-  `baked declared surface at ${packageDirName}/${declaredSurfacePath}: ` +
+  `baked declared surface at ${TARGET_PACKAGE_DIR_NAME}/${declaredSurfacePath}: ` +
     `format ${declaredSurface.formatVersion}, core ${declaredSurface.buildStamp.coreVersion}`
 );

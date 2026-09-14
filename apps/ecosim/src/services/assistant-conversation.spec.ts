@@ -7,9 +7,10 @@
 
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
+import { assistantToolManifest } from "@wendoo/assistant-bridge/relay";
 import { ruleIdAt } from "@wendoo/assistant-bridge/testing";
 import type { EditedBrainWorkspaces } from "@wendoo/assistant-panel";
-import { assistantToolManifest, createEditedBrainWorkspaces } from "@wendoo/assistant-panel";
+import { createEditedBrainWorkspaces } from "@wendoo/assistant-panel";
 import { recordFor } from "@wendoo/assistant-panel/conversation/store";
 import type { AssistantChannel } from "@wendoo/assistant-panel/session/channel";
 import { AssistantMachine, AssistantStatus } from "@wendoo/assistant-panel/session/machine";
@@ -18,6 +19,7 @@ import { runScriptedService } from "@wendoo/assistant-panel/testing/scripted-ser
 import type { ConversationAssistantEntry, ConversationRecord, ConversationToolCall } from "@wendoo/assistant-relay";
 import type { RelayLoopback } from "@wendoo/assistant-relay/testing";
 import { createRelayLoopback } from "@wendoo/assistant-relay/testing";
+import { __test__clientBuild } from "@wendoo/core/__test__";
 import { coreModule, createWendooEnvironment, List } from "@wendoo/core/app";
 import type { BrainPageDef, BrainRuleDef } from "@wendoo/core/brain/model";
 import { BrainCommandHistory, BrainDef } from "@wendoo/core/brain/model";
@@ -120,6 +122,7 @@ function appStand(script: (ruleId: string) => ScriptedService): Stand {
   const machine = new AssistantMachine({
     connect,
     manifest: assistantToolManifest(adapter),
+    clientBuild: __test__clientBuild,
     workspace: workspaces.workspaceFor,
   });
 

@@ -39,11 +39,17 @@ export {
 export type {
   RelayConnect,
   RelayConnectAccepted,
+  RelayConnectEnvelope,
   RelayConnectRefused,
   RelaySessionId,
   RelayToolManifest,
 } from "./session.js";
-export { ASSISTANT_RELAY_PROTOCOL_VERSION, RelayRefusalCode, relayToolManifestSchema } from "./session.js";
+export {
+  ASSISTANT_RELAY_PROTOCOL_VERSION,
+  RelayRefusalCode,
+  relayConnectEnvelopeSchema,
+  relayToolManifestSchema,
+} from "./session.js";
 export type {
   RelayCorrelation,
   RelayRequestId,

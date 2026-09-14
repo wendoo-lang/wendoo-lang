@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
+import { __test__clientBuild } from "@wendoo/core/__test__";
 import { CONVERSATION_RECORD_VERSION, conversationRecordSchema } from "./conversation.js";
 import type { RelayDownstreamMessage, RelayUpstreamMessage } from "./messages.js";
 import {
@@ -49,6 +50,7 @@ const upstream: readonly RelayUpstreamMessage[] = [
   {
     type: "session:connect",
     protocolVersion: ASSISTANT_RELAY_PROTOCOL_VERSION,
+    clientBuild: __test__clientBuild,
     manifest: {
       target: "example-org/trg-fake",
       tools: ["compile", "read_project"],
@@ -59,6 +61,7 @@ const upstream: readonly RelayUpstreamMessage[] = [
   {
     type: "session:connect",
     protocolVersion: ASSISTANT_RELAY_PROTOCOL_VERSION,
+    clientBuild: __test__clientBuild,
     manifest: {
       target: "example-org/trg-fake",
       tools: ["compile", "read_project"],
@@ -175,6 +178,7 @@ describe("the relay wire", () => {
     const forged = {
       type: "session:connect",
       protocolVersion: ASSISTANT_RELAY_PROTOCOL_VERSION,
+      clientBuild: __test__clientBuild,
       manifest: {
         target: "example-org/trg-fake",
         tools: [],
@@ -191,6 +195,7 @@ describe("the relay wire", () => {
     const carried = {
       type: "session:connect",
       protocolVersion: ASSISTANT_RELAY_PROTOCOL_VERSION,
+      clientBuild: __test__clientBuild,
       manifest: {
         target: "example-org/trg-fake",
         tools: [],
@@ -210,6 +215,7 @@ describe("the relay wire", () => {
     const forged = {
       type: "session:connect",
       protocolVersion: ASSISTANT_RELAY_PROTOCOL_VERSION,
+      clientBuild: __test__clientBuild,
       manifest: {
         target: "example-org/trg-fake",
         tools: [],
@@ -220,6 +226,35 @@ describe("the relay wire", () => {
     };
 
     assert.equal(relayUpstreamMessageSchema.safeParse(forged).success, false);
+  });
+
+  test("refuses a connect that does not state the build the client runs", () => {
+    const manifest = { target: "example-org/trg-fake", tools: [], morphology: false, catalogDigest: "0f3a19c2" };
+    const refused: readonly unknown[] = [
+      { type: "session:connect", protocolVersion: ASSISTANT_RELAY_PROTOCOL_VERSION, manifest },
+      {
+        type: "session:connect",
+        protocolVersion: ASSISTANT_RELAY_PROTOCOL_VERSION,
+        clientBuild: { targetPackageVersion: __test__clientBuild.targetPackageVersion },
+        manifest,
+      },
+      {
+        type: "session:connect",
+        protocolVersion: ASSISTANT_RELAY_PROTOCOL_VERSION,
+        clientBuild: { ...__test__clientBuild, targetPackageVersion: "" },
+        manifest,
+      },
+      {
+        type: "session:connect",
+        protocolVersion: ASSISTANT_RELAY_PROTOCOL_VERSION,
+        clientBuild: { ...__test__clientBuild, coreVersion: "0.2.20" },
+        manifest,
+      },
+    ];
+
+    for (const message of refused) {
+      assert.equal(relayUpstreamMessageSchema.safeParse(message).success, false, JSON.stringify(message));
+    }
   });
 
   test("refuses an added library the wire cannot act on", () => {

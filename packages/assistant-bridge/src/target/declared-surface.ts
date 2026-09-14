@@ -1,11 +1,6 @@
+import type { CoreBuild } from "@wendoo/core";
 import { z } from "zod";
-import type {
-  ScenarioInputKind,
-  SubjectStateChannel,
-  TargetAdapter,
-  TargetBuildStamp,
-  TargetManifest,
-} from "./adapter.js";
+import type { ScenarioInputKind, SubjectStateChannel, TargetAdapter, TargetManifest } from "./adapter.js";
 
 /**
  * Version of the declared-surface format {@link declaredSurfaceOf} writes.
@@ -36,12 +31,11 @@ const subjectStateChannelSchema = z.object({
   description: z.string(),
 }) satisfies z.ZodType<SubjectStateChannel>;
 
-/** The language build an adapter artifact bundles, and the moment it was built. */
+/** The language build an adapter artifact bundles. */
 const buildStampSchema = z.object({
   coreVersion: z.string(),
   coreDistHash: z.string(),
-  builtAt: z.string(),
-}) satisfies z.ZodType<TargetBuildStamp>;
+}) satisfies z.ZodType<CoreBuild>;
 
 /**
  * The baked declarative surface of a target package: everything a consumer
@@ -76,15 +70,15 @@ export type DeclaredSurface = z.infer<typeof declaredSurfaceSchema>;
  * package bakes. A state channel bakes as its name and description only.
  *
  * @param adapter The adapter to read the declarations from.
- * @param buildStamp The stamp the artifact publishing `adapter` carries.
+ * @param buildStamp The language build the artifact publishing `adapter` carries.
  */
-export function declaredSurfaceOf(adapter: TargetAdapter, buildStamp: TargetBuildStamp): DeclaredSurface {
+export function declaredSurfaceOf(adapter: TargetAdapter, buildStamp: CoreBuild): DeclaredSurface {
   const { target, thing, provides } = adapter.manifest();
-  const { coreVersion, coreDistHash, builtAt } = buildStamp;
+  const { coreVersion, coreDistHash } = buildStamp;
   return {
     formatVersion: DECLARED_SURFACE_FORMAT_VERSION,
     targetIdentity: adapter.targetIdentity,
-    buildStamp: { coreVersion, coreDistHash, builtAt },
+    buildStamp: { coreVersion, coreDistHash },
     manifest: { target, thing, provides: [...provides] },
     subjects: [...adapter.subjects()],
     inputKinds: adapter.inputKinds().map(({ name, description }) => ({ name, description })),

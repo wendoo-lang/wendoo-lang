@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { RelayConnect, RelayConnectAccepted, RelayConnectRefused } from "./session.js";
-import { RelayRefusalCode, relayToolManifestSchema } from "./session.js";
+import { clientBuildSchema, RelayRefusalCode, relayToolManifestSchema } from "./session.js";
 import type { RelayToolCallRequest, RelayToolResult } from "./tool-calls.js";
 import { relayToolCallRequestSchema, relayToolResultSchema } from "./tool-calls.js";
 
@@ -216,6 +216,7 @@ export const relayUpstreamMessageSchema = z.discriminatedUnion("type", [
   z.strictObject({
     type: z.literal("session:connect"),
     protocolVersion: z.number().int().positive(),
+    clientBuild: clientBuildSchema,
     manifest: relayToolManifestSchema,
     conversation: z.unknown().optional(),
   }),

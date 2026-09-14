@@ -68,6 +68,15 @@ These instructions apply to all Copilot features, including inline tab completio
   `export type`). Roblox-ts emits Luau `require` for value imports, and value cycles
   are unsafe at module-init time on Luau. To break a value cycle, extract the shared
   symbols into a third module.
+- A Node-only subtree under `src` (`src/docs`, `src/tooling`) is allowed for code that
+  reads this package's own build output or a consuming package's manifest. It must be
+  excluded from `tsconfig.esm.json`, `tsconfig.rbx.json` and `build:rbx`'s wireit `files`;
+  emit to its own `outDir` outside every language-output directory, because `readCoreBuild`
+  hashes `dist/node`; and get an export entry declaring `"browser": null`. Its specs import
+  their subject by relative path, not by package specifier.
+- Co-locate types with their producers, except a serialization type whose producer sits in
+  a Node-only subtree: that type goes in a browser-safe module beside the package's other
+  public types (`src/build-identity.ts`), and that module imports nothing but types.
 
 ### Shared UI (`packages/ui`)
 

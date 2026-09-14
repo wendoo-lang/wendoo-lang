@@ -1,9 +1,9 @@
-import { createTargetBuildStamp } from "@wendoo/assistant-bridge/kit/node";
+import { readCoreBuild } from "@wendoo/core/tooling";
 import path from "path";
 import { defineConfig } from "vite";
 import { rehearsalDefines } from "../src/rehearsal/source-content.ts";
 
-const appDir = process.cwd();
+const appDir = path.resolve(__dirname, "..");
 
 // Build output of packages linked into the app from this repository, which sits
 // outside node_modules.
@@ -24,7 +24,7 @@ export default defineConfig({
   ssr: {
     noExternal: true,
   },
-  define: { ...rehearsalDefines(), BUILD_STAMP: JSON.stringify(createTargetBuildStamp(appDir)) },
+  define: { ...rehearsalDefines(), BUILD_STAMP: JSON.stringify(readCoreBuild(appDir)) },
   publicDir: false,
   logLevel: "warn",
   build: {

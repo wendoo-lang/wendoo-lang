@@ -5,8 +5,8 @@ import { uiPlugin } from "../../../packages/ui/src/vite-plugin.ts";
 import { rehearsalDefines } from "../src/rehearsal/source-content.ts";
 import { embeddedExtensions } from "./embedded-extensions.mjs";
 
-const appRoot = path.resolve(__dirname, ".."); // adjust if needed
-const assetsRoot = path.resolve(appRoot, "assets") + path.sep;
+const appDir = path.resolve(__dirname, "..");
+const assetsRoot = path.resolve(appDir, "assets") + path.sep;
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -16,15 +16,15 @@ export default defineConfig({
   define: rehearsalDefines(),
   resolve: {
     alias: {
-      "@": path.resolve(process.cwd(), "./src"),
-      "@wendoo/assistant-panel": path.resolve(process.cwd(), "../../packages/assistant-panel/src"),
-      "@wendoo/docs": path.resolve(process.cwd(), "../../packages/docs/src"),
-      "@wendoo/ui": path.resolve(process.cwd(), "../../packages/ui/src"),
-      "@wendoo/app-host": path.resolve(process.cwd(), "../../packages/app-host/src"),
-      "@wendoo/ts-compiler": path.resolve(process.cwd(), "../../packages/ts-compiler/src"),
-      "@wendoo/bridge-protocol": path.resolve(process.cwd(), "../../packages/bridge-protocol/src"),
-      "@wendoo/bridge-client": path.resolve(process.cwd(), "../../packages/bridge-client/src"),
-      "@wendoo/bridge-app": path.resolve(process.cwd(), "../../packages/bridge-app/src"),
+      "@": path.resolve(appDir, "./src"),
+      "@wendoo/assistant-panel": path.resolve(appDir, "../../packages/assistant-panel/src"),
+      "@wendoo/docs": path.resolve(appDir, "../../packages/docs/src"),
+      "@wendoo/ui": path.resolve(appDir, "../../packages/ui/src"),
+      "@wendoo/app-host": path.resolve(appDir, "../../packages/app-host/src"),
+      "@wendoo/ts-compiler": path.resolve(appDir, "../../packages/ts-compiler/src"),
+      "@wendoo/bridge-protocol": path.resolve(appDir, "../../packages/bridge-protocol/src"),
+      "@wendoo/bridge-client": path.resolve(appDir, "../../packages/bridge-client/src"),
+      "@wendoo/bridge-app": path.resolve(appDir, "../../packages/bridge-app/src"),
     },
   },
   optimizeDeps: {
@@ -32,7 +32,7 @@ export default defineConfig({
   },
   server: {
     fs: {
-      allow: [path.resolve(process.cwd(), "../..")],
+      allow: [path.resolve(appDir, "../..")],
     },
     watch: {
       ignored: (p) => {

@@ -1,3 +1,4 @@
+import type { CoreBuild } from "@wendoo/core";
 import type { CompiledActionBundle, IBrainDef, WendooModule } from "@wendoo/core/app";
 
 /**
@@ -9,43 +10,17 @@ import type { CompiledActionBundle, IBrainDef, WendooModule } from "@wendoo/core
 export const ADAPTER_CONTRACT_VERSION = 10;
 
 /**
- * The build of the language package a consumer holds. Two consumers agree on
- * the semantics a brain runs under exactly when they report the same
- * {@link coreDistHash}.
+ * Read the language build an imported artifact module publishes as its optional
+ * `buildStamp` export. Returns `undefined` for an artifact that exports none and
+ * for one whose export is not a language build, so a caller treats both as an
+ * artifact that states no vintage.
  */
-export interface CoreBuild {
-  /** Version the language package declares for itself, for example `0.2.18`. */
-  readonly coreVersion: string;
-  /**
-   * Hex sha256 over the language package's Node build output, content and
-   * layout alike. It changes whenever the bundled semantics can change.
-   */
-  readonly coreDistHash: string;
-}
-
-/**
- * What an artifact was built with, published as its optional `buildStamp`
- * export. A loader compares it against its own {@link CoreBuild} to decide
- * whether the artifact rehearses under the loader's language build.
- */
-export interface TargetBuildStamp extends CoreBuild {
-  /** ISO 8601 moment the artifact was built. */
-  readonly builtAt: string;
-}
-
-/**
- * Read the build stamp out of an imported artifact module. Returns `undefined`
- * for an artifact that exports none and for one whose export is not a stamp,
- * so a caller treats both as an artifact that states no vintage.
- */
-export function readBuildStamp(artifactModule: unknown): TargetBuildStamp | undefined {
+export function readBuildStamp(artifactModule: unknown): CoreBuild | undefined {
   const published = (artifactModule as { buildStamp?: unknown } | undefined)?.buildStamp;
   if (typeof published !== "object" || published === null) return undefined;
-  const { coreVersion, coreDistHash, builtAt } = published as Partial<TargetBuildStamp>;
-  if (typeof coreVersion !== "string" || typeof coreDistHash !== "string" || typeof builtAt !== "string") {
-    return undefined;
-  }
-  return { coreVersion, coreDistHash, builtAt };
+  const { coreVersion, coreDistHash } = published as Partial<CoreBuild>;
+  if (typeof coreVersion !== "string" || typeof coreDistHash !== "string") return undefined;
+  return { coreVersion, coreDistHash };
 }
 
 /** Facts about a target world that a session states to the model before it plans. */

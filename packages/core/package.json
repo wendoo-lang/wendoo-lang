@@ -77,6 +77,22 @@
     "./lib/index.ts": {
       "default": "./lib/index.ts"
     },
+    "./__test__": {
+      "node": {
+        "import": {
+          "types": "./dist/node/test-only-build-identity.d.ts",
+          "default": "./dist/node/test-only-build-identity.js"
+        },
+        "require": {
+          "types": "./dist/node/test-only-build-identity.d.ts",
+          "default": "./dist/node/test-only-build-identity.js"
+        }
+      },
+      "import": {
+        "types": "./dist/esm/test-only-build-identity.d.ts",
+        "default": "./dist/esm/test-only-build-identity.js"
+      }
+    },
     "./app": {
       "node": {
         "import": {
@@ -323,6 +339,13 @@
       },
       "default": "./dist/rbx/runtime/init.luau"
     },
+    "./tooling": {
+      "types": "./dist/tooling/index.d.ts",
+      "browser": null,
+      "import": "./dist/tooling/index.js",
+      "require": "./dist/tooling/index.js",
+      "default": "./dist/tooling/index.js"
+    },
     "./runtime/__test__": {
       "node": {
         "import": {
@@ -463,11 +486,12 @@
     }
   },
   "scripts": {
-    "build": "npm run build:docs && npm run build:rbx && npm run build:node && npm run build:esm",
+    "build": "npm run build:docs && npm run build:rbx && npm run build:node && npm run build:esm && npm run build:tooling",
     "build:prod": "wireit",
     "build:docs": "node scripts/build-docs.js",
     "build:node": "tsc -p tsconfig.node.json && node scripts/post-build-node.js",
     "build:esm": "tsc --build tsconfig.esm.json && node scripts/post-build-esm.js",
+    "build:tooling": "tsc -p tsconfig.tooling.json",
     "build:rbx": "wireit",
     "pregenerate:ambient": "npm run build:node && npm run build:prod --prefix ../ts-compiler",
     "generate:ambient": "tsx --tsconfig scripts/tsconfig.json scripts/generate-ambient.ts",
@@ -481,9 +505,9 @@
     "lint": "biome lint ./src ./scripts --write",
     "check": "biome check ./src ./scripts --write",
     "check:call-style": "node scripts/check-call-style.js",
-    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.rbx.json && tsc --noEmit -p tsconfig.spec.json && tsc --noEmit -p lib/tsconfig.ambient.json && tsc --noEmit -p scripts/tsconfig.json && tsc --noEmit -p lib/tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.rbx.json && tsc --noEmit -p tsconfig.tooling.json && tsc --noEmit -p tsconfig.spec.json && tsc --noEmit -p lib/tsconfig.ambient.json && tsc --noEmit -p scripts/tsconfig.json && tsc --noEmit -p lib/tsconfig.json",
     "format": "biome format ./src ./scripts --write",
-    "pretest": "npm run build:node && npm run build:esm && npm run build:rbx",
+    "pretest": "npm run build:node && npm run build:esm && npm run build:rbx && npm run build:tooling",
     "test": "npm run check:call-style && tsx --tsconfig tsconfig.node.json --test $(find src -name '*.spec.ts')",
     "release:patch": "node ../../scripts/release.js patch",
     "release:minor": "node ../../scripts/release.js minor",
@@ -491,7 +515,7 @@
   },
   "wireit": {
     "build:prod": {
-      "command": "npm run build:docs && npm run build:node && npm run build:esm",
+      "command": "npm run build:docs && npm run build:node && npm run build:esm && npm run build:tooling",
       "files": [
         "src/**",
         "!src/**/*.spec.ts",
@@ -503,11 +527,14 @@
         "scripts/post-build-node.js",
         "tsconfig.node.json",
         "tsconfig.esm.json",
+        "tsconfig.tooling.json",
         "package-lock.json"
       ],
       "output": [
         "dist/node/**",
         "dist/esm/**",
+        "dist/tooling/**",
+        "dist/build-identity.*",
         ".platform-emit/node/**",
         ".platform-emit/esm/**",
         "tsconfig.esm.tsbuildinfo"
@@ -519,6 +546,7 @@
       "command": "rbxtsc --type package --project tsconfig.rbx.json && node scripts/post-build-rbx.js",
       "files": [
         "src/**",
+        "!src/tooling/**",
         "!src/**/*.node.ts",
         "!src/**/*.spec.ts",
         "!src/**/__fixtures__/**/*.ts",

@@ -15,6 +15,7 @@ import {
   RelayTakeoverCode,
   thinkingWritingName,
 } from "@wendoo/assistant-relay";
+import type { ClientBuild } from "@wendoo/core";
 import { assertUnreachable } from "@wendoo/core";
 import type { PersonActivity } from "../app/person-activity";
 import type { ConversationStore, ConversationUpdate } from "../conversation/store";
@@ -129,6 +130,8 @@ export interface AssistantMachineOptions {
   readonly connect: AssistantConnect;
   /** What the handshake declares this client serves. */
   readonly manifest: RelayToolManifest;
+  /** The build the handshake declares this client runs. */
+  readonly clientBuild: ClientBuild;
   /**
    * The live workspace a brain's tool calls run against. Called once per served
    * batch with the brain the running turn belongs to, which is not necessarily
@@ -731,6 +734,7 @@ export class AssistantMachine {
       connected.send({
         type: "session:connect",
         protocolVersion: ASSISTANT_RELAY_PROTOCOL_VERSION,
+        clientBuild: this.options.clientBuild,
         manifest: this.options.manifest,
         ...(held.entries.length > 0 ? { conversation: held } : {}),
       });

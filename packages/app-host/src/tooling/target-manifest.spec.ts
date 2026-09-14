@@ -3,8 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, test } from "node:test";
-import { targetManifestPath } from "@wendoo/app-host/tooling";
-import { readTargetIdentity } from "./target-manifest.js";
+import { readTargetPackageVersion, targetManifestPath } from "./target-manifest.js";
 
 /** Temporary trees this file created, removed once it finishes. */
 const roots: string[] = [];
@@ -23,23 +22,23 @@ async function appWithManifest(manifest: unknown): Promise<string> {
   return appDir;
 }
 
-describe("reading the identity a target app declares", () => {
-  test("returns the identity the published manifest declares", async () => {
-    const appDir = await appWithManifest({ identity: "example-target", version: "1.0.0" });
+describe("reading the package version a target app declares", () => {
+  test("returns the version the published manifest declares, not the one its last package carried", async () => {
+    const appDir = await appWithManifest({ identity: "example-target", version: "1.1.0", buildVersion: "1.0.0" });
 
-    assert.equal(readTargetIdentity(appDir), "example-target");
+    assert.equal(readTargetPackageVersion(appDir), "1.1.0");
   });
 
-  test("throws when the manifest declares an empty identity", async () => {
-    const appDir = await appWithManifest({ identity: "", version: "1.0.0" });
+  test("throws when the manifest declares an empty version", async () => {
+    const appDir = await appWithManifest({ identity: "example-target", version: "" });
 
-    assert.throws(() => readTargetIdentity(appDir));
+    assert.throws(() => readTargetPackageVersion(appDir));
   });
 
   test("throws when the app publishes no manifest", async () => {
     const appDir = await mkdtemp(join(tmpdir(), "target-manifest-"));
     roots.push(appDir);
 
-    assert.throws(() => readTargetIdentity(appDir));
+    assert.throws(() => readTargetPackageVersion(appDir));
   });
 });

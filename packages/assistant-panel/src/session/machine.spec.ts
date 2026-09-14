@@ -23,6 +23,7 @@ import {
 } from "@wendoo/assistant-relay";
 import type { RelayLoopback } from "@wendoo/assistant-relay/testing";
 import { createRelayLoopback } from "@wendoo/assistant-relay/testing";
+import { __test__clientBuild } from "@wendoo/core/__test__";
 import { createPersonActivity } from "../app/person-activity";
 import { recordFor } from "../conversation/store";
 import type { ScriptedCall, ScriptedService, ScriptedTurn } from "../testing/scripted-service";
@@ -189,6 +190,7 @@ function harness(script: ScriptedService | ((at: number) => ScriptedService), op
     machine: new AssistantMachine({
       connect,
       manifest,
+      clientBuild: __test__clientBuild,
       workspace,
       ...(options.mediate ? { mediate: options.mediate } : {}),
       ...(options.activity ? { activity: options.activity } : {}),
@@ -2221,6 +2223,26 @@ describe("dialing for the brain being shown", () => {
     await flush();
 
     assert.equal(stand.connects(), 3, "showing it again dialed once, and once only");
+    stand.machine.close();
+    await stand.served;
+  });
+});
+
+describe("what a session's handshake declares of the client", () => {
+  test("states the build the host gave, on every session it opens", async () => {
+    const stand = harness(oneQuietTurn);
+
+    stand.machine.setActiveBrain("brain-a");
+    stand.machine.send("make it hide");
+    await settledFor(stand.machine, "brain-a");
+    stand.machine.setActiveBrain("brain-b");
+    stand.machine.send("make it seek");
+    await settledFor(stand.machine, "brain-b");
+
+    assert.deepEqual(
+      stand.handshakes().map((handshake) => handshake.clientBuild),
+      [__test__clientBuild, __test__clientBuild]
+    );
     stand.machine.close();
     await stand.served;
   });

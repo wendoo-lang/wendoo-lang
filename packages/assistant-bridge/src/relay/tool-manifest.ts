@@ -1,13 +1,11 @@
-import type { CatalogTile, TargetAdapter } from "@wendoo/assistant-bridge";
-import {
-  CatalogScope,
-  catalogDigest,
-  catalogTilesInScope,
-  createAuthoringWorkspace,
-  readCatalog,
-  toolDefinitions,
-} from "@wendoo/assistant-bridge";
 import type { RelayToolManifest } from "@wendoo/assistant-relay";
+import { catalogDigest } from "../catalog/digest.js";
+import { CatalogScope } from "../catalog/scope.js";
+import type { TargetAdapter } from "../target/adapter.js";
+import type { CatalogTile } from "../tools/read-catalog.js";
+import { catalogTilesInScope, readCatalog } from "../tools/read-catalog.js";
+import { toolDefinitions } from "../tools/tool-schemas.js";
+import { createAuthoringWorkspace } from "../tools/workspace.js";
 
 /** Name of the empty document the environment catalog is read over. */
 const catalogBrainName = "catalog";

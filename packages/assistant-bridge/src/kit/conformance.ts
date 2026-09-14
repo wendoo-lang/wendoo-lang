@@ -5,6 +5,7 @@ import { basename, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import type { IBrainDef } from "@wendoo/core/app";
+import { describeCoreBuild } from "@wendoo/core/tooling";
 import { summarizeRun } from "../simulate/summarizer.js";
 import type { AdapterExpectation, SimulationRun, SimulationScenario, TargetAdapter } from "../target/adapter.js";
 import {
@@ -389,7 +390,7 @@ export async function checkArtifactSelfContained(
         detail:
           buildStamp === undefined
             ? `${basename(artifactPath)} publishes no build stamp, so it states no language build`
-            : `built against core ${buildStamp.coreVersion} at ${buildStamp.builtAt}`,
+            : `built against ${describeCoreBuild(buildStamp)}`,
       },
     ]);
   } catch (cause) {

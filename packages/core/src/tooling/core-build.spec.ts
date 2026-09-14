@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { existsSync, readdirSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { after, describe, test } from "node:test";
-import { createTargetBuildStamp, readCoreBuild } from "./build-stamp.js";
+import { DEV_TARGET_PACKAGE_VERSION } from "../build-identity.js";
+import { createClientBuild, describeCoreBuild, readCoreBuild } from "./core-build.js";
 
 /** Temporary trees this file created, removed once it finishes. */
 const roots: string[] = [];
@@ -110,13 +112,45 @@ describe("reading the language build a package consumes", () => {
   });
 });
 
-describe("the stamp an artifact publishes", () => {
-  test("carries the language build and the moment it was built", async () => {
+describe("the language output the hash covers", () => {
+  /** This package's own directory, whose build output the assertions below read. */
+  const coreDir = resolve(__dirname, "..", "..");
+
+  test("holds none of the build tooling that computes the hash", () => {
+    const languageOutput = join(coreDir, "dist", "node");
+
+    assert.ok(existsSync(join(languageOutput, "index.js")), "the language build is built");
+    assert.ok(existsSync(join(coreDir, "dist", "tooling", "index.js")), "the tooling build is built");
+    assert.deepEqual(
+      readdirSync(languageOutput).filter((entry) => entry === "tooling"),
+      []
+    );
+  });
+});
+
+describe("the build a host app bundle states of itself", () => {
+  test("carries the version it is given and the hash of the language build it bundles", async () => {
     const root = await tree();
 
-    const stamp = createTargetBuildStamp(root);
+    const build = createClientBuild(root, "0.4.2");
 
-    assert.deepEqual({ coreVersion: stamp.coreVersion, coreDistHash: stamp.coreDistHash }, await readCoreBuild(root));
-    assert.equal(new Date(stamp.builtAt).toISOString(), stamp.builtAt);
+    assert.equal(build.targetPackageVersion, "0.4.2");
+    assert.equal(build.coreDistHash, (await readCoreBuild(root)).coreDistHash);
+  });
+
+  test("carries the dev version for a bundle built outside a release", async () => {
+    const root = await tree();
+
+    assert.equal(createClientBuild(root, DEV_TARGET_PACKAGE_VERSION).targetPackageVersion, "dev");
+  });
+});
+
+describe("a language build said as one phrase", () => {
+  test("names the version and the head of the dist hash", () => {
+    const phrase = describeCoreBuild({ coreVersion: "1.2.3", coreDistHash: "0123456789abcdef0123456789abcdef" });
+
+    assert.ok(phrase.includes("1.2.3"), "the phrase names the version");
+    assert.ok(phrase.includes("0123456789ab"), "the phrase names the head of the hash");
+    assert.equal(phrase.includes("0123456789abc"), false, "the phrase quotes no more of the hash than that");
   });
 });

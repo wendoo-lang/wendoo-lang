@@ -1,4 +1,6 @@
 export * as brain from "./brain";
+export type { ClientBuild, CoreBuild } from "./build-identity";
+export { DEV_CLIENT_BUILD, DEV_TARGET_PACKAGE_VERSION, UNKNOWN_CORE_DIST_HASH } from "./build-identity";
 export { assertUnreachable } from "./platform/assert";
 export { Dict } from "./platform/dict";
 export { Error } from "./platform/error";

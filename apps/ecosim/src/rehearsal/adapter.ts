@@ -1,6 +1,7 @@
-import type { TargetAdapter, TargetBuildStamp, TargetManifest } from "@wendoo/assistant-bridge";
+import type { TargetAdapter, TargetManifest } from "@wendoo/assistant-bridge";
 import type { RehearsalWorld, WorldDriver, WorldStaging } from "@wendoo/assistant-bridge/kit";
 import { createRehearsalAdapter, pairTileDocs } from "@wendoo/assistant-bridge/kit";
+import type { CoreBuild } from "@wendoo/core";
 import type { IBrainDef } from "@wendoo/core/app";
 import type { Actor, Archetype } from "@/brain/actor";
 import { ARCHETYPE_NAMES } from "@/brain/archetypes";
@@ -12,11 +13,10 @@ import { injectedContent } from "./content";
 import { createRehearsalWorld, SCENARIO_INPUT_KINDS } from "./world";
 
 /**
- * The language build this module graph bundles and the moment it was built.
- * Absent in a source run and in every build that injects no stamp, which states
- * no vintage at all.
+ * The language build this module graph bundles. Absent in a source run and in
+ * every build that injects no language build, which states no vintage at all.
  */
-export const buildStamp: TargetBuildStamp | undefined = typeof BUILD_STAMP === "object" ? BUILD_STAMP : undefined;
+export const buildStamp: CoreBuild | undefined = typeof BUILD_STAMP === "object" ? BUILD_STAMP : undefined;
 
 const MANIFEST: TargetManifest = {
   target: "ecosim, a top-down world of creatures",

@@ -202,6 +202,25 @@ This has already cost a full cycle: an agent asked to derive a colour from each 
 discovered that the tokens it was deriving from are declared but painted by nothing, wrote that
 down as a finding, derived from them anyway, and produced a result rejected on sight.
 
+## New Exported Concepts Name Their Owner
+
+Every new exported type, constant, or helper is a placement decision.
+When a change adds exported declarations, the report states, for each,
+the package that owns the concept and a one-sentence ownership argument.
+The tests a placement must pass:
+
+- The symbol is named for the concept it is, never for a consumer or a
+  transport that happens to touch it first.
+- The producer of a value lives in the package that owns the concept.
+- Dependency edges point from consumer to owner, never the reverse.
+- Knowledge about a format or domain lives in the package that defines
+  that format, and other packages consume it rather than restating it.
+
+A placement that fails any of these is fixed before the change
+completes, or reported as a finding with a proposed time -- never left
+silent. When the right owner is genuinely contested, stop and present
+the options rather than defaulting to wherever the edit happened to be.
+
 ## Broad View Before Acting
 
 Before making any change that touches more than one call site, method

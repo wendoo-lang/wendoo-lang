@@ -25,6 +25,48 @@ export function languageGrammarLegend(): string {
 - A new variable already holds its type's empty value -- a number starts at 0, a yes/no at no, a text at "" -- so a rule may read one before anything has written to it.`;
 }
 
+/**
+ * Every field {@link CatalogTile} declares, in the order a tile line writes
+ * them. A field a tile carries that is not named here is written after all of
+ * these, its fellow unnamed fields in ascending name order.
+ */
+const CATALOG_TILE_FIELDS = [
+  "tileId",
+  "label",
+  "kind",
+  "description",
+  "assistant",
+  "outputType",
+  "args",
+  "placement",
+  "requires",
+  "provides",
+  "outputs",
+  "consumesWhenResult",
+  "hidden",
+  "deprecated",
+] as const satisfies readonly (keyof CatalogTile)[];
+
+/** The names {@link CATALOG_TILE_FIELDS} holds, for telling a tile's other fields apart from them. */
+const declaredFields: ReadonlySet<string> = new Set(CATALOG_TILE_FIELDS);
+
+/**
+ * Serialize `tile` as the JSON object one digest line holds, writing its fields
+ * in the order {@link CATALOG_TILE_FIELDS} states and leaving out every field
+ * holding `undefined`. The bytes do not depend on the order `tile` itself
+ * spells its fields in.
+ */
+function tileLine(tile: CatalogTile): string {
+  const carried = new Map<string, unknown>(Object.entries(tile));
+  const unnamed = [...carried.keys()].filter((field) => !declaredFields.has(field)).sort();
+  const ordered: Record<string, unknown> = {};
+  for (const field of [...CATALOG_TILE_FIELDS, ...unnamed]) {
+    const value = carried.get(field);
+    if (value !== undefined) ordered[field] = value;
+  }
+  return JSON.stringify(ordered);
+}
+
 /** Fingerprint `text` as eight lowercase hex digits, the same in every runtime. */
 function fingerprint(text: string): string {
   let hash = 0x811c9dc5;
@@ -38,16 +80,18 @@ function fingerprint(text: string): string {
 /**
  * Serialize the catalog deterministically for the prompt prefix as JSON Lines:
  * one line per tile, each holding exactly the object `read_catalog` reports for
- * that tile once {@link sanitizeCatalogTile} has capped its author text. Tiles
- * the editor hides from its pickers are omitted, and the rest are sorted by
- * tile id, so the same catalog always produces the same bytes. Every character
- * of a tile's text is carried, JSON-encoded.
+ * that tile once {@link sanitizeCatalogTile} has capped its author text, its
+ * fields written as {@link CATALOG_TILE_FIELDS} orders them. Tiles the editor
+ * hides from its pickers are omitted, and the rest are sorted by tile id, so
+ * the same catalog always produces the same bytes whatever order its tiles and
+ * their fields arrived in. Every character of a tile's text is carried,
+ * JSON-encoded, including the fields of a tile richer than this build declares.
  */
 export function catalogDigest(tiles: readonly CatalogTile[]): CatalogDigest {
   const listed = tiles
     .filter((tile) => !tile.hidden)
     .map(sanitizeCatalogTile)
     .sort((a, b) => (a.tileId < b.tileId ? -1 : a.tileId > b.tileId ? 1 : 0));
-  const text = listed.map((tile) => JSON.stringify(tile)).join("\n");
+  const text = listed.map(tileLine).join("\n");
   return { text, tileCount: listed.length, hash: fingerprint(text) };
 }

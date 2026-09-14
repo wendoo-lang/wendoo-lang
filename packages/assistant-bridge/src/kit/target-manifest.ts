@@ -1,20 +1,5 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
-/** Directory of a target app holding its ready-to-publish package. */
-const packageDirName = "target-package";
-
-/** File the target package's manifest is kept in. */
-const manifestFileName = "wendoo.json";
-
-/**
- * Path of the manifest the target app at `appDir` publishes.
- *
- * @param appDir Absolute path of the target app directory.
- */
-export function targetManifestPath(appDir: string): string {
-  return join(appDir, packageDirName, manifestFileName);
-}
+import { targetManifestPath } from "@wendoo/app-host/tooling";
 
 /**
  * The identity the target app at `appDir` declares in its published manifest.

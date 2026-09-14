@@ -7,7 +7,6 @@ export { createEditedBrainWorkspaces, NoEditedBrain, NoEditedBrainCode } from ".
 export type { PersonActivity, PersonActivityOptions } from "./app/person-activity";
 export { createPersonActivity, personInteractionWindowMs, watchPersonInteraction } from "./app/person-activity";
 export { assistantSessionUrl } from "./app/service-url";
-export { assistantToolManifest, environmentTiles } from "./app/tool-manifest";
 export type { AssistantContextValue } from "./assistant-context";
 export { useAssistant } from "./assistant-context";
 export type { BrainPlaces, RulePlace } from "./conversation/brain-places";
