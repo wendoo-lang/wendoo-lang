@@ -1,6 +1,6 @@
 {
   "name": "Ecosystem Simulator",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "identity": "wendoo-lang/trg-ecosim",
   "description": "Program the brains of carnivores, herbivores, and plants in a live 2D ecosystem with Wendoo.",
   "targets": {
@@ -83,7 +83,7 @@
       "app/assets/brain/icons/wander.svg",
       "app/assets/fonts/latinmodern-math.woff2",
       "app/assets/main-BGylXWOf.css",
-      "app/assets/main-CruvkMUu.js",
+      "app/assets/main-BaTM4DoX.js",
       "app/assets/phaser-BG365Q_w.js",
       "app/favicon.png",
       "app/favicon.svg",
@@ -100,5 +100,5 @@
   "declaredSurface": {
     "path": "declared-surface.json"
   },
-  "buildVersion": "0.1.6"
+  "buildVersion": "0.1.7"
 }
