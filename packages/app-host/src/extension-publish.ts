@@ -240,27 +240,8 @@ export interface ExtensionPublishOptions {
   readonly backend: ExtensionPublishBackend;
 }
 
-/**
- * Manifest field naming the version that was baked into a target's packaged app
- * bundle. A target's release flow writes this stamp at packaging time equal to
- * the version the bundle was built with; a publish of a target refuses when the
- * manifest version has moved away from the stamp (the version was bumped without
- * repackaging). Carried through publish as a manifest extra. Libraries do not
- * carry it.
- */
-const BUILD_VERSION_STAMP_FIELD = "buildVersion";
-
 function refusal(code: ExtensionPublishErrorCode, message: string): ExtensionPublishResult {
   return { ok: false, error: { code, message } };
-}
-
-/**
- * Read the {@link BUILD_VERSION_STAMP_FIELD} build-version stamp from a
- * manifest's extras, or `undefined` when the manifest carries no string stamp.
- */
-function readBuildVersionStamp(manifest: ProjectContentManifest): string | undefined {
-  const raw = manifest.extras?.[BUILD_VERSION_STAMP_FIELD];
-  return typeof raw === "string" ? raw : undefined;
 }
 
 /**
@@ -381,7 +362,7 @@ export async function publishExtensionVersion(options: ExtensionPublishOptions):
     // the tag namespace below: a target keeps its manifest version, so the head
     // manifest version equals it by construction and cannot distinguish a
     // re-publish from a first publish.
-    const stamp = readBuildVersionStamp(manifest);
+    const stamp = manifest.buildVersion;
     if (stamp !== undefined && stamp !== version) {
       return refusal(
         ExtensionPublishErrorCode.HOST_APP_STAMP_MISMATCH,

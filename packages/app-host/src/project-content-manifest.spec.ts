@@ -436,6 +436,52 @@ describe("parseProjectContentManifest", () => {
     assert.strictEqual(result.ok, false);
     assert.deepStrictEqual(errorCodes(result), [ProjectContentManifestErrorCode.FILE_ESCAPES_ROOT]);
   });
+
+  it("carries a build version through as a declared field, not as an extra", () => {
+    const result = parseProjectContentManifest(JSON.stringify({ name: "P", version: "0.1.0", buildVersion: "0.1.0" }));
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.strictEqual(result.manifest.buildVersion, "0.1.0");
+      assert.strictEqual("extras" in result.manifest, false);
+    }
+    const absent = parseProjectContentManifest(JSON.stringify({ name: "P", version: "0.1.0" }));
+    assert.strictEqual(absent.ok, true);
+    if (absent.ok) {
+      assert.strictEqual("buildVersion" in absent.manifest, false);
+    }
+  });
+
+  it("rejects a malformed buildVersion with INVALID_BUILD_VERSION", () => {
+    for (const buildVersion of ["", 7, null, { version: "0.1.0" }]) {
+      const result = validateProjectContentManifest({ name: "P", version: "0.1.0", buildVersion });
+      assert.strictEqual(result.ok, false, `Expected rejection for ${JSON.stringify(buildVersion)}`);
+      assert.deepStrictEqual(errorCodes(result), [ProjectContentManifestErrorCode.INVALID_BUILD_VERSION]);
+    }
+  });
+
+  it("serializes a published target package byte-identically to its source bytes", () => {
+    // The field order every already-published target package carries.
+    const published = `${JSON.stringify(
+      {
+        name: "Ecosystem Simulator",
+        version: "0.1.7",
+        identity: "wendoo-lang/trg-ecosim",
+        description: "Program the brains of carnivores, herbivores, and plants.",
+        targets: { "wendoo-lang/lib-ecosim": { packageVersion: "^0.1.0" } },
+        hostApp: { path: "app", files: ["app/index.html"] },
+        rehearsalAdapter: { path: "rehearsal/adapter.js" },
+        declaredSurface: { path: "declared-surface.json" },
+        buildVersion: "0.1.7",
+      },
+      null,
+      2
+    )}`;
+    const result = parseProjectContentManifest(published);
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.strictEqual(serializeProjectContentManifest(result.manifest), published);
+    }
+  });
 });
 
 describe("validateProjectContentManifest", () => {

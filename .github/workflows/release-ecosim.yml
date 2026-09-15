@@ -123,14 +123,13 @@ jobs:
           TRG_PUBLISH_TOKEN: ${{ secrets.TRG_PUBLISH_TOKEN }}
         run: |
           set -euo pipefail
-          IDENTITY="$(node -p "require('./wendoo.json').identity")"
-          TRG_REMOTE="https://github.com/$IDENTITY.git"
+          TRG_REMOTE="$(./node_modules/.bin/wendoo publish --print-remote --dir target-package)"
           export GIT_CONFIG_COUNT=3
           export GIT_CONFIG_KEY_0="user.name"
           export GIT_CONFIG_VALUE_0="github-actions[bot]"
           export GIT_CONFIG_KEY_1="user.email"
           export GIT_CONFIG_VALUE_1="41898282+github-actions[bot]@users.noreply.github.com"
-          export GIT_CONFIG_KEY_2="url.https://x-access-token:$TRG_PUBLISH_TOKEN@github.com/$IDENTITY.git.insteadOf"
+          export GIT_CONFIG_KEY_2="url.https://x-access-token:$TRG_PUBLISH_TOKEN@${TRG_REMOTE#https://}.insteadOf"
           export GIT_CONFIG_VALUE_2="$TRG_REMOTE"
           npm run release-trg -- publish
 

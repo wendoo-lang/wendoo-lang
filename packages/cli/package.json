@@ -42,9 +42,10 @@
   },
   "wireit": {
     "build:prod": {
-      "command": "tsc --build tsconfig.prod.json",
+      "command": "tsc --build tsconfig.prod.json && chmod +x dist/main.js",
       "dependencies": [
         "../app-host:build:prod",
+        "../assistant-bridge:build:prod",
         "../service-api:build:prod"
       ],
       "files": [
@@ -72,6 +73,7 @@
   },
   "dependencies": {
     "@wendoo/app-host": "file:../app-host",
+    "@wendoo/assistant-bridge": "file:../assistant-bridge",
     "@wendoo/service-api": "file:../service-api"
   }
 }

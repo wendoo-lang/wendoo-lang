@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { runAssembleCommand } from "./assemble-command.js";
 import { isLocalBuild } from "./local-redirect.js";
 import { runPublishCommand } from "./publish-command.js";
+import { runReleaseCommand } from "./release-command.js";
 import { runUnpackCommand } from "./unpack-command.js";
 import { runVersionCommand } from "./version-command.js";
 
@@ -11,6 +13,8 @@ commands:
   publish   publish a version of a Wendoo project to GitHub
   version   increment a Wendoo project's version in its wendoo.json
   unpack    convert a .wendoo export into a publishable project directory
+  assemble  assemble a target app's publishable package from its build
+  release   prepare and publish a target app's package
 
 options:
   -v, --version   print the wendoo version
@@ -64,6 +68,12 @@ export async function runCli(argv: readonly string[]): Promise<number> {
   }
   if (command === "unpack") {
     return runUnpackCommand(rest);
+  }
+  if (command === "assemble") {
+    return runAssembleCommand(rest);
+  }
+  if (command === "release") {
+    return runReleaseCommand(rest);
   }
   process.stderr.write(command === undefined ? CLI_USAGE : `wendoo: unknown command "${command}"\n${CLI_USAGE}`);
   return 1;

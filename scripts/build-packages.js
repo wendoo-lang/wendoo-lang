@@ -337,7 +337,7 @@ function main(argv) {
   return 0;
 }
 
-module.exports = { buildOrder, modulesDirName };
+module.exports = { buildOrder, modulesDirName, neededVariants, readDeclaration, stepsFor };
 
 if (require.main === module) {
   try {

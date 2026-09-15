@@ -5,7 +5,7 @@ import path from "node:path";
 import { after, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { deriveCoordinateFromRemoteUrl } from "@wendoo/app-host";
-import { resolvePublishTarget } from "./publish-command.js";
+import { PublishCommandErrorCode, resolvePublishTarget } from "./publish-command.js";
 import {
   cloneAtTag,
   githubRewriteEnv,
@@ -829,4 +829,64 @@ describe("publishing the codal-position extension content", () => {
       assert.deepEqual(Array.from(new Uint8Array(publishedIndex)), Array.from(new Uint8Array(sourceIndex)));
     }
   );
+});
+
+describe("wendoo publish --print-remote", () => {
+  it("prints the identity-derived remote for a subdirectory project and publishes nothing", async () => {
+    const root = await scratch();
+    const monorepoRemote = await initBareRemote(root, "acme/monorepo.git");
+    const checkout = await initCheckoutProject(root, monorepoRemote, {
+      "packages/blinker/wendoo.json": JSON.stringify(
+        { name: "Blinker", version: "0.1.0", identity: "example-org/blinker" },
+        null,
+        2
+      ),
+    });
+    const project = path.join(checkout, "packages", "blinker");
+
+    const result = await runCliBin(project, "publish", "--print-remote");
+
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(result.stdout, "https://github.com/example-org/blinker.git\n");
+    assert.equal((await runGit(root, "ls-remote", "--tags", monorepoRemote)).trim(), "");
+  });
+
+  it("prints an explicit --remote unchanged", async () => {
+    const root = await scratch();
+    const remote = await initBareRemote(root);
+    const project = await scratch();
+    await writeProjectFiles(project, {
+      "wendoo.json": JSON.stringify({ name: "Blinker", version: "0.1.0" }, null, 2),
+    });
+
+    const result = await runCliBin(project, "publish", "--print-remote", "--remote", remote);
+
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(result.stdout, `${remote}\n`);
+  });
+
+  it("prints the checkout's origin for a standalone project", async () => {
+    const root = await scratch();
+    const remote = await initBareRemote(root);
+    const checkout = await initCheckoutProject(root, remote, {
+      "wendoo.json": JSON.stringify({ name: "Blinker", version: "0.1.0" }, null, 2),
+    });
+
+    const result = await runCliBin(checkout, "publish", "--print-remote");
+
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(result.stdout, `${remote}\n`);
+  });
+
+  it("refuses when neither an origin nor a recorded identity resolves a remote", async () => {
+    const project = await scratch();
+    await writeProjectFiles(project, {
+      "wendoo.json": JSON.stringify({ name: "Blinker", version: "0.1.0" }, null, 2),
+    });
+
+    const result = await runCliBin(project, "publish", "--print-remote");
+
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, new RegExp(PublishCommandErrorCode.REMOTE_UNRESOLVED));
+  });
 });

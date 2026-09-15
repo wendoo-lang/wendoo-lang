@@ -1,16 +1,20 @@
 #!/usr/bin/env node
 
-// Check or regenerate the package-lock.json of an app or package and of every
-// local package it depends on, in dependency order.
+// Check or regenerate the package-lock.json of every package a directory holds
+// and of every local package those depend on, in dependency order.
 //
 // Usage:
-//   node scripts/lockfiles.js <dir>...
-//   node scripts/lockfiles.js --fix <dir>...
+//   node scripts/lockfiles.js [--fix] [--fix-command <command>] <dir>...
 //
-// The order comes from scripts/build-packages.js, so the walk covers the same
-// `file:` dependency graph the build driver walks and may span repositories.
-// A named directory holding no package.json is skipped, and a package reached
-// more than once is visited once.
+// Each named directory is expanded by scripts/repo-packages.js, so naming a
+// repository root sweeps every package the repository holds. The order comes
+// from scripts/build-packages.js, so the walk covers the same `file:` dependency
+// graph the build driver walks and may span repositories. A named directory
+// holding no package.json contributes nothing, and a package reached more than
+// once is visited once.
+//
+// `--fix-command` names the command a failure report tells the reader to run;
+// without it the report points back at this script's own `--fix`.
 //
 // A lockfile is honest when regenerating its resolution from its package.json
 // leaves it unchanged. A dishonest one records a resolution its package.json no
@@ -36,6 +40,7 @@ const { tmpdir } = require("node:os");
 const { join, relative, resolve } = require("node:path");
 
 const { buildOrder, modulesDirName } = require("./build-packages.js");
+const { discoverPackages } = require("./repo-packages.js");
 
 /** File npm records a package's resolved dependency tree in. */
 const lockfileName = "package-lock.json";
@@ -235,18 +240,35 @@ function regenerateUntilSettled(order) {
   return undefined;
 }
 
+/** Default text a failure report names when the caller declares no fix command. */
+const defaultFixCommand = "node scripts/lockfiles.js --fix";
+
 function main(argv) {
-  const fix = argv[0] === "--fix";
-  const named = (fix ? argv.slice(1) : argv).map((dir) => resolve(process.cwd(), dir));
+  let fix = false;
+  let fixCommand = defaultFixCommand;
+  const named = [];
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === "--fix") {
+      fix = true;
+    } else if (arg === "--fix-command") {
+      const value = argv[i + 1];
+      if (value === undefined) {
+        console.error("--fix-command requires a value.");
+        return 1;
+      }
+      i++;
+      fixCommand = value;
+    } else {
+      named.push(resolve(process.cwd(), arg));
+    }
+  }
   if (named.length === 0) {
-    console.error("Usage: node scripts/lockfiles.js [--fix] <dir>...");
+    console.error("Usage: node scripts/lockfiles.js [--fix] [--fix-command <command>] <dir>...");
     return 1;
   }
 
-  const order = buildOrder(
-    named.filter((dir) => existsSync(join(dir, "package.json"))),
-    true
-  );
+  const order = buildOrder(discoverPackages(named), true);
   if (order.length === 0) {
     console.error("None of the named directories holds a package.json.");
     return 1;
@@ -276,7 +298,7 @@ function main(argv) {
   if (unmatched.length > 0) {
     console.error(
       `\n${unmatched.length} lockfile(s) do not match their package.json:\n  ${unmatched.join("\n  ")}\n` +
-        'Run "npm run lockfiles:sync" from the repository root to bring them up to date.'
+        `Run "${fixCommand}" to bring them up to date.`
     );
   }
   if (incomplete.length > 0) printIncomplete(incomplete);

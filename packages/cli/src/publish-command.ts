@@ -22,6 +22,7 @@ import {
 import { GitCommandError, git, tryGit } from "./git.js";
 
 const PUBLISH_USAGE = `usage: wendoo publish [patch|minor|major] [--dir <path>] [--remote <url>] [--allow-unstable-refs]
+       wendoo publish --print-remote [--dir <path>] [--remote <url>]
 
 Publishes a version of the Wendoo project in --dir (default: the current
 directory). Run from inside an already-published project's folder, no flags are
@@ -56,11 +57,14 @@ and identity are written back to the project directory's wendoo.json.
                    allow dependencies that are unstable for consumers: a
                    branch reference, or a pinned version the fetch source
                    does not yet serve
+  --print-remote   print the git remote this publish would record the version
+                   on, and exit without publishing
 `;
 
 /** Stable identifiers for publish command failures beyond the engine's refusals. */
 export const PublishCommandErrorCode = {
   WRITE_BACK_FAILED: "PUBLISH_WRITE_BACK_FAILED",
+  REMOTE_UNRESOLVED: "PUBLISH_REMOTE_UNRESOLVED",
 } as const;
 
 /** Union of all {@link PublishCommandErrorCode} values. */
@@ -74,6 +78,8 @@ interface PublishArguments {
   dir: string;
   remote: string | undefined;
   allowUnstableRefs: boolean;
+  /** True to print the resolved publish remote and exit without publishing. */
+  printRemote: boolean;
 }
 
 function isVersionBump(value: string): value is PublishVersionBump {
@@ -85,11 +91,14 @@ function parsePublishArguments(args: readonly string[]): PublishArguments | stri
   let dir = process.cwd();
   let remote: string | undefined;
   let allowUnstableRefs = false;
+  let printRemote = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--allow-unstable-refs") {
       allowUnstableRefs = true;
+    } else if (arg === "--print-remote") {
+      printRemote = true;
     } else if (arg === "--dir" || arg === "--remote") {
       const value = args[i + 1];
       if (value === undefined) {
@@ -111,7 +120,7 @@ function parsePublishArguments(args: readonly string[]): PublishArguments | stri
     }
   }
 
-  return { bump, dir, remote, allowUnstableRefs };
+  return { bump, dir, remote, allowUnstableRefs, printRemote };
 }
 
 /** Inputs {@link resolvePublishTarget} decides the publish target from. */
@@ -381,6 +390,18 @@ export async function runPublishCommand(args: readonly string[]): Promise<number
       isCheckoutRoot: checkoutPrefix === "",
       hasOrigin: originUrl !== undefined,
     });
+    if (parsed.printRemote) {
+      const remote = target.mode === "constructed" ? target.remote : originUrl;
+      if (remote === undefined) {
+        process.stderr.write(
+          `wendoo publish: ${PublishCommandErrorCode.REMOTE_UNRESOLVED}: ${parsed.dir} publishes to its ` +
+            "checkout's origin, which has no URL.\n"
+        );
+        return 1;
+      }
+      process.stdout.write(`${remote}\n`);
+      return 0;
+    }
     const result =
       target.mode === "constructed" ? await publishToRemote(parsed, target.remote) : await publishInCheckout(parsed);
     if (!result.ok) {

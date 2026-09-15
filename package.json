@@ -7,8 +7,10 @@
     "install": "npm run install:packages && npm run install:apps",
     "install:packages": "npm --prefix packages install",
     "install:apps": "npm --prefix apps install",
-    "lockfiles:check": "node scripts/lockfiles.js . packages packages/*/ apps apps/*/",
-    "lockfiles:sync": "node scripts/lockfiles.js --fix . packages packages/*/ apps apps/*/",
+    "lockfiles:check": "node scripts/lockfiles.js --fix-command 'npm run lockfiles:sync' .",
+    "lockfiles:sync": "node scripts/lockfiles.js --fix .",
+    "build-inputs:check": "node scripts/build-inputs.js --fix-command 'npm run build-inputs:sync' .",
+    "build-inputs:sync": "node scripts/build-inputs.js --fix .",
     "check": "biome check --write ./scripts",
     "check:only": "biome check ./scripts",
     "test": "node --test scripts/*.spec.js"

@@ -21,6 +21,7 @@
   "exclude": ["node_modules", "dist", "**/*.spec.ts", "src/test-support"],
   "references": [
     { "path": "../app-host/tsconfig.json" },
+    { "path": "../assistant-bridge/tsconfig.json" },
     { "path": "../service-api/tsconfig.json" }
   ]
 }

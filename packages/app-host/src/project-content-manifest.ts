@@ -250,6 +250,13 @@ export interface ProjectContentManifest {
    */
   readonly declaredSurface?: ProjectContentManifestDeclaredSurface;
   /**
+   * Semver version the packaged content was built at, written when the package
+   * is assembled. Present only on a project whose content is assembled by a
+   * build; a hand-authored project omits it. A publish refuses when it is
+   * present and differs from {@link ProjectContentManifest.version}.
+   */
+  readonly buildVersion?: string;
+  /**
    * Root-level fields of the source document outside the manifest schema
    * (for example application-specific content), keyed by property name and
    * carried verbatim: a parse followed by a serialize preserves them. Present
@@ -272,6 +279,7 @@ const MANIFEST_SCHEMA_FIELDS: ReadonlySet<string> = new Set([
   "hostApp",
   "rehearsalAdapter",
   "declaredSurface",
+  "buildVersion",
 ]);
 
 /** Stable identifiers for content manifest validation errors. */
@@ -288,6 +296,7 @@ export const ProjectContentManifestErrorCode = {
   HOST_APP_FILES_OVERLAP: "PROJECT_MANIFEST_HOST_APP_FILES_OVERLAP",
   INVALID_REHEARSAL_ADAPTER: "PROJECT_MANIFEST_INVALID_REHEARSAL_ADAPTER",
   INVALID_DECLARED_SURFACE: "PROJECT_MANIFEST_INVALID_DECLARED_SURFACE",
+  INVALID_BUILD_VERSION: "PROJECT_MANIFEST_INVALID_BUILD_VERSION",
   INVALID_EXTENSIONS: "PROJECT_MANIFEST_INVALID_EXTENSIONS",
   INVALID_EXTENSION_COORDINATE: "PROJECT_MANIFEST_INVALID_EXTENSION_COORDINATE",
   DUPLICATE_EXTENSION_COORDINATE: "PROJECT_MANIFEST_DUPLICATE_EXTENSION_COORDINATE",
@@ -727,6 +736,19 @@ export function validateProjectContentManifest(value: unknown): ProjectContentMa
     }
   }
 
+  let buildVersion: string | undefined;
+  if (value.buildVersion !== undefined) {
+    if (typeof value.buildVersion !== "string" || value.buildVersion.length === 0) {
+      errors.push({
+        code: ProjectContentManifestErrorCode.INVALID_BUILD_VERSION,
+        path: "$.buildVersion",
+        message: "$.buildVersion must be a non-empty string when present.",
+      });
+    } else {
+      buildVersion = value.buildVersion;
+    }
+  }
+
   if (files !== undefined && hostApp !== undefined) {
     const topLevelFiles = new Set(files);
     for (const path of hostApp.files) {
@@ -784,6 +806,7 @@ export function validateProjectContentManifest(value: unknown): ProjectContentMa
       ...(hostApp !== undefined ? { hostApp } : {}),
       ...(rehearsalAdapter !== undefined ? { rehearsalAdapter } : {}),
       ...(declaredSurface !== undefined ? { declaredSurface } : {}),
+      ...(buildVersion !== undefined ? { buildVersion } : {}),
       ...(extras !== undefined ? { extras } : {}),
     },
     errors: [],
@@ -811,6 +834,7 @@ export function projectContentManifestToJson(manifest: ProjectContentManifest): 
     ...(manifest.hostApp !== undefined ? { hostApp: manifest.hostApp } : {}),
     ...(manifest.rehearsalAdapter !== undefined ? { rehearsalAdapter: manifest.rehearsalAdapter } : {}),
     ...(manifest.declaredSurface !== undefined ? { declaredSurface: manifest.declaredSurface } : {}),
+    ...(manifest.buildVersion !== undefined ? { buildVersion: manifest.buildVersion } : {}),
     ...(manifest.extras !== undefined ? manifest.extras : {}),
   };
 }

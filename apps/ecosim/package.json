@@ -34,8 +34,8 @@
     "build": "vite build --config vite/config.prod.mjs",
     "postbuild": "npm run build:headless",
     "build:headless": "wireit",
-    "package": "npm run build && wendoo-assemble-target-package",
-    "release-trg": "node scripts/release-trg.mjs",
+    "package": "npm run build && node_modules/.bin/wendoo assemble",
+    "release-trg": "node_modules/.bin/wendoo release",
     "pregenerate:ambient": "npm run generate:ambient --prefix ../../packages/core",
     "generate:ambient": "tsx --tsconfig scripts/tsconfig.json scripts/generate-ambient.ts",
     "clean": "rm -rf dist && rm -rf dist-headless && rm -rf node_modules/.vite",
@@ -52,6 +52,17 @@
     "build:deps": "node ../../scripts/build-packages.js .",
     "release": "node scripts/release-dispatch.mjs"
   },
+  "wendooTarget": {
+    "packageScript": "package",
+    "hostApp": {
+      "path": "dist",
+      "script": "build"
+    },
+    "rehearsalAdapter": {
+      "path": "dist-headless/rehearsal/adapter.js",
+      "script": "build:headless"
+    }
+  },
   "wireit": {
     "build:headless": {
       "command": "vite build --config vite/config.headless.mjs",
@@ -61,10 +72,33 @@
         "tsconfig*.json",
         "package.json",
         "wendoo.json",
-        "../../packages/*/package.json",
-        "../../packages/*/dist/**",
+        "../../packages/core/package.json",
+        "../../packages/core/dist/node/**",
+        "../../packages/core/dist/esm/**",
+        "../../packages/service-api/package.json",
+        "../../packages/service-api/dist/**",
+        "../../packages/app-host/package.json",
+        "../../packages/app-host/dist/**",
+        "../../packages/assistant-relay/package.json",
+        "../../packages/assistant-relay/dist/**",
+        "../../packages/assistant-bridge/package.json",
+        "../../packages/assistant-bridge/dist/**",
+        "../../packages/ui/package.json",
+        "../../packages/ui/src/**",
+        "../../packages/assistant-panel/package.json",
+        "../../packages/assistant-panel/src/**",
+        "../../packages/bridge-protocol/package.json",
+        "../../packages/bridge-protocol/dist/**",
+        "../../packages/bridge-client/package.json",
+        "../../packages/bridge-client/dist/**",
+        "../../packages/ts-compiler/package.json",
+        "../../packages/ts-compiler/dist/**",
+        "../../packages/bridge-app/package.json",
+        "../../packages/bridge-app/dist/**",
+        "../../packages/docs/package.json",
         "../../packages/docs/src/**",
-        "../../packages/ui/src/**"
+        "../../packages/cli/package.json",
+        "../../packages/cli/dist/**"
       ],
       "output": [
         "dist-headless/**"
