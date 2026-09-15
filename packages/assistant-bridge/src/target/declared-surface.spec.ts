@@ -11,7 +11,13 @@ import {
 } from "../testing/index.js";
 import type { TargetAdapter } from "./adapter.js";
 import { ADAPTER_CONTRACT_VERSION } from "./adapter.js";
-import { DECLARED_SURFACE_FORMAT_VERSION, declaredSurfaceOf, declaredSurfaceSchema } from "./declared-surface.js";
+import {
+  DECLARED_SURFACE_FORMAT_VERSION,
+  DeclaredSurfaceReadCode,
+  declaredSurfaceOf,
+  declaredSurfaceSchema,
+  readDeclaredSurface,
+} from "./declared-surface.js";
 
 /** The language build a fixture artifact publishes. */
 const stamp: CoreBuild = {
@@ -93,5 +99,60 @@ describe("reading a declared surface", () => {
       const { [field]: _removed, ...rest } = complete;
       assert.equal(declaredSurfaceSchema.safeParse(rest).success, false, `expected ${field} to be required`);
     }
+  });
+});
+
+describe("reading a baked declared surface", () => {
+  test("reads a document this writer baked", () => {
+    const baked: unknown = JSON.parse(JSON.stringify(declaredSurfaceOf(createTargetAdapter(), stamp)));
+
+    const read = readDeclaredSurface(baked);
+
+    assert.equal(read.ok, true);
+    assert.equal(read.ok && read.surface.targetIdentity, FAKE_TARGET_IDENTITY);
+    assert.deepEqual(read.ok && read.surface.buildStamp, stamp);
+  });
+
+  test("reads a document at this format carrying fields this version does not name", () => {
+    const later = { ...declaredSurfaceOf(createTargetAdapter(), stamp), toolFamilies: ["edit.image"] };
+
+    const read = readDeclaredSurface(later);
+
+    assert.equal(read.ok, true);
+    assert.deepEqual(read.ok && read.surface.subjects, [FAKE_SUBJECT]);
+  });
+
+  test("refuses a document written at any other format version, in either direction", () => {
+    const neighbours = [-2, -1, 1, 2]
+      .map((offset) => DECLARED_SURFACE_FORMAT_VERSION + offset)
+      .filter((version) => version >= 1);
+    assert.ok(neighbours.length > 0, "there is a format version other than this one to refuse");
+
+    for (const formatVersion of neighbours) {
+      const other = { ...declaredSurfaceOf(createTargetAdapter(), stamp), formatVersion };
+
+      const read = readDeclaredSurface(other);
+
+      assert.equal(read.ok, false, `expected format ${formatVersion} to be refused`);
+      assert.equal(read.ok === false && read.rejection.code, DeclaredSurfaceReadCode.UnsupportedFormatVersion);
+    }
+  });
+
+  test("refuses a document that states no format version", () => {
+    const { formatVersion: _absent, ...rest } = declaredSurfaceOf(createTargetAdapter(), stamp);
+
+    const read = readDeclaredSurface(rest);
+
+    assert.equal(read.ok, false);
+    assert.equal(read.ok === false && read.rejection.code, DeclaredSurfaceReadCode.Malformed);
+  });
+
+  test("refuses a document at this format that does not match it", () => {
+    const broken = { ...declaredSurfaceOf(createTargetAdapter(), stamp), subjects: "the creature" };
+
+    const read = readDeclaredSurface(broken);
+
+    assert.equal(read.ok, false);
+    assert.equal(read.ok === false && read.rejection.code, DeclaredSurfaceReadCode.Malformed);
   });
 });

@@ -65,6 +65,69 @@ export const declaredSurfaceSchema = z.object({
 /** The baked declarative surface of a target package. */
 export type DeclaredSurface = z.infer<typeof declaredSurfaceSchema>;
 
+/** Why a baked declared-surface document could not be read. */
+export const DeclaredSurfaceReadCode = {
+  /** The document states a format version other than {@link DECLARED_SURFACE_FORMAT_VERSION}. */
+  UnsupportedFormatVersion: "declared_surface_unsupported_format_version",
+  /** The document states no readable format version, or does not match the format. */
+  Malformed: "declared_surface_malformed",
+} as const;
+
+/** Why a baked declared-surface document could not be read. */
+export type DeclaredSurfaceReadCode = (typeof DeclaredSurfaceReadCode)[keyof typeof DeclaredSurfaceReadCode];
+
+/** One reason a document is not a readable declared surface, machine-readable first. */
+export interface DeclaredSurfaceRejection {
+  readonly code: DeclaredSurfaceReadCode;
+  /** Human-readable context; the code is the contract. */
+  readonly detail: string;
+}
+
+/** The declared surface a document carries, or why it carries none this reader can use. */
+export type DeclaredSurfaceReadResult =
+  | { readonly ok: true; readonly surface: DeclaredSurface }
+  | { readonly ok: false; readonly rejection: DeclaredSurfaceRejection };
+
+/** The one field read off a document before the format it is written in is known. */
+const formatVersionEnvelopeSchema = z.object({ formatVersion: z.number().int().positive() });
+
+/**
+ * Read `document` as a baked declared surface. The format version is read off
+ * the document first and must equal {@link DECLARED_SURFACE_FORMAT_VERSION};
+ * both an older and a newer document are refused with
+ * {@link DeclaredSurfaceReadCode.UnsupportedFormatVersion}. A document at this
+ * version is then read against the format, and one that does not match it is
+ * refused with {@link DeclaredSurfaceReadCode.Malformed}. Fields this version
+ * does not name are accepted and left out of the surface.
+ *
+ * @param document The parsed JSON of a package's baked declared-surface file.
+ */
+export function readDeclaredSurface(document: unknown): DeclaredSurfaceReadResult {
+  const envelope = formatVersionEnvelopeSchema.safeParse(document);
+  if (!envelope.success) {
+    return {
+      ok: false,
+      rejection: { code: DeclaredSurfaceReadCode.Malformed, detail: "the document states no format version" },
+    };
+  }
+  const { formatVersion } = envelope.data;
+  if (formatVersion !== DECLARED_SURFACE_FORMAT_VERSION) {
+    return {
+      ok: false,
+      rejection: {
+        code: DeclaredSurfaceReadCode.UnsupportedFormatVersion,
+        detail: `the document is written at format ${formatVersion}; this reader reads ${DECLARED_SURFACE_FORMAT_VERSION}`,
+      },
+    };
+  }
+  const parsed = declaredSurfaceSchema.safeParse(document);
+  if (!parsed.success) {
+    const issues = parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ");
+    return { ok: false, rejection: { code: DeclaredSurfaceReadCode.Malformed, detail: issues } };
+  }
+  return { ok: true, surface: parsed.data };
+}
+
 /**
  * Serialize what `adapter` declares about its target into the data a target
  * package bakes. A state channel bakes as its name and description only.

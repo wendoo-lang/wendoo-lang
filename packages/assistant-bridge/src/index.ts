@@ -44,11 +44,17 @@ export {
   readAdapterArtifact,
   readBuildStamp,
 } from "./target/adapter.js";
-export type { DeclaredSurface } from "./target/declared-surface.js";
+export type {
+  DeclaredSurface,
+  DeclaredSurfaceReadResult,
+  DeclaredSurfaceRejection,
+} from "./target/declared-surface.js";
 export {
   DECLARED_SURFACE_FORMAT_VERSION,
+  DeclaredSurfaceReadCode,
   declaredSurfaceOf,
   declaredSurfaceSchema,
+  readDeclaredSurface,
 } from "./target/declared-surface.js";
 export type { CompileDiagnostic, CompileResult } from "./tools/compile.js";
 export { compileBrain } from "./tools/compile.js";
