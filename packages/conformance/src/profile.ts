@@ -78,6 +78,8 @@ export const ConformanceActionKeys = {
   Counter: "sensor.conformance.counter",
   DeferCancel: "actuator.conformance.defer-cancel",
   DeferRead: "sensor.conformance.defer-read",
+  EmitText: "actuator.conformance.emit-text",
+  EmitFlag: "actuator.conformance.emit-flag",
 } as const;
 
 /**
@@ -116,6 +118,16 @@ export const ConformanceHostActions = {
     actionId: TARGET_ACTION_ID_BASE + 8,
     fnId: TARGET_FUNC_ID_BASE + 8,
   },
+  EmitText: {
+    key: ConformanceActionKeys.EmitText,
+    actionId: TARGET_ACTION_ID_BASE + 9,
+    fnId: TARGET_FUNC_ID_BASE + 10,
+  },
+  EmitFlag: {
+    key: ConformanceActionKeys.EmitFlag,
+    actionId: TARGET_ACTION_ID_BASE + 10,
+    fnId: TARGET_FUNC_ID_BASE + 11,
+  },
 } as const;
 
 /**
@@ -130,6 +142,8 @@ export const ConformanceOperators = {
 } as const;
 
 const AnonValue = param(CoreParameterId.AnonymousNumber, { name: "value", anonymous: true });
+const AnonText = param(CoreParameterId.AnonymousString, { name: "value", anonymous: true });
+const AnonFlag = param(CoreParameterId.AnonymousBoolean, { name: "value", anonymous: true });
 const Ticks = param(ConformanceParameterId.Ticks, { name: "ticks", default: mkNumberValue(1) });
 const Period = param(ConformanceParameterId.Period, { name: "period", default: mkNumberValue(1) });
 
@@ -142,6 +156,8 @@ const signalCallDef = mkCallDef(bag(Period));
 const counterCallDef = mkCallDef(bag());
 const deferCancelCallDef = mkCallDef(bag(Ticks));
 const deferReadCallDef = mkCallDef(bag(AnonValue, Ticks));
+const emitTextCallDef = mkCallDef(bag(AnonText));
+const emitFlagCallDef = mkCallDef(bag(AnonFlag));
 
 const kEchoValueSlotId = getSlotId(echoCallDef, AnonValue);
 const kDeferEchoValueSlotId = getSlotId(deferEchoCallDef, AnonValue);
@@ -151,6 +167,8 @@ const kSignalPeriodSlotId = getSlotId(signalCallDef, Period);
 const kDeferCancelTicksSlotId = getSlotId(deferCancelCallDef, Ticks);
 const kDeferReadValueSlotId = getSlotId(deferReadCallDef, AnonValue);
 const kDeferReadTicksSlotId = getSlotId(deferReadCallDef, Ticks);
+const kEmitTextValueSlotId = getSlotId(emitTextCallDef, AnonText);
+const kEmitFlagValueSlotId = getSlotId(emitFlagCallDef, AnonFlag);
 
 /** Whole-tick count a deferred call waits, or a signal's period, when the argument carries none. */
 const DEFAULT_WHOLE_TICKS = 1;
@@ -303,6 +321,14 @@ function execDeferRead(ctx: ExecutionContext, args: ReadonlyList<Value>, handle:
   });
 }
 
+function execEmitText(_ctx: ExecutionContext, args: ReadonlyList<Value>): Value {
+  return args.get(kEmitTextValueSlotId);
+}
+
+function execEmitFlag(_ctx: ExecutionContext, args: ReadonlyList<Value>): Value {
+  return args.get(kEmitFlagValueSlotId);
+}
+
 function execDeferAdd(ctx: ExecutionContext, args: ReadonlyList<Value>, handle: AsyncHandle): void {
   const numerics = ctx.services.app.numerics;
   const sum = safeNumBinary(args, (a, b) => numerics.round(a + b));
@@ -411,6 +437,26 @@ const deferReadSensor = {
   metadata: { label: "defer read" },
 } satisfies CreateHostSensorOptions;
 
+const emitTextActuator = {
+  key: ConformanceHostActions.EmitText.key,
+  actionId: ConformanceHostActions.EmitText.actionId,
+  fnId: ConformanceHostActions.EmitText.fnId,
+  callDef: emitTextCallDef,
+  fn: { exec: execEmitText },
+  isAsync: false,
+  metadata: { label: "emit text" },
+} satisfies CreateHostActuatorOptions;
+
+const emitFlagActuator = {
+  key: ConformanceHostActions.EmitFlag.key,
+  actionId: ConformanceHostActions.EmitFlag.actionId,
+  fnId: ConformanceHostActions.EmitFlag.fnId,
+  callDef: emitFlagCallDef,
+  fn: { exec: execEmitFlag },
+  isAsync: false,
+  metadata: { label: "emit flag" },
+} satisfies CreateHostActuatorOptions;
+
 /**
  * The conformance host profile: the host surface every VM implements in its
  * test harness to replay the corpus.
@@ -437,6 +483,12 @@ const deferReadSensor = {
  * - `defer read(value, ticks)` -- asynchronous sensor whose handle resolves to
  *   `value` exactly `ticks` ticks after its dispatch, so a section reading it
  *   suspends until then.
+ * - `emit text(value)` -- synchronous actuator whose argument slot is
+ *   String-typed, returning its argument, so a string value lands in the
+ *   trace's argument and result positions.
+ * - `emit flag(value)` -- synchronous actuator whose argument slot is
+ *   Boolean-typed, returning its argument, so a boolean value lands in the
+ *   trace's argument and result positions.
  * - `lhs defer plus rhs` -- asynchronous infix operator whose handle resolves
  *   to the sum one tick after its dispatch, so the expression containing it
  *   suspends until then. An operand carrying no number, and a sum that is not
@@ -463,6 +515,8 @@ export function conformanceModule(): WendooModule {
       api.registerHostSensor(createHostSensor(counterSensor));
       api.registerHostActuator(createHostActuator(deferCancelActuator));
       api.registerHostSensor(createHostSensor(deferReadSensor));
+      api.registerHostActuator(createHostActuator(emitTextActuator));
+      api.registerHostActuator(createHostActuator(emitFlagActuator));
       api.registerOperator({
         spec: {
           id: ConformanceOperators.DeferAdd.opId,

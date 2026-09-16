@@ -1,0 +1,15 @@
+mctrace 1
+profile 3e8
+precision f32
+tick 1 time 41800000 dt 00000000
+action 409 site 0 args 1 string "corpus" result string "corpus"
+action 409 site 1 args 1 string "gr\xc3\xbc\xc3\x9f" result string "gr\xc3\xbc\xc3\x9f"
+action 409 site 2 args 1 string "a\"b\\c" result string "a\"b\\c"
+action 40a site 3 args 1 bool 1 result bool 1
+action 40a site 4 args 1 bool 0 result bool 0
+tick 2 time 42000000 dt 41800000
+action 409 site 0 args 1 string "corpus" result string "corpus"
+action 409 site 1 args 1 string "gr\xc3\xbc\xc3\x9f" result string "gr\xc3\xbc\xc3\x9f"
+action 409 site 2 args 1 string "a\"b\\c" result string "a\"b\\c"
+action 40a site 3 args 1 bool 1 result bool 1
+action 40a site 4 args 1 bool 0 result bool 0

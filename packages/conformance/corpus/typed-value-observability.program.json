@@ -1,0 +1,261 @@
+{
+  "program": {
+    "version": 1,
+    "functions": [
+      {
+        "code": [
+          {
+            "op": 72
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 5,
+            "a": 0
+          },
+          {
+            "op": 6,
+            "a": 0
+          },
+          {
+            "op": 44,
+            "a": 1033,
+            "b": 1,
+            "c": 0
+          },
+          {
+            "op": 73
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 31
+          }
+        ],
+        "numParams": 0
+      },
+      {
+        "code": [
+          {
+            "op": 72
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 5,
+            "a": 1
+          },
+          {
+            "op": 6,
+            "a": 0
+          },
+          {
+            "op": 44,
+            "a": 1033,
+            "b": 1,
+            "c": 1
+          },
+          {
+            "op": 73
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 31
+          }
+        ],
+        "numParams": 0
+      },
+      {
+        "code": [
+          {
+            "op": 72
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 5,
+            "a": 2
+          },
+          {
+            "op": 6,
+            "a": 0
+          },
+          {
+            "op": 44,
+            "a": 1033,
+            "b": 1,
+            "c": 2
+          },
+          {
+            "op": 73
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 31
+          }
+        ],
+        "numParams": 0
+      },
+      {
+        "code": [
+          {
+            "op": 72
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 0,
+            "a": 1
+          },
+          {
+            "op": 6,
+            "a": 0
+          },
+          {
+            "op": 44,
+            "a": 1034,
+            "b": 1,
+            "c": 3
+          },
+          {
+            "op": 73
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 31
+          }
+        ],
+        "numParams": 0
+      },
+      {
+        "code": [
+          {
+            "op": 72
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 0,
+            "a": 2
+          },
+          {
+            "op": 6,
+            "a": 0
+          },
+          {
+            "op": 44,
+            "a": 1034,
+            "b": 1,
+            "c": 4
+          },
+          {
+            "op": 73
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 31
+          }
+        ],
+        "numParams": 0
+      }
+    ],
+    "constantPools": {
+      "numbers": [],
+      "strings": [
+        "corpus",
+        "grüß",
+        "a\"b\\c"
+      ],
+      "values": [
+        {
+          "t": 1
+        },
+        {
+          "t": 2,
+          "v": true
+        },
+        {
+          "t": 2,
+          "v": false
+        }
+      ]
+    },
+    "types": [],
+    "variableNames": [],
+    "entryPoint": 0,
+    "actions": [],
+    "ruleFuncIds": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "ruleAncestors": []
+  },
+  "pages": [
+    {
+      "pageIndex": 0,
+      "pageId": "1uQGngetiRKxqU5k",
+      "pageName": "Unnamed Page",
+      "rootRuleFuncIds": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "actionCallSites": [
+        {
+          "binding": "host",
+          "callSiteId": 0,
+          "actionId": 1033
+        },
+        {
+          "binding": "host",
+          "callSiteId": 1,
+          "actionId": 1033
+        },
+        {
+          "binding": "host",
+          "callSiteId": 2,
+          "actionId": 1033
+        },
+        {
+          "binding": "host",
+          "callSiteId": 3,
+          "actionId": 1034
+        },
+        {
+          "binding": "host",
+          "callSiteId": 4,
+          "actionId": 1034
+        }
+      ]
+    }
+  ]
+}

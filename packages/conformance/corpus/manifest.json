@@ -189,6 +189,14 @@
       "schedule": [16, 16, 16]
     },
     {
+      "id": "implicit-conversions",
+      "source": "packages/conformance/src/cases/implicit-conversions.spec.ts",
+      "summary": "Every core conversion host function fired implicitly: mismatched values in typed argument slots, in a binary operator's operand, and at a variable assignment target.",
+      "behaviors": ["host-sync-action-call", "implicit-conversion", "rule-when-empty", "variable-slot-storage"],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
       "id": "nil-equality-lattice",
       "source": "packages/conformance/src/cases/nil-equality-lattice.spec.ts",
       "summary": "Every core equality overload with a nil operand: nil against nil, and against a number, a boolean, and a string in both operand orders.",
@@ -377,6 +385,14 @@
       ],
       "precisions": ["f32", "f64"],
       "schedule": [16, 16, 16, 16, 16, 16]
+    },
+    {
+      "id": "typed-value-observability",
+      "source": "packages/conformance/src/cases/typed-value-observability.spec.ts",
+      "summary": "String and boolean values through the typed argument slots, landing string and bool tokens in the trace's argument and result positions, with UTF-8 and escaped string bytes pinned.",
+      "behaviors": ["host-sync-action-call", "rule-when-empty", "string-constant-push"],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
     }
   ]
 }

@@ -1,0 +1,25 @@
+mctrace 1
+profile 3e8
+precision f64
+tick 1 time 4030000000000000 dt 0000000000000000
+action 401 site 1 args 1 number 4014000000000000 result void
+action 401 site 3 args 1 number 3ff0000000000000 result void
+action 409 site 5 args 1 string "7" result string "7"
+action 409 site 7 args 1 string "false" result string "false"
+action 40a site 9 args 1 bool 1 result bool 1
+action 40a site b args 1 bool 0 result bool 0
+action 40a site d args 1 bool 1 result bool 1
+action 40a site f args 1 bool 0 result bool 0
+action 409 site 12 args 1 string "a7" result string "a7"
+action 401 site 14 args 1 number 401c000000000000 result void
+tick 2 time 4040000000000000 dt 4030000000000000
+action 401 site 1 args 1 number 4014000000000000 result void
+action 401 site 3 args 1 number 3ff0000000000000 result void
+action 409 site 5 args 1 string "7" result string "7"
+action 409 site 7 args 1 string "false" result string "false"
+action 40a site 9 args 1 bool 1 result bool 1
+action 40a site b args 1 bool 0 result bool 0
+action 40a site d args 1 bool 1 result bool 1
+action 40a site f args 1 bool 0 result bool 0
+action 409 site 12 args 1 string "a7" result string "a7"
+action 401 site 14 args 1 number 401c000000000000 result void

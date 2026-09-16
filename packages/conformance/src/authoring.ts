@@ -36,6 +36,10 @@ export interface ConformanceTiles {
   readonly deferCancel: IBrainTileDef;
   /** WHEN-side asynchronous sensor tile of `defer read(value, ticks)`. */
   readonly deferRead: IBrainTileDef;
+  /** DO-side actuator tile of `emit text(value)`, whose argument slot is String-typed. */
+  readonly emitText: IBrainTileDef;
+  /** DO-side actuator tile of `emit flag(value)`, whose argument slot is Boolean-typed. */
+  readonly emitFlag: IBrainTileDef;
   /** Operator tile of the asynchronous infix `lhs defer plus rhs`. */
   readonly deferAdd: IBrainTileDef;
   /** Parameter tile naming the `ticks` argument of a deferred call. */
@@ -82,6 +86,8 @@ export function conformanceTiles(environment: WendooEnvironment): ConformanceTil
     counter: requireTile(environment, mkSensorTileId(ConformanceHostActions.Counter.key)),
     deferCancel: requireTile(environment, mkActuatorTileId(ConformanceHostActions.DeferCancel.key)),
     deferRead: requireTile(environment, mkSensorTileId(ConformanceHostActions.DeferRead.key)),
+    emitText: requireTile(environment, mkActuatorTileId(ConformanceHostActions.EmitText.key)),
+    emitFlag: requireTile(environment, mkActuatorTileId(ConformanceHostActions.EmitFlag.key)),
     deferAdd: requireTile(environment, mkOperatorTileId(ConformanceOperators.DeferAdd.opId)),
     ticks: requireTile(environment, mkParameterTileId(ConformanceParameterId.Ticks)),
     period: requireTile(environment, mkParameterTileId(ConformanceParameterId.Period)),
