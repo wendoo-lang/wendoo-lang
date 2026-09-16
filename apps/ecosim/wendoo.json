@@ -1,6 +1,6 @@
 {
   "name": "Wendoo Ecosystem Simulator",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "identity": "wendoo-lang/trg-ecosim",
   "description": "Program the brains of carnivores, herbivores, and plants in a live 2D ecosystem.",
   "targets": {
