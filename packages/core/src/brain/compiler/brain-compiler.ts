@@ -148,6 +148,8 @@ export class BrainCompiler {
   private actionIndices: Dict<string, number>;
   /** Counter for unique call-site IDs (shared across all rules for uniqueness) */
   private nextCallSiteIdCounter: { value: number };
+  /** Type-table indices pinned as tree-shaker roots for host-produced struct values */
+  private pinnedTypeIndices: UniqueSet<number>;
   /** Code-generation diagnostics collected across all compiled rules. */
   private compileDiags: List<BrainBuildDiagnostic>;
 
@@ -178,6 +180,7 @@ export class BrainCompiler {
     this.actionRefs = List.empty();
     this.actionIndices = Dict.empty();
     this.nextCallSiteIdCounter = { value: 1 };
+    this.pinnedTypeIndices = new UniqueSet<number>();
     this.compileDiags = List.empty();
   }
 
@@ -209,6 +212,7 @@ export class BrainCompiler {
     this.actionRefs = List.empty();
     this.actionIndices = Dict.empty();
     this.nextCallSiteIdCounter = { value: 0 };
+    this.pinnedTypeIndices = new UniqueSet<number>();
     this.compileDiags = List.empty();
     this.operatorOverloads = brainDef.servicesOperatorOverloads();
 
@@ -238,6 +242,7 @@ export class BrainCompiler {
       ruleAncestors: this.ruleAncestors,
       actionRefs: this.actionRefs,
       pages: this.pages,
+      pinnedTypeIndices: this.pinnedTypeIndices,
     };
   }
 
@@ -678,6 +683,7 @@ export class BrainCompiler {
       actionResolver: this.actionResolver,
       typeEnv,
       constantPool: this.constantPool,
+      pinnedTypeIndices: this.pinnedTypeIndices,
       typeRegistry: this.typeRegistry,
       catalogs: this.catalogs,
       nextCallSiteId: this.nextCallSiteIdCounter,

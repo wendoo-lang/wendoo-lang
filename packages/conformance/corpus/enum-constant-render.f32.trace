@@ -1,0 +1,7 @@
+mctrace 1
+profile 3e8
+precision f32
+tick 1 time 41800000 dt 00000000
+action 401 site 0 args 1 enum "seek" result void
+tick 2 time 42000000 dt 41800000
+action 401 site 0 args 1 enum "seek" result void

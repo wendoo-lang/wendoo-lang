@@ -166,6 +166,19 @@
       "schedule": [16, 16, 16, 16]
     },
     {
+      "id": "enum-constant-render",
+      "source": "packages/conformance/src/cases/enum-constant-render.spec.ts",
+      "summary": "The profile's enum literal emitted every think, landing the program-local enum constant's symbol token in the dispatch's argument position.",
+      "behaviors": [
+        "enum-constant-push",
+        "enum-value-render",
+        "host-sync-action-call",
+        "rule-when-empty"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
       "id": "handle-pressure",
       "source": "packages/conformance/src/cases/handle-pressure.spec.ts",
       "summary": "More concurrent asynchronous dispatches than the profile's handle cap admits, spilling across thinks in bounded waves.",
@@ -193,6 +206,21 @@
       "source": "packages/conformance/src/cases/implicit-conversions.spec.ts",
       "summary": "Every core conversion host function fired implicitly: mismatched values in typed argument slots, in a binary operator's operand, and at a variable assignment target.",
       "behaviors": ["host-sync-action-call", "implicit-conversion", "rule-when-empty", "variable-slot-storage"],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
+      "id": "list-argument-gather",
+      "source": "packages/conformance/src/cases/list-argument-gather.spec.ts",
+      "summary": "Three values of three kinds gathered from one repeated value slot into a single list and passed whole into the dispatch, landing the list token in the trace's argument position.",
+      "behaviors": [
+        "host-sync-action-call",
+        "list-value-render",
+        "repeated-arg-list-gather",
+        "rule-when-empty",
+        "struct-constant-push",
+        "struct-value-render"
+      ],
       "precisions": ["f32", "f64"],
       "schedule": [16, 16]
     },
@@ -344,6 +372,104 @@
       ],
       "precisions": ["f32", "f64"],
       "schedule": [16, 16]
+    },
+    {
+      "id": "struct-argument-render",
+      "source": "packages/conformance/src/cases/struct-argument-render.spec.ts",
+      "summary": "An asynchronous struct reading captured into a variable and passed whole into emit's argument slot, landing the struct token in the trace's argument position.",
+      "behaviors": [
+        "async-sensor-when-evaluation",
+        "fiber-await-park",
+        "host-async-action-dispatch",
+        "host-sync-action-call",
+        "root-rule-respawn",
+        "struct-value-render",
+        "variable-slot-storage"
+      ],
+      "precisions": [
+        "f32",
+        "f64"
+      ],
+      "schedule": [
+        16,
+        16,
+        16,
+        16
+      ]
+    },
+    {
+      "id": "struct-constant-render",
+      "source": "packages/conformance/src/cases/struct-constant-render.spec.ts",
+      "summary": "The profile's Point literal stored into a variable every think, with slot-indexed field reads and the struct whole pinning the closed-struct constant's decode end to end.",
+      "behaviors": [
+        "child-rule-spawn",
+        "child-rule-synchronous-cascade",
+        "host-sync-action-call",
+        "struct-constant-push",
+        "struct-field-access",
+        "struct-value-render",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
+      "id": "struct-deep-copy-asymmetry",
+      "source": "packages/conformance/src/cases/struct-deep-copy-asymmetry.spec.ts",
+      "summary": "A captured struct reading copied into a second variable and mutated there, pinning that a variable store deep-copies while a field write mutates the stored struct in place.",
+      "behaviors": [
+        "child-rule-spawn",
+        "child-rule-synchronous-cascade",
+        "struct-deep-copy-asymmetry",
+        "struct-field-access",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16]
+    },
+    {
+      "id": "struct-field-reads",
+      "source": "packages/conformance/src/cases/struct-field-reads.spec.ts",
+      "summary": "An asynchronous struct reading captured into a variable, with slot-indexed field reads feeding the emits and no struct value in an observable position.",
+      "behaviors": [
+        "async-sensor-when-evaluation",
+        "fiber-await-park",
+        "host-async-action-dispatch",
+        "root-rule-respawn",
+        "struct-field-access",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16]
+    },
+    {
+      "id": "struct-native-aliasing",
+      "source": "packages/conformance/src/cases/struct-native-aliasing.spec.ts",
+      "summary": "A captured native-backed value copied into a second variable, with a field write through the copy visible through both variables and the value whole rendering opaque, pinning that the native handle copies by reference.",
+      "behaviors": [
+        "child-rule-spawn",
+        "child-rule-synchronous-cascade",
+        "struct-native-alias-on-copy",
+        "struct-native-field-hooks",
+        "struct-native-opaque-render",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16]
+    },
+    {
+      "id": "struct-native-snapshot",
+      "source": "packages/conformance/src/cases/struct-native-snapshot.spec.ts",
+      "summary": "A resolver-backed native value whose variable store materializes the resolver once via snapshotNative, so both field reads of one capture show the host object pinned at assignment.",
+      "behaviors": [
+        "async-sensor-when-evaluation",
+        "root-rule-respawn",
+        "struct-native-field-hooks",
+        "struct-native-snapshot-on-copy",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16]
     },
     {
       "id": "then-trigger-abandoned",

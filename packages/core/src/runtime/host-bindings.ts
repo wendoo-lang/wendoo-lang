@@ -1,6 +1,7 @@
 import type { ITileCatalog } from "../brain/interfaces/catalog";
 import type { Dict } from "../platform/dict";
 import type { List, ReadonlyList } from "../platform/list";
+import type { UniqueSet } from "../platform/uniqueset";
 import type { EventEmitterConsumer } from "../util";
 import type { HostActionBinding } from "./context";
 import type {
@@ -54,6 +55,16 @@ export interface UnlinkedBrainProgram extends Program {
    * function IDs of its root rules.
    */
   pages: List<PageMetadata>;
+
+  /**
+   * Type-table indices interned for struct values that host actions construct
+   * at runtime (a struct-typed action output type, or a struct-typed declared
+   * output, read or not). No instruction operand references
+   * these entries, so the tree shaker takes them as explicit type-reachability
+   * roots. Compile-pipeline internal; never serialized. Absent is treated as
+   * empty.
+   */
+  pinnedTypeIndices?: UniqueSet<number>;
 }
 
 /** Brain-side action metadata associated with a compiled bytecode action artifact. */

@@ -1,0 +1,7 @@
+mctrace 1
+profile 3e8
+precision f64
+tick 1 time 4030000000000000 dt 0000000000000000
+action 40e site 0 args 1 list 3 number 4012000000000000 string "hi" struct 2 number 400c000000000000 number c011000000000000 result void
+tick 2 time 4040000000000000 dt 4030000000000000
+action 40e site 0 args 1 list 3 number 4012000000000000 string "hi" struct 2 number 400c000000000000 number c011000000000000 result void

@@ -4,6 +4,7 @@ import {
   CoreControlFlowId,
   CoreHostActions,
   CoreTypeIds,
+  mkAccessorTileId,
   mkActuatorTileId,
   mkControlFlowTileId,
   mkLiteralTileId,
@@ -14,7 +15,17 @@ import {
 import { BrainDef, type BrainPageDef, type BrainRuleDef } from "@wendoo/core/brain/model";
 import { BrainTileOperatorDef, BrainTileVariableDef } from "@wendoo/core/brain/tiles";
 import type { TypeCodec, TypeId } from "@wendoo/core/runtime";
-import { ConformanceHostActions, ConformanceOperators, ConformanceParameterId } from "./profile";
+import {
+  CONFORMANCE_ANCHOR_TYPE_ID,
+  CONFORMANCE_MODE_LITERAL_KEY,
+  CONFORMANCE_MODE_TYPE_ID,
+  CONFORMANCE_POINT_LITERAL_LABEL,
+  CONFORMANCE_POINT_TYPE_ID,
+  CONFORMANCE_TARGET_TYPE_ID,
+  ConformanceHostActions,
+  ConformanceOperators,
+  ConformanceParameterId,
+} from "./profile";
 
 /** The tiles a conformance case authors its rules from. */
 export interface ConformanceTiles {
@@ -40,8 +51,28 @@ export interface ConformanceTiles {
   readonly emitText: IBrainTileDef;
   /** DO-side actuator tile of `emit flag(value)`, whose argument slot is Boolean-typed. */
   readonly emitFlag: IBrainTileDef;
+  /** DO-side actuator tile of `emit all(value...)`, whose repeated value slot gathers its arguments into one list. */
+  readonly emitAll: IBrainTileDef;
   /** Operator tile of the asynchronous infix `lhs defer plus rhs`. */
   readonly deferAdd: IBrainTileDef;
+  /** Inline asynchronous sensor tile of `defer point()`, returning a `Point` struct reading. */
+  readonly deferPoint: IBrainTileDef;
+  /** Inline asynchronous sensor tile of `defer anchor()`, returning an `Anchor` native struct value. */
+  readonly deferAnchor: IBrainTileDef;
+  /** Inline asynchronous sensor tile of `defer target()`, returning a `Target` native struct value. */
+  readonly deferTarget: IBrainTileDef;
+  /** Accessor tile reading the `x` field of a `Point` struct value. */
+  readonly pointX: IBrainTileDef;
+  /** Accessor tile reading the `y` field of a `Point` struct value. */
+  readonly pointY: IBrainTileDef;
+  /** Accessor tile on the `x` field of an `Anchor` value, dispatching the type's field hooks. */
+  readonly anchorX: IBrainTileDef;
+  /** Accessor tile reading the `value` field of a `Target` value through the type's field getter. */
+  readonly targetValue: IBrainTileDef;
+  /** Literal tile carrying the `Mode` enum constant `seek`. */
+  readonly modeSeek: IBrainTileDef;
+  /** Literal tile carrying the closed `Point` struct constant `waypoint`. */
+  readonly pointWaypoint: IBrainTileDef;
   /** Parameter tile naming the `ticks` argument of a deferred call. */
   readonly ticks: IBrainTileDef;
   /** Parameter tile naming the `period` argument of `signal`. */
@@ -88,7 +119,20 @@ export function conformanceTiles(environment: WendooEnvironment): ConformanceTil
     deferRead: requireTile(environment, mkSensorTileId(ConformanceHostActions.DeferRead.key)),
     emitText: requireTile(environment, mkActuatorTileId(ConformanceHostActions.EmitText.key)),
     emitFlag: requireTile(environment, mkActuatorTileId(ConformanceHostActions.EmitFlag.key)),
+    emitAll: requireTile(environment, mkActuatorTileId(ConformanceHostActions.EmitAll.key)),
     deferAdd: requireTile(environment, mkOperatorTileId(ConformanceOperators.DeferAdd.opId)),
+    deferPoint: requireTile(environment, mkSensorTileId(ConformanceHostActions.DeferPoint.key)),
+    deferAnchor: requireTile(environment, mkSensorTileId(ConformanceHostActions.DeferAnchor.key)),
+    deferTarget: requireTile(environment, mkSensorTileId(ConformanceHostActions.DeferTarget.key)),
+    pointX: requireTile(environment, mkAccessorTileId(CONFORMANCE_POINT_TYPE_ID, "x")),
+    pointY: requireTile(environment, mkAccessorTileId(CONFORMANCE_POINT_TYPE_ID, "y")),
+    anchorX: requireTile(environment, mkAccessorTileId(CONFORMANCE_ANCHOR_TYPE_ID, "x")),
+    targetValue: requireTile(environment, mkAccessorTileId(CONFORMANCE_TARGET_TYPE_ID, "value")),
+    modeSeek: requireTile(environment, mkLiteralTileId(CONFORMANCE_MODE_TYPE_ID, CONFORMANCE_MODE_LITERAL_KEY)),
+    pointWaypoint: requireTile(
+      environment,
+      mkLiteralTileId(CONFORMANCE_POINT_TYPE_ID, CONFORMANCE_POINT_LITERAL_LABEL)
+    ),
     ticks: requireTile(environment, mkParameterTileId(ConformanceParameterId.Ticks)),
     period: requireTile(environment, mkParameterTileId(ConformanceParameterId.Period)),
   };
@@ -238,6 +282,48 @@ export function grouped(environment: WendooEnvironment, ...tiles: IBrainTileDef[
  */
 export function numberVariable(brainDef: BrainDef, name: string): IBrainTileDef {
   const variable = new BrainTileVariableDef(`variable:conformance.${name}`, name, CoreTypeIds.Number, name);
+  brainDef.catalog().registerTileDef(variable);
+  return variable;
+}
+
+/**
+ * Mints a brain-scoped `Point`-typed variable tile and registers it in
+ * `brainDef`'s catalog. The tile id and the variable's unique id are derived
+ * from `name`, so one authored case always names one variable slot.
+ *
+ * @param brainDef - Document the variable belongs to.
+ * @param name - Variable name, as authored and as compiled into the slot pool.
+ */
+export function pointVariable(brainDef: BrainDef, name: string): IBrainTileDef {
+  const variable = new BrainTileVariableDef(`variable:conformance.${name}`, name, CONFORMANCE_POINT_TYPE_ID, name);
+  brainDef.catalog().registerTileDef(variable);
+  return variable;
+}
+
+/**
+ * Mints a brain-scoped `Anchor`-typed variable tile and registers it in
+ * `brainDef`'s catalog. The tile id and the variable's unique id are derived
+ * from `name`, so one authored case always names one variable slot.
+ *
+ * @param brainDef - Document the variable belongs to.
+ * @param name - Variable name, as authored and as compiled into the slot pool.
+ */
+export function anchorVariable(brainDef: BrainDef, name: string): IBrainTileDef {
+  const variable = new BrainTileVariableDef(`variable:conformance.${name}`, name, CONFORMANCE_ANCHOR_TYPE_ID, name);
+  brainDef.catalog().registerTileDef(variable);
+  return variable;
+}
+
+/**
+ * Mints a brain-scoped `Target`-typed variable tile and registers it in
+ * `brainDef`'s catalog. The tile id and the variable's unique id are derived
+ * from `name`, so one authored case always names one variable slot.
+ *
+ * @param brainDef - Document the variable belongs to.
+ * @param name - Variable name, as authored and as compiled into the slot pool.
+ */
+export function targetVariable(brainDef: BrainDef, name: string): IBrainTileDef {
+  const variable = new BrainTileVariableDef(`variable:conformance.${name}`, name, CONFORMANCE_TARGET_TYPE_ID, name);
   brainDef.catalog().registerTileDef(variable);
   return variable;
 }

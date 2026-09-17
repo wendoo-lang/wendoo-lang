@@ -38,6 +38,14 @@
       "description": "Freshly spawned child rules drain depth-first within the spawning think, one subtree finishing before the next begins."
     },
     {
+      "id": "enum-constant-push",
+      "description": "PUSH_CONST_VAL pushes an enum constant decoded from its (type index, symbol ordinal) pair against the program type table."
+    },
+    {
+      "id": "enum-value-render",
+      "description": "An enum value in an observable position renders as its enum token: the symbol key, quoted."
+    },
+    {
       "id": "fault-host-error",
       "description": "An async handle rejected without an explicit error faults the awaiting fiber with HostError."
     },
@@ -114,6 +122,10 @@
       "description": "The list opcodes construct, read, write, and resize a list value."
     },
     {
+      "id": "list-value-render",
+      "description": "A list value in an observable position renders as its list token: the element count in minimal hex, then one value token per element, in order."
+    },
+    {
       "id": "map-operations",
       "description": "The map opcodes construct, read, write, and delete entries of a map value."
     },
@@ -174,6 +186,10 @@
       "description": "A page change request naming no page -- an index outside the program's pages, or an id no page carries -- is a no-op: the active page stays active, keeps running, and loses no fiber."
     },
     {
+      "id": "repeated-arg-list-gather",
+      "description": "The arguments filling one repeated value slot gather, in source order, into a single list value built with LIST_NEW and one LIST_PUSH per element."
+    },
+    {
       "id": "root-rule-quiesce",
       "description": "A root rule does not re-fire while any live fiber of its rule subtree is still in flight."
     },
@@ -226,8 +242,36 @@
       "description": "PUSH_CONST_STR pushes the string at its index in the program's string constant pool."
     },
     {
+      "id": "struct-constant-push",
+      "description": "PUSH_CONST_VAL pushes a closed-struct constant decoded from the residual pool, its field values encoded recursively."
+    },
+    {
+      "id": "struct-deep-copy-asymmetry",
+      "description": "STORE_VAR_SLOT deep-copies a struct on store while STRUCT_SET_FIELD writes the stored struct's field slot in place, so a variable copy does not alias its source."
+    },
+    {
       "id": "struct-field-access",
       "description": "The struct opcodes construct a struct and read and write its fields by slot index."
+    },
+    {
+      "id": "struct-native-alias-on-copy",
+      "description": "A deep copy of a native-backed struct whose type registers no snapshotNative copies the native handle by reference, so every copy fronts the same host object."
+    },
+    {
+      "id": "struct-native-field-hooks",
+      "description": "A struct type's registered field getter and setter dispatch slot-indexed field reads and writes to the host object behind the value, with a getter miss reading nil."
+    },
+    {
+      "id": "struct-native-opaque-render",
+      "description": "A native-backed struct value in an observable position renders as the opaque token."
+    },
+    {
+      "id": "struct-native-snapshot-on-copy",
+      "description": "A deep copy of a struct whose type registers snapshotNative materializes the lazy native handle once at the copy, pinning the host object it resolved to."
+    },
+    {
+      "id": "struct-value-render",
+      "description": "A struct value in an observable position renders as its struct token: the field count in minimal hex, then one value token per field slot, in slot order."
     },
     {
       "id": "try-catch-handler",

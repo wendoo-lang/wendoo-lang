@@ -153,6 +153,9 @@ function valueToken(value: Value, precision: NumberPrecision): string {
     case NativeType.Buffer:
       return `buffer ${bufferToHex(value)}`;
     case NativeType.Struct: {
+      if (value.native !== undefined) {
+        return OPAQUE_VALUE_TOKEN;
+      }
       const fields = value.v;
       if (fields === undefined) {
         return OPAQUE_VALUE_TOKEN;

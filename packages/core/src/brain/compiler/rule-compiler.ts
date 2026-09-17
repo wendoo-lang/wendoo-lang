@@ -4,7 +4,15 @@ import { List, type ReadonlyList } from "../../platform/list";
 import { logger } from "../../platform/logger";
 import { StringUtils as SU } from "../../platform/string";
 import { TypeUtils } from "../../platform/types";
-import type { ActionDescriptor, ActionRef, BrainActionResolver, ITypeRegistry, TypeId } from "../../runtime";
+import type { UniqueSet } from "../../platform/uniqueset";
+import type {
+  ActionDescriptor,
+  ActionRef,
+  BrainActionResolver,
+  ITypeRegistry,
+  NullableTypeDef,
+  TypeId,
+} from "../../runtime";
 import {
   type BrainActionArgSlot,
   CoreFuncId,
@@ -81,6 +89,11 @@ interface CompilationContext {
   typeEnv: TypeEnv;
   /** Constant pool for managing literal values */
   constantPool: ConstantPool;
+  /**
+   * Type-table indices interned for struct values host actions construct at
+   * runtime; the tree shaker takes them as explicit type-reachability roots.
+   */
+  pinnedTypeIndices: UniqueSet<number>;
   /** Type registry, used to instantiate the `List<T>` type of a repeated arg slot. */
   typeRegistry: ITypeRegistry;
   /** Tile catalogs, used to resolve a repeated slot's parameter element type. */
@@ -418,6 +431,7 @@ export class ExprCompiler implements ExprVisitor<void> {
   }
 
   visitOutput(expr: OutputExpr): void {
+    this.pinStructType(expr.tileDef.outputType);
     // Read the sensor output's backing rule variable. RuleContextGetVariable
     // takes the name in arg slot 1 and ignores slot 0 (the method receiver), so
     // slot 0 is a nil filler and slot 1 is the constant output key.
@@ -607,6 +621,12 @@ export class ExprCompiler implements ExprVisitor<void> {
    * slot path so the operand stack stays balanced for error recovery.
    */
   private emitActionDispatch(action: ActionDescriptor, argc: number, callSiteId: number, nodeId: number): void {
+    this.pinStructType(action.outputType);
+    if (action.outputs !== undefined) {
+      for (const output of action.outputs) {
+        this.pinStructType(output.type);
+      }
+    }
     const resolved = this.context.actionResolver.resolveAction(action);
 
     if (resolved && resolved.binding === "host") {
@@ -637,6 +657,26 @@ export class ExprCompiler implements ExprVisitor<void> {
     } else {
       this.emitter.actionCall(actionSlot, argc, callSiteId);
     }
+  }
+
+  /**
+   * Intern a struct type a host action produces at runtime into the program
+   * type table, and record the table index in the pin set so the tree shaker
+   * keeps the entry. A nullable `typeId` interns its base type. A `typeId`
+   * that is absent, unregistered, or not struct-typed interns nothing.
+   */
+  private pinStructType(typeId: TypeId | undefined): void {
+    if (typeId === undefined) {
+      return;
+    }
+    let def = this.context.typeRegistry.get(typeId);
+    if (def?.nullable) {
+      def = this.context.typeRegistry.get((def as NullableTypeDef).baseTypeId);
+    }
+    if (def === undefined || def.coreType !== NativeType.Struct) {
+      return;
+    }
+    this.context.pinnedTypeIndices.add(this.context.constantPool.addType(def.typeId));
   }
 
   /**

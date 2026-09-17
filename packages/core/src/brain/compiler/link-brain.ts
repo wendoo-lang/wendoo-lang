@@ -60,5 +60,5 @@ export function runBrainLinkPipeline(
     return { diagnostics };
   }
 
-  return { program: treeshakeProgram(linked.program), diagnostics };
+  return { program: treeshakeProgram(linked.program, compiled.program.pinnedTypeIndices), diagnostics };
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { before, describe, test } from "node:test";
 
-import { Dict, List } from "@wendoo/core";
+import { Dict, List, UniqueSet } from "@wendoo/core";
 import type { BrainServices } from "@wendoo/core/brain";
 import { __test__createBrainServices } from "@wendoo/core/brain/__test__";
 import { treeshakeProgram as treeshakeLinked } from "@wendoo/core/brain/compiler";
@@ -145,9 +145,9 @@ function flatten(linked: LinkedBrainProgram): FlatProgram {
   };
 }
 
-function treeshakeProgram(flat: FlatProgram): FlatProgram {
+function treeshakeProgram(flat: FlatProgram, pinnedTypeIndices?: UniqueSet<number>): FlatProgram {
   const linked = toLinked(flat);
-  const out = treeshakeLinked(linked);
+  const out = treeshakeLinked(linked, pinnedTypeIndices);
   return out === linked ? flat : flatten(out);
 }
 
@@ -571,6 +571,44 @@ describe("treeshakeProgram", () => {
     const instOfInstr = result.functions.get(0).code.get(0);
     assert.equal(instOfInstr.op, Op.INSTANCE_OF);
     assert.equal(instOfInstr.a, 0);
+  });
+
+  test("a pinned type entry with no operand reference survives the sweep", () => {
+    const prog = mkProgram({
+      functions: [mkFunc([mkInstr(Op.RET)], 0, "main"), mkFunc([mkInstr(Op.RET)], 0, "dead")],
+      types: [mkStructEntry("Unpinned"), mkStructEntry("Pinned")],
+      entryPoint: 0,
+    });
+    const result = treeshakeProgram(prog, new UniqueSet<number>([1]));
+    assert.equal(result.functions.size(), 1, "the sweep runs and removes the dead function");
+    assert.equal(result.types.size(), 1);
+    assert.equal(result.types.get(0)!.typeId, "struct:<Pinned>");
+  });
+
+  test("a pinned structural entry keeps its children alive and child references remap", () => {
+    const listEntry: ProgramTypeEntry = { tag: "list", typeId: "list:<List<struct:<Elem>>>", elem: 1 };
+    const prog = mkProgram({
+      functions: [mkFunc([mkInstr(Op.RET)], 0, "main"), mkFunc([mkInstr(Op.RET)], 0, "dead")],
+      types: [mkStructEntry("Unpinned"), mkStructEntry("Elem"), listEntry],
+      entryPoint: 0,
+    });
+    const result = treeshakeProgram(prog, new UniqueSet<number>([2]));
+    assert.equal(result.types.size(), 2);
+    assert.equal(result.types.get(0)!.typeId, "struct:<Elem>");
+    const shakenList = result.types.get(1)!;
+    assert.equal(shakenList.tag, "list");
+    assert.equal((shakenList as { elem: number }).elem, 0);
+  });
+
+  test("a pinned entry keeps a program with no dead code unchanged", () => {
+    const prog = mkProgram({
+      functions: [mkFunc([mkInstr(Op.RET)], 0, "main")],
+      types: [mkStructEntry("PinnedOnly")],
+      entryPoint: 0,
+    });
+    const result = treeshakeProgram(prog, new UniqueSet<number>([0]));
+    assert.equal(result, prog);
+    assert.equal(result.types.size(), 1);
   });
 
   test("variable names only referenced by dead functions are removed", () => {

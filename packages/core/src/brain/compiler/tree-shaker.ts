@@ -118,7 +118,8 @@ interface ReachableConstSets {
 function markReachableConstants(
   program: Program,
   reachableFuncs: UniqueSet<number>,
-  reachableVars: UniqueSet<number>
+  reachableVars: UniqueSet<number>,
+  pinnedTypeIndices: UniqueSet<number> | undefined
 ): ReachableConstSets {
   const values = new UniqueSet<number>();
   const numbers = new UniqueSet<number>();
@@ -165,6 +166,15 @@ function markReachableConstants(
     if (init !== NO_VARIABLE_INIT) {
       values.add(init);
     }
+  }
+
+  // Pinned entries back struct values host actions construct at runtime; no
+  // instruction operand references them, so they root type reachability
+  // directly.
+  if (pinnedTypeIndices !== undefined) {
+    pinnedTypeIndices.forEach((idx) => {
+      types.add(idx);
+    });
   }
 
   expandReachableTypes(program, values, types);
@@ -627,13 +637,21 @@ function remapInstructionForDedup(ins: Instr, consts: ConstRemaps): Instr {
   return ins;
 }
 
-/** Strip unreachable functions, constants, and variable names from `linked` and dedupe constants. */
-export function treeshakeProgram(linked: LinkedBrainProgram): LinkedBrainProgram {
+/**
+ * Strip unreachable functions, constants, and variable names from `linked` and
+ * dedupe constants. `pinnedTypeIndices` are type-table indices kept alive as
+ * explicit reachability roots; the pins index the pre-shake table and are
+ * consumed here, before any remap.
+ */
+export function treeshakeProgram(
+  linked: LinkedBrainProgram,
+  pinnedTypeIndices?: UniqueSet<number>
+): LinkedBrainProgram {
   const program = linked.program;
   const programTypes = program.types ?? List.empty<ProgramTypeEntry>();
   const reachableFuncs = markReachableFunctions(program, linked.pages);
   const reachableVars = markReachableVariableNames(program, reachableFuncs);
-  const reachableConsts = markReachableConstants(program, reachableFuncs, reachableVars);
+  const reachableConsts = markReachableConstants(program, reachableFuncs, reachableVars, pinnedTypeIndices);
 
   const funcsDead = reachableFuncs.size() < program.functions.size();
   const valuesDead = reachableConsts.values.size() < program.constantPools.values.size();

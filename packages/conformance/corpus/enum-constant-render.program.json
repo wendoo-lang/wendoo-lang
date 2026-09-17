@@ -1,0 +1,102 @@
+{
+  "program": {
+    "version": 1,
+    "functions": [
+      {
+        "code": [
+          {
+            "op": 72
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 0,
+            "a": 1
+          },
+          {
+            "op": 6,
+            "a": 0
+          },
+          {
+            "op": 44,
+            "a": 1025,
+            "b": 1,
+            "c": 0
+          },
+          {
+            "op": 73
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 31
+          }
+        ],
+        "numParams": 0
+      }
+    ],
+    "constantPools": {
+      "numbers": [],
+      "strings": [],
+      "values": [
+        {
+          "t": 1
+        },
+        {
+          "t": 5,
+          "typeId": "enum:<Mode>",
+          "v": "seek"
+        }
+      ]
+    },
+    "types": [
+      {
+        "tag": "enum",
+        "typeId": "enum:<Mode>",
+        "name": "Mode",
+        "symbols": [
+          {
+            "key": "idle",
+            "value": "idle"
+          },
+          {
+            "key": "seek",
+            "value": "seek"
+          },
+          {
+            "key": "flee",
+            "value": "flee"
+          }
+        ]
+      }
+    ],
+    "variableNames": [],
+    "entryPoint": 0,
+    "actions": [],
+    "ruleFuncIds": [
+      0
+    ],
+    "ruleAncestors": []
+  },
+  "pages": [
+    {
+      "pageIndex": 0,
+      "pageId": "1uQGngetiRKxqU5k",
+      "pageName": "Unnamed Page",
+      "rootRuleFuncIds": [
+        0
+      ],
+      "actionCallSites": [
+        {
+          "binding": "host",
+          "callSiteId": 0,
+          "actionId": 1025
+        }
+      ]
+    }
+  ]
+}
