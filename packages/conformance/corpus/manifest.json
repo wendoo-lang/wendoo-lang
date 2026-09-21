@@ -458,6 +458,23 @@
       "schedule": [16, 16, 16, 16]
     },
     {
+      "id": "struct-native-lifetime",
+      "source": "packages/conformance/src/cases/struct-native-lifetime.spec.ts",
+      "summary": "A captured native-backed value read before and after the world destroys its host object, pinning that the type's field getter resolves nothing once the object is gone and every later read is nil.",
+      "behaviors": [
+        "async-sensor-when-evaluation",
+        "child-rule-spawn",
+        "child-rule-synchronous-cascade",
+        "host-sync-action-call",
+        "root-rule-respawn",
+        "struct-native-destroyed-read",
+        "struct-native-field-hooks",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16]
+    },
+    {
       "id": "struct-native-snapshot",
       "source": "packages/conformance/src/cases/struct-native-snapshot.spec.ts",
       "summary": "A resolver-backed native value whose variable store materializes the resolver once via snapshotNative, so both field reads of one capture show the host object pinned at assignment.",
@@ -466,6 +483,24 @@
         "root-rule-respawn",
         "struct-native-field-hooks",
         "struct-native-snapshot-on-copy",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16]
+    },
+    {
+      "id": "struct-operator-add",
+      "source": "packages/conformance/src/cases/struct-operator-add.spec.ts",
+      "summary": "A registered binary operator over two struct-typed operands, combining a captured struct reading with a struct constant and emitting the fieldwise sums and the result whole.",
+      "behaviors": [
+        "async-sensor-when-evaluation",
+        "child-rule-spawn",
+        "child-rule-synchronous-cascade",
+        "operator-struct-overload",
+        "root-rule-respawn",
+        "struct-constant-push",
+        "struct-field-access",
+        "struct-value-render",
         "variable-slot-storage"
       ],
       "precisions": ["f32", "f64"],

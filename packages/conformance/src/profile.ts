@@ -21,6 +21,7 @@ import {
   getCallSiteState,
   getSlotId,
   isNumberValue,
+  isStructValue,
   List,
   mkCallDef,
   mkClosedStructValueByName,
@@ -163,6 +164,8 @@ export const CONFORMANCE_TARGET_READING = { first: 1.5, second: 8.5 } as const;
 export interface ConformanceAnchorObject {
   x: number;
   y: number;
+  /** True once the world has destroyed the object; a destroyed anchor designates nothing. */
+  destroyed: boolean;
 }
 
 /** One host object a `Target` resolution returns. */
@@ -207,6 +210,7 @@ export const ConformanceActionKeys = {
   DeferAnchor: "sensor.conformance.defer-anchor",
   DeferTarget: "sensor.conformance.defer-target",
   EmitAll: "actuator.conformance.emit-all",
+  DestroyAnchor: "actuator.conformance.destroy-anchor",
 } as const;
 
 /**
@@ -275,6 +279,11 @@ export const ConformanceHostActions = {
     actionId: TARGET_ACTION_ID_BASE + 14,
     fnId: TARGET_FUNC_ID_BASE + 15,
   },
+  DestroyAnchor: {
+    key: ConformanceActionKeys.DestroyAnchor,
+    actionId: TARGET_ACTION_ID_BASE + 15,
+    fnId: TARGET_FUNC_ID_BASE + 16,
+  },
 } as const;
 
 /**
@@ -286,6 +295,7 @@ export const ConformanceHostActions = {
  */
 export const ConformanceOperators = {
   DeferAdd: { opId: "conformance.defer-add", fnId: TARGET_FUNC_ID_BASE + 9 },
+  PointAdd: { opId: "conformance.point-add", fnId: TARGET_FUNC_ID_BASE + 17 },
 } as const;
 
 const AnonValue = param(CoreParameterId.AnonymousNumber, { name: "value", anonymous: true });
@@ -310,6 +320,7 @@ const deferPointCallDef = mkCallDef(bag());
 const deferAnchorCallDef = mkCallDef(bag());
 const deferTargetCallDef = mkCallDef(bag());
 const emitAllCallDef = mkCallDef(bag(repeated(AnonAny, { min: 0 })));
+const destroyAnchorCallDef = mkCallDef(bag());
 
 const kEchoValueSlotId = getSlotId(echoCallDef, AnonValue);
 const kDeferEchoValueSlotId = getSlotId(deferEchoCallDef, AnonValue);
@@ -337,6 +348,15 @@ const COUNTER_START = 0;
 /** Binding strength `defer plus` parses at. */
 const DEFER_ADD_PRECEDENCE = 120;
 
+/** Binding strength `point plus` parses at. */
+const POINT_ADD_PRECEDENCE = 120;
+
+/** Arg-buffer slot of the left operand of a binary operator overload. */
+const kOperatorLhsSlotId = 0;
+
+/** Arg-buffer slot of the right operand of a binary operator overload. */
+const kOperatorRhsSlotId = 1;
+
 /** One deferred settlement the world owes, held until its due tick. */
 interface PendingSettlement {
   /** Tick ordinal at which the settlement is due. */
@@ -360,6 +380,7 @@ export class ConformanceWorld {
   private readonly anchorObject: ConformanceAnchorObject = {
     x: CONFORMANCE_ANCHOR_READING.x,
     y: CONFORMANCE_ANCHOR_READING.y,
+    destroyed: false,
   };
 
   private readonly firstTarget: ConformanceTargetObject = { value: CONFORMANCE_TARGET_READING.first };
@@ -371,6 +392,16 @@ export class ConformanceWorld {
   /** The world's one `Anchor` host object; every `defer anchor` reading is backed by it. */
   anchor(): ConformanceAnchorObject {
     return this.anchorObject;
+  }
+
+  /**
+   * Destroy the world's one anchor host object. Every `Anchor` value already
+   * handed out keeps fronting it, and every field hook of the type then
+   * designates nothing. Destroying an already destroyed anchor changes
+   * nothing.
+   */
+  destroyAnchor(): void {
+    this.anchorObject.destroyed = true;
   }
 
   /**
@@ -500,10 +531,11 @@ function execDeferRead(ctx: ExecutionContext, args: ReadonlyList<Value>, handle:
 }
 
 /**
- * Builds one `Point` struct reading in the environment `ctx` executes in.
- * Throws when that environment has not registered the `Point` type.
+ * Builds one closed `Point` struct value carrying `x` and `y`, in the
+ * environment `ctx` executes in. Throws when that environment has not
+ * registered the `Point` type.
  */
-function mkPointReading(ctx: ExecutionContext): Value {
+function mkPointValue(ctx: ExecutionContext, x: number, y: number): Value {
   const typeDef = ctx.services.runtime.types.get(CONFORMANCE_POINT_TYPE_ID) as StructTypeDef | undefined;
   if (!typeDef) {
     throw new Error("conformance Point type is not registered");
@@ -511,10 +543,18 @@ function mkPointReading(ctx: ExecutionContext): Value {
   return mkClosedStructValueByName(
     typeDef,
     new Dict([
-      ["x", mkNumberValue(CONFORMANCE_POINT_READING.x)],
-      ["y", mkNumberValue(CONFORMANCE_POINT_READING.y)],
+      ["x", mkNumberValue(x)],
+      ["y", mkNumberValue(y)],
     ])
   );
+}
+
+/**
+ * Builds one `Point` struct reading in the environment `ctx` executes in.
+ * Throws when that environment has not registered the `Point` type.
+ */
+function mkPointReading(ctx: ExecutionContext): Value {
+  return mkPointValue(ctx, CONFORMANCE_POINT_READING.x, CONFORMANCE_POINT_READING.y);
 }
 
 function execDeferPoint(ctx: ExecutionContext, _args: ReadonlyList<Value>, handle: AsyncHandle): void {
@@ -529,12 +569,24 @@ function execDeferPoint(ctx: ExecutionContext, _args: ReadonlyList<Value>, handl
 }
 
 /**
+ * The host object an `Anchor` value designates: the object behind `source`,
+ * or nothing when the value carries none or the world destroyed the object.
+ */
+function resolveAnchorObject(source: StructValue): ConformanceAnchorObject | undefined {
+  const anchor = source.native as ConformanceAnchorObject | undefined;
+  if (!anchor || anchor.destroyed) {
+    return undefined;
+  }
+  return anchor;
+}
+
+/**
  * Field getter of the `Anchor` type: reads the field off the host object
- * behind `source`. A value carrying no host object, and a field id the type
- * does not declare, both read as absent.
+ * `source` designates. A value designating no host object, and a field id the
+ * type does not declare, both read as absent.
  */
 function anchorFieldGetter(source: StructValue, fieldId: number, _ctx: ExecutionContext): Value | undefined {
-  const anchor = source.native as ConformanceAnchorObject | undefined;
+  const anchor = resolveAnchorObject(source);
   if (!anchor) {
     return undefined;
   }
@@ -549,11 +601,11 @@ function anchorFieldGetter(source: StructValue, fieldId: number, _ctx: Execution
 
 /**
  * Field setter of the `Anchor` type: writes the field of the host object
- * behind `source`. Rejects a value carrying no host object, a non-number
- * value, and a field id the type does not declare.
+ * `source` designates. Rejects a value designating no host object, a
+ * non-number value, and a field id the type does not declare.
  */
 function anchorFieldSetter(source: StructValue, fieldId: number, value: Value, _ctx: ExecutionContext): boolean {
-  const anchor = source.native as ConformanceAnchorObject | undefined;
+  const anchor = resolveAnchorObject(source);
   if (!anchor || !isNumberValue(value)) {
     return false;
   }
@@ -646,6 +698,34 @@ function execEmitText(_ctx: ExecutionContext, args: ReadonlyList<Value>): Value 
 
 function execEmitFlag(_ctx: ExecutionContext, args: ReadonlyList<Value>): Value {
   return args.get(kEmitFlagValueSlotId);
+}
+
+function execDestroyAnchor(ctx: ExecutionContext): Value {
+  worldOf(ctx)?.destroyAnchor();
+  return VOID_VALUE;
+}
+
+/** The number in field `fieldId` of a closed `Point` operand, or undefined when it carries none. */
+function pointFieldNumber(operand: Value | undefined, fieldId: number): number | undefined {
+  if (!isStructValue(operand)) {
+    return undefined;
+  }
+  const field = operand.v?.at(fieldId);
+  return field !== undefined && isNumberValue(field) ? field.v : undefined;
+}
+
+function execPointAdd(ctx: ExecutionContext, args: ReadonlyList<Value>): Value {
+  const lhs = args.get(kOperatorLhsSlotId);
+  const rhs = args.get(kOperatorRhsSlotId);
+  const lhsX = pointFieldNumber(lhs, ConformancePointField.X);
+  const lhsY = pointFieldNumber(lhs, ConformancePointField.Y);
+  const rhsX = pointFieldNumber(rhs, ConformancePointField.X);
+  const rhsY = pointFieldNumber(rhs, ConformancePointField.Y);
+  if (lhsX === undefined || lhsY === undefined || rhsX === undefined || rhsY === undefined) {
+    return NIL_VALUE;
+  }
+  const numerics = ctx.services.app.numerics;
+  return mkPointValue(ctx, numerics.round(lhsX + rhsX), numerics.round(lhsY + rhsY));
 }
 
 function execDeferAdd(ctx: ExecutionContext, args: ReadonlyList<Value>, handle: AsyncHandle): void {
@@ -812,6 +892,16 @@ const emitFlagActuator = {
   metadata: { label: "emit flag" },
 } satisfies CreateHostActuatorOptions;
 
+const destroyAnchorActuator = {
+  key: ConformanceHostActions.DestroyAnchor.key,
+  actionId: ConformanceHostActions.DestroyAnchor.actionId,
+  fnId: ConformanceHostActions.DestroyAnchor.fnId,
+  callDef: destroyAnchorCallDef,
+  fn: { exec: execDestroyAnchor },
+  isAsync: false,
+  metadata: { label: "destroy anchor" },
+} satisfies CreateHostActuatorOptions;
+
 const emitAllActuator = {
   key: ConformanceHostActions.EmitAll.key,
   actionId: ConformanceHostActions.EmitAll.actionId,
@@ -858,6 +948,10 @@ const emitAllActuator = {
  *   to the sum one tick after its dispatch, so the expression containing it
  *   suspends until then. An operand carrying no number, and a sum that is not
  *   a number, both resolve nil.
+ * - `lhs point plus rhs` -- synchronous infix operator over two `Point`
+ *   operands, evaluating to a fresh closed `Point` carrying the fieldwise sums
+ *   at the profile's precision. An operand carrying no `Point` reading
+ *   evaluates nil.
  * - `defer point()` -- asynchronous inline sensor whose handle resolves to a
  *   fresh `Point` struct reading `{x: 1.5, y: 2.25}` exactly one tick after
  *   its dispatch. The struct is constructed at settle time, immediately
@@ -869,6 +963,11 @@ const emitAllActuator = {
  *   1025, fields `x` and `y`) is native-backed: its registered field getter
  *   and setter read and write the host object behind the value, and a deep
  *   copy shares that object by reference, so every copy aliases one anchor.
+ * - `destroy anchor()` -- synchronous actuator returning void, destroying the
+ *   world's one anchor host object. Every `Anchor` value handed out before the
+ *   call keeps fronting that object, and from then on the type's field hooks
+ *   designate nothing: reads return absent, which the VM renders nil, and
+ *   writes are rejected.
  * - `defer target()` -- asynchronous inline sensor whose handle resolves to a
  *   fresh `Target` value exactly one tick after its dispatch, backed by a
  *   lazy resolver over the world's call-counting target resolution. `Target`
@@ -993,6 +1092,7 @@ export function conformanceModule(): WendooModule {
       api.registerHostSensor(createHostSensor(deferAnchorSensor));
       api.registerHostSensor(createHostSensor(deferTargetSensor));
       api.registerHostActuator(createHostActuator(emitAllActuator));
+      api.registerHostActuator(createHostActuator(destroyAnchorActuator));
       api.registerOperator({
         spec: {
           id: ConformanceOperators.DeferAdd.opId,
@@ -1012,6 +1112,28 @@ export function conformanceModule(): WendooModule {
         new BrainTileOperatorDef(
           ConformanceOperators.DeferAdd.opId,
           { placement: TilePlacement.EitherSide, metadata: { label: "defer plus" } },
+          api.brainServices
+        )
+      );
+      api.registerOperator({
+        spec: {
+          id: ConformanceOperators.PointAdd.opId,
+          parse: { fixity: "infix", precedence: POINT_ADD_PRECEDENCE, assoc: "left" },
+        },
+        overloads: [
+          {
+            argTypes: [CONFORMANCE_POINT_TYPE_ID, CONFORMANCE_POINT_TYPE_ID],
+            resultType: CONFORMANCE_POINT_TYPE_ID,
+            fnId: ConformanceOperators.PointAdd.fnId,
+            fn: { exec: execPointAdd },
+            isAsync: false,
+          },
+        ],
+      });
+      api.registerTile(
+        new BrainTileOperatorDef(
+          ConformanceOperators.PointAdd.opId,
+          { placement: TilePlacement.EitherSide, metadata: { label: "point plus" } },
           api.brainServices
         )
       );

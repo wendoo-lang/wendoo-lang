@@ -158,6 +158,10 @@
       "description": "String concatenation and string equality operate on string operands."
     },
     {
+      "id": "operator-struct-overload",
+      "description": "An operator overload declared over struct-typed operands resolves by operand type and dispatches its host function, which may evaluate to a struct."
+    },
+    {
       "id": "page-activation-hook",
       "description": "An action's page-activation hook runs once per activation of the page its call site belongs to, before that page's root rules spawn, and does not run on a page restart."
     },
@@ -256,6 +260,10 @@
     {
       "id": "struct-native-alias-on-copy",
       "description": "A deep copy of a native-backed struct whose type registers no snapshotNative copies the native handle by reference, so every copy fronts the same host object."
+    },
+    {
+      "id": "struct-native-destroyed-read",
+      "description": "A field read of a native-backed struct whose host object the host has destroyed dispatches the type's field getter, which designates nothing, and pushes nil."
     },
     {
       "id": "struct-native-field-hooks",

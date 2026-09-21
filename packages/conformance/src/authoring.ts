@@ -53,8 +53,12 @@ export interface ConformanceTiles {
   readonly emitFlag: IBrainTileDef;
   /** DO-side actuator tile of `emit all(value...)`, whose repeated value slot gathers its arguments into one list. */
   readonly emitAll: IBrainTileDef;
+  /** DO-side actuator tile of `destroy anchor()`, destroying the world's one anchor host object. */
+  readonly destroyAnchor: IBrainTileDef;
   /** Operator tile of the asynchronous infix `lhs defer plus rhs`. */
   readonly deferAdd: IBrainTileDef;
+  /** Operator tile of the synchronous infix `lhs point plus rhs`, over two `Point` operands. */
+  readonly pointAdd: IBrainTileDef;
   /** Inline asynchronous sensor tile of `defer point()`, returning a `Point` struct reading. */
   readonly deferPoint: IBrainTileDef;
   /** Inline asynchronous sensor tile of `defer anchor()`, returning an `Anchor` native struct value. */
@@ -67,6 +71,8 @@ export interface ConformanceTiles {
   readonly pointY: IBrainTileDef;
   /** Accessor tile on the `x` field of an `Anchor` value, dispatching the type's field hooks. */
   readonly anchorX: IBrainTileDef;
+  /** Accessor tile on the `y` field of an `Anchor` value, dispatching the type's field hooks. */
+  readonly anchorY: IBrainTileDef;
   /** Accessor tile reading the `value` field of a `Target` value through the type's field getter. */
   readonly targetValue: IBrainTileDef;
   /** Literal tile carrying the `Mode` enum constant `seek`. */
@@ -120,13 +126,16 @@ export function conformanceTiles(environment: WendooEnvironment): ConformanceTil
     emitText: requireTile(environment, mkActuatorTileId(ConformanceHostActions.EmitText.key)),
     emitFlag: requireTile(environment, mkActuatorTileId(ConformanceHostActions.EmitFlag.key)),
     emitAll: requireTile(environment, mkActuatorTileId(ConformanceHostActions.EmitAll.key)),
+    destroyAnchor: requireTile(environment, mkActuatorTileId(ConformanceHostActions.DestroyAnchor.key)),
     deferAdd: requireTile(environment, mkOperatorTileId(ConformanceOperators.DeferAdd.opId)),
+    pointAdd: requireTile(environment, mkOperatorTileId(ConformanceOperators.PointAdd.opId)),
     deferPoint: requireTile(environment, mkSensorTileId(ConformanceHostActions.DeferPoint.key)),
     deferAnchor: requireTile(environment, mkSensorTileId(ConformanceHostActions.DeferAnchor.key)),
     deferTarget: requireTile(environment, mkSensorTileId(ConformanceHostActions.DeferTarget.key)),
     pointX: requireTile(environment, mkAccessorTileId(CONFORMANCE_POINT_TYPE_ID, "x")),
     pointY: requireTile(environment, mkAccessorTileId(CONFORMANCE_POINT_TYPE_ID, "y")),
     anchorX: requireTile(environment, mkAccessorTileId(CONFORMANCE_ANCHOR_TYPE_ID, "x")),
+    anchorY: requireTile(environment, mkAccessorTileId(CONFORMANCE_ANCHOR_TYPE_ID, "y")),
     targetValue: requireTile(environment, mkAccessorTileId(CONFORMANCE_TARGET_TYPE_ID, "value")),
     modeSeek: requireTile(environment, mkLiteralTileId(CONFORMANCE_MODE_TYPE_ID, CONFORMANCE_MODE_LITERAL_KEY)),
     pointWaypoint: requireTile(
