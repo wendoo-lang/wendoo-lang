@@ -1,0 +1,200 @@
+{
+  "program": {
+    "version": 1,
+    "functions": [
+      {
+        "code": [
+          {
+            "op": 70
+          },
+          {
+            "op": 45,
+            "a": 1036,
+            "b": 0,
+            "c": 0
+          },
+          {
+            "op": 50
+          },
+          {
+            "op": 2
+          },
+          {
+            "op": 11,
+            "a": 0
+          },
+          {
+            "op": 71,
+            "a": 5
+          },
+          {
+            "op": 72
+          },
+          {
+            "op": 44,
+            "a": 1039,
+            "b": 0,
+            "c": 1
+          },
+          {
+            "op": 73
+          },
+          {
+            "op": 32,
+            "a": 1
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 31
+          }
+        ],
+        "numParams": 0
+      },
+      {
+        "code": [
+          {
+            "op": 72
+          },
+          {
+            "op": 10,
+            "a": 0
+          },
+          {
+            "op": 4,
+            "a": 0
+          },
+          {
+            "op": 116
+          },
+          {
+            "op": 115,
+            "a": 0
+          },
+          {
+            "op": 73
+          },
+          {
+            "op": 32,
+            "a": 2
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 31
+          }
+        ],
+        "numParams": 0
+      },
+      {
+        "code": [
+          {
+            "op": 72
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 10,
+            "a": 0
+          },
+          {
+            "op": 114,
+            "a": 0
+          },
+          {
+            "op": 6,
+            "a": 0
+          },
+          {
+            "op": 44,
+            "a": 1025,
+            "b": 1,
+            "c": 2
+          },
+          {
+            "op": 73
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 31
+          }
+        ],
+        "numParams": 0
+      }
+    ],
+    "constantPools": {
+      "numbers": [
+        8.5
+      ],
+      "strings": [],
+      "values": [
+        {
+          "t": 1
+        }
+      ]
+    },
+    "types": [
+      {
+        "tag": "atom",
+        "typeId": "struct:<Anchor>",
+        "atomId": 1025
+      }
+    ],
+    "variableNames": [
+      "obj"
+    ],
+    "entryPoint": 0,
+    "actions": [],
+    "ruleFuncIds": [
+      0,
+      1,
+      2
+    ],
+    "ruleAncestors": [
+      {
+        "ruleFuncId": 1,
+        "parentRuleFuncId": 0
+      },
+      {
+        "ruleFuncId": 2,
+        "parentRuleFuncId": 1
+      }
+    ]
+  },
+  "pages": [
+    {
+      "pageIndex": 0,
+      "pageId": "1uQGngetiRKxqU5k",
+      "pageName": "Unnamed Page",
+      "rootRuleFuncIds": [
+        0
+      ],
+      "actionCallSites": [
+        {
+          "binding": "host",
+          "callSiteId": 0,
+          "actionId": 1036
+        },
+        {
+          "binding": "host",
+          "callSiteId": 1,
+          "actionId": 1039
+        },
+        {
+          "binding": "host",
+          "callSiteId": 2,
+          "actionId": 1025
+        }
+      ]
+    }
+  ]
+}

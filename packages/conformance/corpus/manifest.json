@@ -507,6 +507,23 @@
       "schedule": [16, 16, 16, 16]
     },
     {
+      "id": "struct-setter-rejection",
+      "source": "packages/conformance/src/cases/struct-setter-rejection.spec.ts",
+      "summary": "A field write through a native-backed value whose host object the world has destroyed, pinning that the type's field setter rejecting the write faults the fiber with ScriptError.",
+      "behaviors": [
+        "async-sensor-when-evaluation",
+        "child-rule-spawn",
+        "child-rule-synchronous-cascade",
+        "host-sync-action-call",
+        "root-rule-respawn",
+        "struct-native-field-hooks",
+        "struct-native-setter-rejection",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16]
+    },
+    {
       "id": "then-trigger-abandoned",
       "source": "packages/conformance/src/cases/then-trigger-abandoned.spec.ts",
       "summary": "A `then` rule armed on a subject whose cluster then loses a child fiber to a fault, so the settle walk resolves the parked arming handle false.",

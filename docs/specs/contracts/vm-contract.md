@@ -1043,8 +1043,17 @@ objects); otherwise it reads or writes `StructValue.v` at the
 `fieldId` slot. Closed structs store field values in
 `StructValue.v: List<Value>` indexed by `fieldId`; missing list
 entries read as `nil`. `STRUCT_SET_FIELD` is a **pure store -- it does
-not copy** the value (JavaScript-style reference semantics); a
-`fieldSetter` that returns `false` faults the fiber.
+not copy** the value (JavaScript-style reference semantics).
+
+A registered `fieldSetter` that returns `false` **rejects the write**,
+and a rejection is a fault, never a no-op: the field is left unwritten,
+and the instruction raises `ScriptError` located at itself. The fault
+does not unwind through the handler stack -- an enclosing `TRY` does
+not catch it -- so the fiber transitions to `FAULT` at that instruction
+and executes nothing further. From there it is an ordinary fault: the
+fault event carries `ScriptError`, any async-action handle the fiber
+owns is rejected with it, and the fiber's rule respawns on the next
+think.
 
 `STRUCT_DEEP_COPY` pops a value and pushes a deep copy of it. It
 copies struct values recursively (a new `StructValue` with a cloned
@@ -1073,7 +1082,9 @@ struct the name -> id map travels in the program type table (the TYPS
 separately-built VM resolves the same id without a host type registry.
 A name that resolves to no field reads as `nil` (`GET_FIELD`) or is a
 no-op (`SET_FIELD`); a non-struct source reads as `nil` (`GET_FIELD`)
-or faults (`SET_FIELD`).
+or faults (`SET_FIELD`). A name that does resolve carries the setter
+rejection of `STRUCT_SET_FIELD` unchanged: a `fieldSetter` returning
+`false` raises `ScriptError` at the `SET_FIELD` instruction.
 
 `SET_FIELD` deep-copies struct values before storing them, the same
 way `STORE_VAR_SLOT` does, so a struct field set through the name-keyed

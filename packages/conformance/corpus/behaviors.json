@@ -274,6 +274,10 @@
       "description": "A native-backed struct value in an observable position renders as the opaque token."
     },
     {
+      "id": "struct-native-setter-rejection",
+      "description": "A field write a struct type's registered field setter rejects faults the writing fiber with ScriptError, leaving the field unwritten and the rest of the fiber's rule subtree unreached."
+    },
+    {
       "id": "struct-native-snapshot-on-copy",
       "description": "A deep copy of a struct whose type registers snapshotNative materializes the lazy native handle once at the copy, pinning the host object it resolved to."
     },

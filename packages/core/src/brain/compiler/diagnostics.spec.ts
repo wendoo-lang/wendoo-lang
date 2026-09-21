@@ -10,7 +10,7 @@ import {
   type WendooModule,
 } from "@wendoo/core";
 import type { IBrainActionTileDef } from "@wendoo/core/brain";
-import { RuleSide } from "@wendoo/core/brain";
+import { mkOperatorTileId, RuleSide } from "@wendoo/core/brain";
 import type { BrainBuildDiagnostic, DiagCode, ParseDiag, TypeInfoDiag } from "@wendoo/core/brain/compiler";
 import {
   CompilationDiagCode,
@@ -23,6 +23,7 @@ import { BrainDef, type BrainPageDef, type BrainRuleDef } from "@wendoo/core/bra
 import { BrainTileActuatorDef } from "@wendoo/core/brain/tiles";
 import {
   bag,
+  CoreOpId,
   CoreParameterId,
   CoreTypeIds,
   mkCallDef,
@@ -39,6 +40,7 @@ const kActuatorKey = "diagspec.eat";
 const kActuatorLabel = "Eat";
 const kNumberActuatorKey = "diagspec.nudge";
 const kUnboundActuatorKey = "diagspec.unbound";
+const kVoidSensorKey = "diagspec.nothing";
 
 /** The action tiles the fixture module puts into the environment's catalog. */
 interface Fixture {
@@ -49,6 +51,8 @@ interface Fixture {
   readonly actuatorTile: IBrainActionTileDef;
   /** Actuator taking one anonymous number argument; placement is the DO side only. */
   readonly numberActuatorTile: IBrainActionTileDef;
+  /** Inline sensor whose result type is `Void`, which no operator overload accepts. */
+  readonly voidSensorTile: IBrainActionTileDef;
 }
 
 /** A host module carrying the sensor and actuators these tests place into rules. */
@@ -81,16 +85,28 @@ function createFixture(): Fixture {
     fn: { exec: () => VOID_VALUE },
   });
 
+  const voidSensor = createHostSensor({
+    key: kVoidSensorKey,
+    actionId: TARGET_ACTION_ID_BASE + 3,
+    fnId: TARGET_FUNC_ID_BASE + 3,
+    callDef: mkCallDef({ type: "bag", items: [] }),
+    outputType: CoreTypeIds.Void,
+    inline: true,
+    fn: { exec: () => VOID_VALUE },
+  });
+
   return {
     sensorTile: sensor.tile,
     actuatorTile: actuator.tile,
     numberActuatorTile: numberActuator.tile,
+    voidSensorTile: voidSensor.tile,
     module: {
       id: "diagnostics-spec-host",
       install(api): void {
         api.registerHostSensor(sensor);
         api.registerHostActuator(actuator);
         api.registerHostActuator(numberActuator);
+        api.registerHostSensor(voidSensor);
       },
     },
   };
@@ -259,5 +275,31 @@ describe("edit-time severity classification", () => {
     assert.equal(dropped.params?.side, RuleSide.When);
     assert.equal(dropped.params?.tileId, fixture.sensorTile.tileId);
     assert.ok(buildDiags.indexOf(parsed) < buildDiags.indexOf(dropped), "the cause is reported before the consequence");
+  });
+});
+
+describe("a warning-severity type diagnostic reaches the build result without blocking it", () => {
+  test("a binary operator with no overload is reported at warning severity and the brain still links", () => {
+    const fixture = createFixture();
+    const { environment, brainDef, rule } = newBrain(fixture);
+    const addTile = environment.brainServices.edit.tiles.get(mkOperatorTileId(CoreOpId.Add));
+    assert.ok(addTile, "expected the core add operator tile");
+
+    rule.when().appendTile(fixture.voidSensorTile);
+    rule.when().appendTile(addTile);
+    rule.when().appendTile(fixture.sensorTile);
+    rule.do().appendTile(fixture.actuatorTile);
+
+    const build = environment.linkBrain(brainDef);
+    const buildDiags = build.diagnostics.toArray();
+
+    const noOverload = only(buildDiags, TypeDiagCode.NoOverloadForBinaryOp);
+    assert.equal(noOverload.severity, "warning");
+    assert.equal(noOverload.params?.rulePath, "0/0");
+    assert.deepEqual(
+      buildDiags.filter((d) => d.severity === "error"),
+      []
+    );
+    assert.ok(build.program, "a warning-severity type diagnostic must not block the build");
   });
 });

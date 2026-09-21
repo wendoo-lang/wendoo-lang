@@ -406,20 +406,18 @@ export class BrainCompiler {
   }
 
   /**
-   * Push the error-severity entries of a side's inference diagnostics,
-   * attributed to the rule at `rulePath`.
+   * Push each inference diagnostic as a build diagnostic at its classified
+   * severity, attributed to the rule at `rulePath`.
    */
-  private pushBlockingTypeErrors(diags: ReadonlyList<TypeInfoDiag>, rulePath: string): void {
+  private pushTypeDiags(diags: ReadonlyList<TypeInfoDiag>, rulePath: string): void {
     for (let i = 0; i < diags.size(); i++) {
       const diag = diags.get(i)!;
-      if (diagnosticSeverity(diag.code) === "error") {
-        this.compileDiags.push({
-          code: diag.code,
-          severity: "error",
-          message: diag.message,
-          params: withRulePath(diag.params, rulePath),
-        });
-      }
+      this.compileDiags.push({
+        code: diag.code,
+        severity: diagnosticSeverity(diag.code),
+        message: diag.message,
+        params: withRulePath(diag.params, rulePath),
+      });
     }
   }
 
@@ -500,7 +498,7 @@ export class BrainCompiler {
     }
 
     for (let i = 0; i < whenParseResult.exprs.size(); i++) {
-      this.pushBlockingTypeErrors(
+      this.pushTypeDiags(
         computeInferredTypes(
           whenParseResult.exprs.get(i),
           this.catalogs,
@@ -513,7 +511,7 @@ export class BrainCompiler {
       );
     }
     for (let i = 0; i < doParseResult.exprs.size(); i++) {
-      this.pushBlockingTypeErrors(
+      this.pushTypeDiags(
         computeInferredTypes(
           doParseResult.exprs.get(i),
           this.catalogs,
