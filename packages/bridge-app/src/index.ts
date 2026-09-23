@@ -4,12 +4,14 @@ export type {
   FolderAppMessage,
   FolderHostMessage,
   FolderInstalledExtensionMetadata,
+  PeerSessionHelloMessage,
 } from "@wendoo/bridge-protocol";
 export {
   FOLDER_HOST_MODE_FOLDER,
   FOLDER_HOST_MODE_GLOBAL,
   FOLDER_HOST_MODE_URL_PARAM,
   FolderSessionErrorCode,
+  PeerSessionErrorCode,
 } from "@wendoo/bridge-protocol";
 export type {
   AppBridge,
@@ -129,10 +131,15 @@ export type {
   UninstallGuardBrain,
 } from "./library-uninstall-guard.js";
 export { collectLibraryUninstallImpact, runGuardedLibraryUninstall } from "./library-uninstall-guard.js";
-
+export type {
+  PeerSession,
+  PeerSessionKind,
+  PeerSessionOptions,
+  PeerSessionPort,
+} from "./peer-session.js";
+export { connectPeerSession, PeerSessionError } from "./peer-session.js";
 export type { TileCompileDiagnostics, UserTileApplyResult, UserTileMetadata } from "./user-tile-registration.js";
 export { applyCompiledUserTiles, collectMetadataFromCompile } from "./user-tile-registration.js";
-
 export type { VfsAssetUrlProvider, VfsAssetUrlProviderOptions } from "./vfs-asset-url-provider.js";
 export { createVfsAssetUrlProvider } from "./vfs-asset-url-provider.js";
 export type {

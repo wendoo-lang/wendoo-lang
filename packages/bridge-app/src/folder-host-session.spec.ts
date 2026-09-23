@@ -10,7 +10,11 @@ import type {
   FolderSessionErrorCode as FolderSessionErrorCodeType,
   FolderVolumeWriteMessage,
 } from "@wendoo/bridge-protocol";
-import { FolderSessionErrorCode, INSTALLED_EXTENSIONS_METADATA_PATH } from "@wendoo/bridge-protocol";
+import {
+  FOLDER_SESSION_PROTOCOL_VERSION,
+  FolderSessionErrorCode,
+  INSTALLED_EXTENSIONS_METADATA_PATH,
+} from "@wendoo/bridge-protocol";
 import {
   decodeInstalledSnapshotFiles,
   INSTALLED_EXTENSIONS_APP_DATA_KEY,
@@ -32,9 +36,11 @@ const POSITION_REFERENCE = `gh:${POSITION_ORIGIN}@v0.1.0`;
 
 /**
  * A host-side fake answering the handshake and capturing every app message,
- * optionally offering an on-disk installed-extensions tree with the welcome.
+ * optionally offering an on-disk installed-extensions tree with the welcome
+ * and optionally declaring a protocol version other than the app's.
  */
 function fakeHostPort(options?: {
+  welcomeProtocolVersion?: number;
   extensionsCache?: ReadonlyArray<[string, FileContentPayload]>;
   volumeWriteErrorCode?: FolderSessionErrorCodeType;
   openExternalDocumentErrorCode?: FolderSessionErrorCodeType;
@@ -53,7 +59,7 @@ function fakeHostPort(options?: {
             type: "folder:welcome",
             id: message.id,
             payload: {
-              protocolVersion: message.payload.protocolVersion,
+              protocolVersion: options?.welcomeProtocolVersion ?? message.payload.protocolVersion,
               projectId: PROJECT_ID,
               manifest: { content: MANIFEST_TEXT, etag: "disk-1" },
               ...(options?.extensionsCache ? { extensionsCache: options.extensionsCache } : {}),
@@ -94,6 +100,20 @@ function fakeHostPort(options?: {
     },
   };
 }
+
+describe("folder session protocol version", () => {
+  for (const hostVersion of [FOLDER_SESSION_PROTOCOL_VERSION - 1, FOLDER_SESSION_PROTOCOL_VERSION + 1]) {
+    it(`rejects a host speaking version ${hostVersion} with the mismatch code`, async () => {
+      const port = fakeHostPort({ welcomeProtocolVersion: hostVersion });
+
+      await assert.rejects(connectFolderHostSession({ port, appName: "test-app" }), (error: unknown) => {
+        assert.ok(error instanceof FolderSessionError);
+        assert.equal(error.code, FolderSessionErrorCode.PROTOCOL_VERSION_MISMATCH);
+        return true;
+      });
+    });
+  }
+});
 
 describe("folder session compiler-controlled files publication", () => {
   it("posts the full file set and install provenance as one folder:compilerFiles message", async () => {

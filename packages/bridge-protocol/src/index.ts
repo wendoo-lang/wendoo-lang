@@ -77,7 +77,8 @@ export {
   MAX_FILE_CONTENT_BYTES,
   MAX_SNAPSHOT_CONTENT_BYTES,
 } from "./notifications.js";
-
+export type { PeerSessionHelloMessage, PeerSessionHelloPayload } from "./peer-session.js";
+export { PeerSessionErrorCode } from "./peer-session.js";
 export type { WsMessage } from "./schemas.js";
 export { wsMessageSchema } from "./schemas.js";
 
