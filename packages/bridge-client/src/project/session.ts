@@ -1,6 +1,7 @@
 import {
   BRIDGE_PROTOCOL_NAMESPACES,
   BridgeSessionErrorCode,
+  type ErrorPayload,
   PROTOCOL_VERSION,
   type WsMessage,
 } from "@wendoo/bridge-protocol";
@@ -15,8 +16,10 @@ export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "re
 export interface SessionEventMap {
   status: ConnectionStatus;
   /**
-   * Stable code of the failure that ended the session. Fires before `status`
-   * becomes `"disconnected"`.
+   * Stable code of the failure that ended the session: one this side detected,
+   * or one the bridge reported in a `session:error`. Fires before `status`
+   * becomes `"disconnected"`. The session is stopped afterwards; call `start()`
+   * to open a new one.
    */
   error: BridgeSessionErrorCode;
 }
@@ -90,22 +93,15 @@ export class ProjectSession<TClient extends WsMessage, TServer extends WsMessage
       this.deliverPayload(msg);
     };
     this.setStatus("connecting");
-    this.reregisterHandlers();
-    this._client.connect(url);
-
+    // Registered ahead of the caller's handlers: ending the session removes
+    // every handler, so a rejected welcome or a coded error reaches no other.
     this._clientUnsubs.push(
       this._client.on("session:welcome", (msg: WsMessage) => {
         const payload = msg.payload as
           | { protocolVersion?: number; sessionId?: string; bindingToken?: string }
           | undefined;
         if (payload?.protocolVersion !== PROTOCOL_VERSION) {
-          this._client!.send({
-            type: "session:goodbye",
-          });
-          this._client!.close();
-          this._client = undefined;
-          this.emit("error", BridgeSessionErrorCode.PROTOCOL_VERSION_MISMATCH);
-          this.setStatus("disconnected");
+          this.fail(BridgeSessionErrorCode.PROTOCOL_VERSION_MISMATCH);
           return;
         }
         if (payload?.sessionId) {
@@ -114,20 +110,30 @@ export class ProjectSession<TClient extends WsMessage, TServer extends WsMessage
         if (payload?.bindingToken) {
           this._meta.bindingToken = payload.bindingToken;
         }
+      }),
+      this._client.on("session:error", (msg: WsMessage) => {
+        const code = (msg.payload as ErrorPayload | undefined)?.code;
+        if (code !== undefined) {
+          this.fail(code);
+        }
       })
     );
+    this.reregisterHandlers();
+    this._client.connect(url);
   }
 
   stop(): void {
-    for (const unsub of this._clientUnsubs) unsub();
-    this._clientUnsubs = [];
     if (!this._client) return;
-    this._client.send({ type: "session:goodbye" });
-    this._client.close();
-    this._client = undefined;
+    this.closeClient();
     this.setStatus("disconnected");
   }
 
+  /**
+   * Subscribe to inbound messages of `type`. The handler stays subscribed
+   * across `start()`/`stop()` cycles. A `session:welcome` reaches the handler
+   * only when this side accepts it, and a `session:error` only when it carries
+   * no `code`. Returns an unsubscribe function.
+   */
   on<T extends TServer["type"]>(type: T, handler: (msg: Extract<TServer, { type: T }>) => void): () => void {
     const wrapper: InternalHandler = (msg) => {
       handler(msg as Extract<TServer, { type: T }>);
@@ -217,6 +223,20 @@ export class ProjectSession<TClient extends WsMessage, TServer extends WsMessage
     if (this._status === next) return;
     this._status = next;
     this.emit("status", next);
+  }
+
+  private closeClient(): void {
+    for (const unsub of this._clientUnsubs) unsub();
+    this._clientUnsubs = [];
+    this._client!.send({ type: "session:goodbye" });
+    this._client!.close();
+    this._client = undefined;
+  }
+
+  private fail(code: BridgeSessionErrorCode): void {
+    this.closeClient();
+    this.emit("error", code);
+    this.setStatus("disconnected");
   }
 
   private deliverPayload(msg: WsMessage): void {

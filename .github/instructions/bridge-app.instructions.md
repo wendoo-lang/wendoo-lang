@@ -110,6 +110,9 @@ declared elsewhere.
   constant, and a connect call binding the mechanism to the kind. A platform
   session kind lives with its platform integration, never in this package or
   in `bridge-protocol`.
+- A kind's name is never one of the bridge protocol's reserved namespaces
+  (`BRIDGE_PROTOCOL_NAMESPACES` in `bridge-protocol`); an app bridge never
+  delivers such a kind's messages as payloads.
 - Core packages contain no platform names. A search of `bridge-protocol/src`
   and `bridge-app/src` for a platform name finds nothing; mechanism specs run
   against a neutral fixture kind.

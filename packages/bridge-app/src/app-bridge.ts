@@ -21,7 +21,11 @@ export type DiagnosticEntry = CompileDiagnosticEntry;
  * remote peer.
  */
 export interface AppBridge {
-  /** Open the bridge connection. No-op if already started. */
+  /**
+   * Open the bridge connection. No-op if already started. A failure that ends
+   * the session (reported in `AppBridgeSnapshot.errorCode`) leaves the bridge
+   * stopped, so a later call opens a new session.
+   */
   start(): void;
   /** Close the bridge connection and release resources. */
   stop(): void;
@@ -152,6 +156,8 @@ class AppBridgeController implements AppBridge {
       }),
       project.session.addEventListener("error", (code) => {
         this._errorCode = code;
+        this.setStatus("disconnected");
+        this.releaseProject();
       }),
       project.session.onPayload((message) => {
         this.emitPayload(message);
@@ -188,10 +194,7 @@ class AppBridgeController implements AppBridge {
     }
 
     project.session.stop();
-    this.disposeProjectBindings();
-    this._project = undefined;
-    this.setJoinCode(undefined);
-    this.disposeFeatures();
+    this.releaseProject();
   }
 
   async requestSync(): Promise<void> {
@@ -350,6 +353,13 @@ class AppBridgeController implements AppBridge {
     for (const listener of this._stateListeners) {
       listener(this._status);
     }
+  }
+
+  private releaseProject(): void {
+    this.disposeProjectBindings();
+    this._project = undefined;
+    this.setJoinCode(undefined);
+    this.disposeFeatures();
   }
 
   private disposeProjectBindings(): void {

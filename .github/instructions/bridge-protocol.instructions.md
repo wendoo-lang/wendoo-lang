@@ -2,7 +2,7 @@
 applyTo: "packages/bridge-protocol/**"
 ---
 
-<!-- Last reviewed: 2026-04-02 -->
+<!-- Last reviewed: 2026-09-24 -->
 
 # bridge-protocol -- Rules & Patterns
 
@@ -26,12 +26,14 @@ consumers (`bridge-client`, `bridge-app`, `vscode-bridge`) see updated types.
 
 ```
 src/
-  index.ts           # barrel (all public exports)
-  schemas.ts         # base wsMessageSchema (Zod)
+  index.ts           # barrel (all public exports), PROTOCOL_VERSION, SessionRole
+  schemas.ts         # base wsMessageSchema (Zod), BRIDGE_PROTOCOL_NAMESPACES
   notifications.ts   # FileSystemNotification + FilesystemSyncPayload (Zod)
+  folder-session.ts  # folder-host session: messages, version, FolderSessionErrorCode
+  peer-session.ts    # peer-session mechanism: generic hello shapes, PeerSessionErrorCode
   messages/
     index.ts         # re-exports all message modules
-    shared.ts        # session control, errors, ping/pong, filesystem messages
+    shared.ts        # session control, errors (BridgeSessionErrorCode), ping/pong, filesystem messages
     app.ts           # app-role client/server message unions
     compile.ts       # compile:diagnostics + compile:status messages
     extension.ts     # extension-role client/server message unions
@@ -47,6 +49,16 @@ src/
 - `filesystemSyncPayloadSchema` -- array of `[path, entry]` tuples for full filesystem
   snapshots.
 - `sessionHelloPayloadSchema` -- Zod schema for the `session:hello` handshake payload.
+- `BRIDGE_PROTOCOL_NAMESPACES` -- the namespaces of the message types this protocol
+  defines: `session`, `control`, `filesystem`, `compile`, `error`. A message type's namespace
+  is the text before its first `:`, or the whole type when it has none.
+- `BridgeSessionErrorCode` -- constant object plus union type of the stable codes of
+  bridge-session failures. `PROTOCOL_VERSION_MISMATCH` covers both directions: a client
+  refusing its bridge's welcome, and a bridge refusing a client's hello.
+- `ErrorPayload` -- payload of `session:error` and `error`: a prose `message` and an
+  optional `code` (`BridgeSessionErrorCode`).
+- The folder-host session's and the peer-session mechanism's types, constants, and
+  error codes (see `bridge-app.instructions.md` for their rules).
 
 ## Message Architecture
 
@@ -59,7 +71,7 @@ client) and a `ServerMessage` union (sent by the bridge server to that client).
 |---|---|---|
 | `session:hello` | client -> server | Initiate/authenticate session |
 | `session:goodbye` | either | Graceful close |
-| `session:error` | either | Session-scoped error |
+| `session:error` | either | Session-scoped error; one carrying a `code` ends the session |
 | `error` | either | General error |
 | `control:ping` | client -> server | Heartbeat request |
 | `control:pong` | server -> client | Heartbeat response |
@@ -94,6 +106,14 @@ client) and a `ServerMessage` union (sent by the bridge server to that client).
   validation, define a Zod schema; otherwise, a plain TypeScript type is sufficient.
 - Message types follow the pattern `{ type: "namespace:action"; payload?: T }`.
   The `type` field is a string literal for discriminated unions.
+- Every bridge WebSocket message type (the `messages/` folder) lies in a namespace listed in
+  `BRIDGE_PROTOCOL_NAMESPACES`. A message in any other namespace is a payload message:
+  endpoints carry it verbatim and never interpret it. Adding a namespace to the list is a
+  wire change -- endpoints stop delivering that namespace's messages as payloads.
+- A bridge-session failure the peer must be able to act on carries a
+  `BridgeSessionErrorCode` in its `ErrorPayload.code`. `code` is optional and additive: an
+  error without one keeps its existing meaning. A new failure adds a member whose JSDoc
+  says who raises it.
 - Role-specific message unions (`AppClientMessage`, `AppServerMessage`,
   `ExtensionClientMessage`, `ExtensionServerMessage`) aggregate shared + role-specific
   messages. Add new messages to the correct union(s).

@@ -60,6 +60,18 @@ function startSession(session: ProjectSession<WsMessage, WsMessage>): MockWebSoc
   return ws;
 }
 
+/** Records the session's error and status events, in order, as `error:<code>` and `status:<status>`. */
+function recordEvents(session: ProjectSession<WsMessage, WsMessage>): string[] {
+  const events: string[] = [];
+  session.addEventListener("error", (code) => {
+    events.push(`error:${code}`);
+  });
+  session.addEventListener("status", (status) => {
+    events.push(`status:${status}`);
+  });
+  return events;
+}
+
 /** One message of every bridge protocol namespace. */
 const PROTOCOL_MESSAGES: readonly WsMessage[] = [
   { type: "session:welcome", payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", joinCode: "J-1" } },
@@ -169,17 +181,6 @@ describe("ProjectSession", () => {
   });
 
   describe("protocol version", () => {
-    function recordEvents(session: ProjectSession<WsMessage, WsMessage>): string[] {
-      const events: string[] = [];
-      session.addEventListener("error", (code) => {
-        events.push(`error:${code}`);
-      });
-      session.addEventListener("status", (status) => {
-        events.push(`status:${status}`);
-      });
-      return events;
-    }
-
     it("ends the session with PROTOCOL_VERSION_MISMATCH when the welcome declares another version", () => {
       const session = createSession();
       const ws = startSession(session);
@@ -219,6 +220,87 @@ describe("ProjectSession", () => {
       assert.deepEqual(events, []);
       assert.equal(session.status, "connected");
       assert.equal(session.sessionId, "s-1");
+    });
+
+    it("delivers only an accepted welcome to welcome handlers", () => {
+      const session = createSession();
+      const welcomes: WsMessage[] = [];
+      session.on("session:welcome", (msg) => {
+        welcomes.push(msg);
+      });
+      const rejected = {
+        type: "session:welcome",
+        payload: { protocolVersion: PROTOCOL_VERSION + 1, sessionId: "s-1" },
+      };
+      const accepted = { type: "session:welcome", payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-2" } };
+
+      startSession(session).simulateMessage(rejected);
+
+      assert.deepEqual(welcomes, []);
+      assert.equal(session.sessionId, undefined);
+
+      startSession(session).simulateMessage(accepted);
+
+      assert.deepEqual(welcomes, [accepted]);
+    });
+
+    it("opens a new session on start after a rejection", () => {
+      const session = createSession();
+      const events = recordEvents(session);
+      const rejectedSocket = startSession(session);
+      rejectedSocket.simulateMessage({ type: "session:welcome", payload: { protocolVersion: PROTOCOL_VERSION + 1 } });
+
+      const ws = startSession(session);
+      ws.simulateMessage({ type: "session:welcome", payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-2" } });
+
+      assert.notEqual(ws, rejectedSocket);
+      assert.equal(parseSent(ws)[0]?.type, "session:hello");
+      assert.equal(session.status, "connected");
+      assert.equal(session.sessionId, "s-2");
+      assert.deepEqual(events.slice(-3), ["status:disconnected", "status:connecting", "status:connected"]);
+    });
+  });
+
+  describe("bridge-reported errors", () => {
+    it("ends the session with the code a session:error carries", () => {
+      const session = createSession();
+      const ws = startSession(session);
+      const events = recordEvents(session);
+      const errors: WsMessage[] = [];
+      session.on("session:error", (msg) => {
+        errors.push(msg);
+      });
+
+      ws.simulateMessage({
+        type: "session:error",
+        payload: { message: "unsupported protocol version", code: BridgeSessionErrorCode.PROTOCOL_VERSION_MISMATCH },
+      });
+
+      assert.deepEqual(events, [`error:${BridgeSessionErrorCode.PROTOCOL_VERSION_MISMATCH}`, "status:disconnected"]);
+      assert.deepEqual(errors, []);
+      assert.equal(parseSent(ws).at(-1)?.type, "session:goodbye");
+      assert.equal(ws.closed, true);
+
+      mock.timers.tick(60_000);
+      assert.equal(MockWebSocket.instances.length, 1);
+    });
+
+    it("keeps the session open on a session:error without a code", () => {
+      const session = createSession();
+      const ws = startSession(session);
+      const events = recordEvents(session);
+      const errors: WsMessage[] = [];
+      session.on("session:error", (msg) => {
+        errors.push(msg);
+      });
+      const uncoded = { type: "session:error", payload: { message: "session already established" } };
+
+      ws.simulateMessage(uncoded);
+
+      assert.deepEqual(events, []);
+      assert.deepEqual(errors, [uncoded]);
+      assert.equal(session.status, "connected");
+      assert.equal(ws.closed, false);
     });
   });
 });

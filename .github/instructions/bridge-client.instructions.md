@@ -2,7 +2,7 @@
 applyTo: "packages/bridge-client/**"
 ---
 
-<!-- Last reviewed: 2026-04-02 -->
+<!-- Last reviewed: 2026-09-24 -->
 
 # bridge-client -- Rules & Patterns
 
@@ -64,18 +64,39 @@ Types re-exported: `IFileSystem`, `StatResult`, `FileTreeEntry`, `FileSystemSnap
 
 ## ProjectSession
 
-Two layers of message handling:
+Three layers of message handling:
 
 1. **WS message handlers** (`on` / `send` / `request`) -- typed against generic TClient/TServer.
    Handlers are stored locally and re-registered on each `WsClient` so they survive
-   `start()`/`stop()` cycles.
+   `start()`/`stop()` cycles. A `session:welcome` reaches `on` handlers only once the
+   session has accepted it.
 
-2. **Session events** (`addEventListener`) -- higher-level events derived from WS messages.
-   Typed via `SessionEventMap`. Current events: `"status"` (ConnectionStatus).
-   Events deduplicate (won't fire if value unchanged).
+2. **Payload messages** (`sendPayload` / `onPayload`) -- messages whose type's namespace is
+   not in `BRIDGE_PROTOCOL_NAMESPACES` (`bridge-protocol`), carried verbatim both ways.
+   `onPayload` delivers every such inbound message except a reply to a pending `request()`.
+   Nothing is buffered: a message arriving while no listener is subscribed is dropped, so
+   subscribe before `start()`. Listeners survive `start()`/`stop()` cycles. `sendPayload`
+   throws if the session is not started.
 
-Session handshake: on connect, sends `session:hello` with metadata; server responds with
-`session:welcome` (sessionId, joinCode, bindingToken).
+3. **Session events** (`addEventListener`) -- higher-level events typed via `SessionEventMap`:
+   - `"status"` (`ConnectionStatus`). Deduplicated: does not fire if the value is unchanged.
+   - `"error"` (`BridgeSessionErrorCode`) -- the stable code of the failure that ended the
+     session. Fires before `"status"` becomes `"disconnected"`.
+
+Session handshake: on connect, sends `session:hello` declaring `PROTOCOL_VERSION`; the server
+responds with `session:welcome` (protocolVersion, sessionId, joinCode, bindingToken).
+
+A session ends on either failure:
+
+- A `session:welcome` declaring no protocol version, or one other than `PROTOCOL_VERSION`:
+  `BridgeSessionErrorCode.PROTOCOL_VERSION_MISMATCH`.
+- A `session:error` whose payload carries a `code`: that code. A `session:error` without a
+  code leaves the session open.
+
+On either, the session sends `session:goodbye`, closes the connection without reconnecting,
+emits `"error"`, then `"status"` `"disconnected"`. The failing message reaches no `on`
+handler, and nothing in a rejected welcome is adopted. A later `start()` opens a new
+session.
 
 ## ProjectFiles
 
@@ -91,4 +112,5 @@ Two `NotifyingFileSystem` wrappers around a shared `FileSystem`:
 - All exports go through `src/index.ts`. Consumers import from `@wendoo/bridge-client`.
 - Use `import type` for type-only imports within the package.
 - All unsubscribe functions return `() => void`.
-- `send()` throws if session not started. `on()` does not -- handlers queue for next start.
+- `send()`, `sendPayload()`, and `request()` throw if the session is not started. `on()` and
+  `onPayload()` do not -- handlers queue for the next start.

@@ -4,9 +4,10 @@ import type { FileSystemNotification, FilesystemSyncPayload } from "../notificat
 /** Stable identifiers for bridge-session errors. */
 export const BridgeSessionErrorCode = {
   /**
-   * The bridge's `session:welcome` declared no protocol version, or one other
-   * than the one this side speaks (`PROTOCOL_VERSION`), so this side ended the
-   * session.
+   * The two sides of the session do not speak a common protocol version. Raised
+   * by a client whose bridge's `session:welcome` declared no protocol version,
+   * or one other than the client's `PROTOCOL_VERSION`; reported by a bridge
+   * that does not support the version a client's `session:hello` declared.
    */
   PROTOCOL_VERSION_MISMATCH: "BRIDGE_SESSION_PROTOCOL_VERSION_MISMATCH",
 } as const;
@@ -17,6 +18,8 @@ export type BridgeSessionErrorCode = (typeof BridgeSessionErrorCode)[keyof typeo
 /** Payload carried by error messages. */
 export interface ErrorPayload {
   message: string;
+  /** Stable code of the failure, when the sender reports one. */
+  code?: BridgeSessionErrorCode;
 }
 
 /** A single filesystem mutation pushed to the peer. */
@@ -49,7 +52,11 @@ export interface ControlPongMessage {
   id?: string;
 }
 
-/** Session-scoped error reported to the peer. */
+/**
+ * Session-scoped error reported to the peer. One whose payload carries a
+ * `code` ends the session: the receiver closes its connection and does not
+ * reconnect.
+ */
 export interface SessionErrorMessage {
   type: "session:error";
   id?: string;

@@ -13,8 +13,7 @@ import { createAppBridge } from "@wendoo/bridge-app";
 import { createCompilationFeature } from "@wendoo/bridge-app/compilation";
 
 const bridge = createAppBridge({
-  appName: "My App",
-  bridgeUrl: "ws://localhost:6464",
+  bridgeUrl: "localhost:6464",
   filesystem: myProjectFileSystem,
   features: [createCompilationFeature({ compiler })],
 });
@@ -22,9 +21,13 @@ const bridge = createAppBridge({
 bridge.start();
 ```
 
+`bridgeUrl` is a bare host with an optional port. The bridge connects with `ws://` to a
+loopback host and `wss://` to any other.
+
 The bridge facade supports:
 
-- `start()` / `stop()` -- lifecycle management
+- `start()` / `stop()` -- lifecycle management; after a failure ends the session, `start()`
+  opens a new one
 - `requestSync()` -- request a full project file sync from the VS Code extension
 - `snapshot()` -- current connection status, join code, and the stable code of the
   failure that ended the session, if one did

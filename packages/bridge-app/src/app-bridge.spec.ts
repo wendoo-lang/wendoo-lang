@@ -475,6 +475,100 @@ describe("createAppBridge", () => {
     assert.equal(bridge.snapshot().status, "connected");
   });
 
+  it("opens a new session when started again after a version rejection", () => {
+    const bridge = createBridge(new MemoryProjectFileSystem());
+    const received: WsMessage[] = [];
+    bridge.onPayload((message) => {
+      received.push(message);
+    });
+
+    bridge.start();
+    const rejectedSocket = lastSocket();
+    rejectedSocket.simulateOpen();
+    rejectedSocket.simulateMessage(welcome(2));
+
+    bridge.start();
+    const socket = lastSocket();
+    socket.simulateOpen();
+    socket.simulateMessage(welcome(1));
+    const inbound = { type: "sample:document", payload: { content: "after restart" } };
+    socket.simulateMessage(inbound);
+
+    assert.notEqual(socket, rejectedSocket);
+    assert.deepEqual(bridge.snapshot(), { status: "connected", joinCode: "JOIN-1", errorCode: undefined });
+    assert.deepEqual(received, [inbound]);
+  });
+
+  it("adopts nothing from a rejected welcome", () => {
+    const tokens: string[] = [];
+    const bridge = createAppBridge({
+      bridgeUrl: "http://localhost:3000",
+      filesystem: new MemoryProjectFileSystem(),
+      onBindingTokenChange: (token) => {
+        tokens.push(token);
+      },
+    });
+    const snapshots: AppBridgeSnapshot[] = [];
+    bridge.onStateChange(() => {
+      snapshots.push(bridge.snapshot());
+    });
+
+    bridge.start();
+    const socket = lastSocket();
+    socket.simulateOpen();
+    socket.simulateMessage({
+      type: "session:welcome",
+      payload: { protocolVersion: 2, sessionId: "session-1", joinCode: "JOIN-1", bindingToken: "token-1" },
+    });
+
+    assert.deepEqual(
+      snapshots.filter((snapshot) => snapshot.joinCode !== undefined),
+      []
+    );
+    assert.deepEqual(tokens, []);
+    assert.equal(bridge.snapshot().errorCode, BridgeSessionErrorCode.PROTOCOL_VERSION_MISMATCH);
+
+    bridge.start();
+    lastSocket().simulateOpen();
+    lastSocket().simulateMessage({
+      type: "session:welcome",
+      payload: { protocolVersion: 1, sessionId: "session-2", joinCode: "JOIN-2", bindingToken: "token-2" },
+    });
+
+    assert.equal(bridge.snapshot().joinCode, "JOIN-2");
+    assert.deepEqual(tokens, ["token-2"]);
+    assert.deepEqual(parseSent(lastSocket())[0], { type: "session:hello", payload: { protocolVersion: 1 } });
+  });
+
+  it("reports a code the bridge sends in a session error and opens a new session on the next start", () => {
+    const bridge = createBridge(new MemoryProjectFileSystem());
+    const snapshots: AppBridgeSnapshot[] = [];
+    bridge.onStateChange(() => {
+      snapshots.push(bridge.snapshot());
+    });
+
+    bridge.start();
+    const socket = lastSocket();
+    socket.simulateOpen();
+    socket.simulateMessage({
+      type: "session:error",
+      payload: { message: "unsupported protocol version", code: BridgeSessionErrorCode.PROTOCOL_VERSION_MISMATCH },
+    });
+
+    assert.deepEqual(snapshots.at(-1), {
+      status: "disconnected",
+      joinCode: undefined,
+      errorCode: BridgeSessionErrorCode.PROTOCOL_VERSION_MISMATCH,
+    });
+    assert.equal(socket.closed, true);
+
+    bridge.start();
+    lastSocket().simulateOpen();
+    lastSocket().simulateMessage(welcome(1));
+
+    assert.deepEqual(bridge.snapshot(), { status: "connected", joinCode: "JOIN-1", errorCode: undefined });
+  });
+
   it("carries a peer session bound over its payload messages", async () => {
     const bridge = createBridge(new MemoryProjectFileSystem());
     const port: PeerSessionPort<SampleMessage> = {
