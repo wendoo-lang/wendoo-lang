@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it, mock } from "node:test";
 import type { FileContent } from "@wendoo/app-host";
-import type { DiagnosticEntry } from "@wendoo/bridge-app";
+import type { DiagnosticEntry, PeerSessionHelloMessage, PeerSessionKind, PeerSessionPort } from "@wendoo/bridge-app";
 import {
   type AppBridgeFeature,
   type AppBridgeSnapshot,
+  BridgeSessionErrorCode,
+  connectPeerSession,
   createAppBridge,
   type ProjectFileChange,
   type ProjectFileSnapshot,
@@ -44,7 +46,7 @@ class MockWebSocket {
     this.onopen?.({});
   }
 
-  simulateMessage(data: WsMessage): void {
+  simulateMessage(data: object): void {
     this.onmessage?.({ data: JSON.stringify(data) });
   }
 
@@ -154,6 +156,23 @@ function createBridge(filesystem: MemoryProjectFileSystem, features: readonly Ap
   });
 }
 
+/** A welcome from the bridge declaring `protocolVersion`. */
+function welcome(protocolVersion: number): WsMessage {
+  return { type: "session:welcome", payload: { protocolVersion, sessionId: "session-1", joinCode: "JOIN-1" } };
+}
+
+/** A session kind speaking protocol version 1. */
+const SAMPLE_KIND: PeerSessionKind<"sample"> = { kind: "sample", protocolVersion: 1 };
+
+/** A payload message of {@link SAMPLE_KIND} carrying opaque text. */
+interface SampleDocumentMessage {
+  type: "sample:document";
+  payload: { content: string };
+}
+
+/** Every message {@link SAMPLE_KIND} carries. */
+type SampleMessage = PeerSessionHelloMessage<"sample"> | SampleDocumentMessage;
+
 function createDiagnostic(message: string): DiagnosticEntry {
   return {
     severity: "error",
@@ -194,7 +213,7 @@ describe("createAppBridge", () => {
     bridge.start();
     const socket = lastSocket();
 
-    assert.deepEqual(snapshots[0], { status: "connecting", joinCode: undefined });
+    assert.deepEqual(snapshots[0], { status: "connecting", joinCode: undefined, errorCode: undefined });
 
     socket.simulateOpen();
     socket.simulateMessage({
@@ -215,7 +234,7 @@ describe("createAppBridge", () => {
 
     bridge.stop();
 
-    assert.deepEqual(bridge.snapshot(), { status: "disconnected", joinCode: undefined });
+    assert.deepEqual(bridge.snapshot(), { status: "disconnected", joinCode: undefined, errorCode: undefined });
   });
 
   it("forwards local changes and applies remote changes through the project file system", () => {
@@ -380,7 +399,7 @@ describe("createAppBridge", () => {
     const syncResponse = messages.find((message) => message.type === "filesystem:sync" && message.id === "sync-1");
 
     assert.equal(attachedWorkspaceSize, 1);
-    assert.deepEqual(seenSnapshots[0], { status: "disconnected", joinCode: undefined });
+    assert.deepEqual(seenSnapshots[0], { status: "disconnected", joinCode: undefined, errorCode: undefined });
     assert.ok(syncResponse?.payload);
     assert.deepEqual(diagnosticsMessage?.payload, {
       file: "src/main.ts",
@@ -392,5 +411,102 @@ describe("createAppBridge", () => {
       success: false,
       diagnosticCount: { error: 1, warning: 0 },
     });
+  });
+
+  it("carries payload messages to and from the peer verbatim", () => {
+    const bridge = createBridge(new MemoryProjectFileSystem());
+    const received: WsMessage[] = [];
+    bridge.onPayload((message) => {
+      received.push(message);
+    });
+
+    bridge.start();
+    const socket = lastSocket();
+    socket.simulateOpen();
+    socket.simulateMessage(welcome(1));
+
+    const inbound = { type: "sample:document", payload: { content: "line\nnext \u00e9" }, extra: [1, 2] };
+    socket.simulateMessage({ type: "session:joinCode", payload: { joinCode: "JOIN-2" } });
+    socket.simulateMessage({ type: "control:pong" });
+    socket.simulateMessage({ type: "filesystem:change", seq: 1, payload: { action: "mkdir", path: "src" } });
+    socket.simulateMessage(inbound);
+
+    const outbound = { type: "sample:document", payload: { content: "reply" }, extra: { kept: true } };
+    const before = socket.sent.length;
+    bridge.sendPayload(outbound);
+
+    assert.deepEqual(received, [inbound]);
+    assert.deepEqual(
+      socket.sent.slice(before).map((raw) => JSON.parse(raw) as unknown),
+      [outbound]
+    );
+  });
+
+  it("throws when a payload is sent before start", () => {
+    const bridge = createBridge(new MemoryProjectFileSystem());
+
+    assert.throws(() => bridge.sendPayload({ type: "sample:document" }));
+  });
+
+  it("reports a protocol version mismatch in the snapshot and clears it on the next start", () => {
+    const bridge = createBridge(new MemoryProjectFileSystem());
+    const snapshots: AppBridgeSnapshot[] = [];
+    bridge.onStateChange(() => {
+      snapshots.push(bridge.snapshot());
+    });
+
+    bridge.start();
+    const socket = lastSocket();
+    socket.simulateOpen();
+    socket.simulateMessage(welcome(2));
+
+    const reported = snapshots.filter((snapshot) => snapshot.errorCode !== undefined);
+    assert.deepEqual(
+      reported.map((snapshot) => [snapshot.status, snapshot.errorCode]),
+      [["disconnected", BridgeSessionErrorCode.PROTOCOL_VERSION_MISMATCH]]
+    );
+    assert.equal(bridge.snapshot().errorCode, BridgeSessionErrorCode.PROTOCOL_VERSION_MISMATCH);
+
+    bridge.stop();
+    bridge.start();
+    lastSocket().simulateOpen();
+
+    assert.equal(bridge.snapshot().errorCode, undefined);
+    assert.equal(bridge.snapshot().status, "connected");
+  });
+
+  it("carries a peer session bound over its payload messages", async () => {
+    const bridge = createBridge(new MemoryProjectFileSystem());
+    const port: PeerSessionPort<SampleMessage> = {
+      postMessage(message) {
+        bridge.sendPayload(message);
+      },
+      onMessage(listener) {
+        return bridge.onPayload((message) => {
+          listener(message as SampleMessage);
+        });
+      },
+    };
+
+    bridge.start();
+    const socket = lastSocket();
+    socket.simulateOpen();
+    socket.simulateMessage(welcome(1));
+
+    const connecting = connectPeerSession<"sample", SampleDocumentMessage>({ kind: SAMPLE_KIND, port });
+    assert.deepEqual(parseSent(socket).at(-1), { type: "sample:hello", payload: { protocolVersion: 1 } });
+
+    socket.simulateMessage({ type: "sample:hello", payload: { protocolVersion: 1 } });
+    socket.simulateMessage({ type: "sample:document", payload: { content: "from peer" } });
+    const session = await connecting;
+    const documents: string[] = [];
+    session.onMessage((message) => {
+      documents.push(message.payload.content);
+    });
+    session.postMessage({ type: "sample:document", payload: { content: "from here" } });
+
+    assert.equal(session.peerProtocolVersion, 1);
+    assert.deepEqual(documents, ["from peer"]);
+    assert.deepEqual(parseSent(socket).at(-1), { type: "sample:document", payload: { content: "from here" } });
   });
 });

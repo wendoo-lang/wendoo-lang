@@ -7,6 +7,7 @@ export type {
   PeerSessionHelloMessage,
 } from "@wendoo/bridge-protocol";
 export {
+  BridgeSessionErrorCode,
   FOLDER_HOST_MODE_FOLDER,
   FOLDER_HOST_MODE_GLOBAL,
   FOLDER_HOST_MODE_URL_PARAM,

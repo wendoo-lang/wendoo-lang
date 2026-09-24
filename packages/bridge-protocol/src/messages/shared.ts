@@ -1,6 +1,19 @@
 import { z } from "zod";
 import type { FileSystemNotification, FilesystemSyncPayload } from "../notifications.js";
 
+/** Stable identifiers for bridge-session errors. */
+export const BridgeSessionErrorCode = {
+  /**
+   * The bridge's `session:welcome` declared no protocol version, or one other
+   * than the one this side speaks (`PROTOCOL_VERSION`), so this side ended the
+   * session.
+   */
+  PROTOCOL_VERSION_MISMATCH: "BRIDGE_SESSION_PROTOCOL_VERSION_MISMATCH",
+} as const;
+
+/** Union of all {@link BridgeSessionErrorCode} values. */
+export type BridgeSessionErrorCode = (typeof BridgeSessionErrorCode)[keyof typeof BridgeSessionErrorCode];
+
 /** Payload carried by error messages. */
 export interface ErrorPayload {
   message: string;

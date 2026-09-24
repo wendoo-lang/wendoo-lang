@@ -1,4 +1,9 @@
-import { PROTOCOL_VERSION, type WsMessage } from "@wendoo/bridge-protocol";
+import {
+  BRIDGE_PROTOCOL_NAMESPACES,
+  BridgeSessionErrorCode,
+  PROTOCOL_VERSION,
+  type WsMessage,
+} from "@wendoo/bridge-protocol";
 import { WsClient } from "../ws-client.js";
 
 type InternalHandler = (msg: WsMessage) => void;
@@ -9,6 +14,11 @@ export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "re
 /** Map of event names to payload types for {@link ProjectSession.addEventListener}. */
 export interface SessionEventMap {
   status: ConnectionStatus;
+  /**
+   * Stable code of the failure that ended the session. Fires before `status`
+   * becomes `"disconnected"`.
+   */
+  error: BridgeSessionErrorCode;
 }
 
 /** Mutable session-scoped metadata persisted across reconnects. */
@@ -30,6 +40,7 @@ export class ProjectSession<TClient extends WsMessage, TServer extends WsMessage
   private _status: ConnectionStatus = "disconnected";
   private _eventListeners = new Map<string, Set<(value: never) => void>>();
   private _messageHandlers = new Map<string, Set<InternalHandler>>();
+  private _payloadListeners = new Set<InternalHandler>();
   private _clientUnsubs: (() => void)[] = [];
   private _wsPath: string;
   private _bridgeUrl: string;
@@ -75,6 +86,9 @@ export class ProjectSession<TClient extends WsMessage, TServer extends WsMessage
     this._client.onDisconnect = () => {
       this.setStatus("reconnecting");
     };
+    this._client.onMessage = (msg) => {
+      this.deliverPayload(msg);
+    };
     this.setStatus("connecting");
     this.reregisterHandlers();
     this._client.connect(url);
@@ -90,6 +104,7 @@ export class ProjectSession<TClient extends WsMessage, TServer extends WsMessage
           });
           this._client!.close();
           this._client = undefined;
+          this.emit("error", BridgeSessionErrorCode.PROTOCOL_VERSION_MISMATCH);
           this.setStatus("disconnected");
           return;
         }
@@ -142,6 +157,30 @@ export class ProjectSession<TClient extends WsMessage, TServer extends WsMessage
     this._client.send(msg);
   }
 
+  /**
+   * Send a payload message to the peer verbatim. The message's type must lie
+   * outside `BRIDGE_PROTOCOL_NAMESPACES`. Throws if the session is not started.
+   */
+  sendPayload(msg: WsMessage): void {
+    if (!this._client) {
+      throw new Error("Session not started");
+    }
+    this._client.send(msg);
+  }
+
+  /**
+   * Subscribe to payload messages: every inbound message whose type lies
+   * outside `BRIDGE_PROTOCOL_NAMESPACES`, except replies to a pending
+   * `request()`, delivered as received. The listener stays subscribed across
+   * `start()`/`stop()` cycles. Returns an unsubscribe function.
+   */
+  onPayload(listener: (msg: WsMessage) => void): () => void {
+    this._payloadListeners.add(listener);
+    return () => {
+      this._payloadListeners.delete(listener);
+    };
+  }
+
   request(type: string, payload?: unknown, seq?: number): Promise<WsMessage> {
     if (!this._client) {
       throw new Error("Session not started");
@@ -178,6 +217,14 @@ export class ProjectSession<TClient extends WsMessage, TServer extends WsMessage
     if (this._status === next) return;
     this._status = next;
     this.emit("status", next);
+  }
+
+  private deliverPayload(msg: WsMessage): void {
+    const namespace = msg.type.split(":", 1)[0];
+    if (BRIDGE_PROTOCOL_NAMESPACES.includes(namespace)) return;
+    for (const listener of this._payloadListeners) {
+      listener(msg);
+    }
   }
 
   private reregisterHandlers(): void {

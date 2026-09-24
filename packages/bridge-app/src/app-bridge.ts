@@ -1,6 +1,11 @@
 import type { ProjectFileChange, ProjectFileSnapshot, ProjectFileSystem } from "@wendoo/app-host";
 import type { ConnectionStatus } from "@wendoo/bridge-client";
-import type { AppClientMessage, CompileDiagnosticEntry } from "@wendoo/bridge-protocol";
+import type {
+  AppClientMessage,
+  BridgeSessionErrorCode,
+  CompileDiagnosticEntry,
+  WsMessage,
+} from "@wendoo/bridge-protocol";
 import { BridgeProject } from "./bridge-project.js";
 import { toFileSystemNotification, toFileSystemSnapshot, toProjectFileChange } from "./project-file-bridge.js";
 
@@ -28,6 +33,21 @@ export interface AppBridge {
   onStateChange(listener: (state: AppBridgeState) => void): () => void;
   /** Subscribe to project file changes pushed by the remote peer. */
   onRemoteChange(listener: (change: ProjectFileChange) => void): () => void;
+  /**
+   * Send a payload message to the peer verbatim. The message's type must lie
+   * outside the bridge protocol's namespaces (`BRIDGE_PROTOCOL_NAMESPACES` in
+   * `@wendoo/bridge-protocol`). A message sent while the connection is
+   * reconnecting is queued and sent once it reopens. Throws when the bridge is
+   * not started or its session has ended.
+   */
+  sendPayload(message: WsMessage): void;
+  /**
+   * Subscribe to payload messages from the peer: every inbound message whose
+   * type lies outside the bridge protocol's namespaces, delivered as received.
+   * A message arriving while no listener is attached is dropped, so subscribe
+   * before `start()` to receive every one. Returns an unsubscribe function.
+   */
+  onPayload(listener: (message: WsMessage) => void): () => void;
 }
 
 /** Snapshot of the bridge connection state. */
@@ -35,6 +55,8 @@ export interface AppBridgeSnapshot {
   status: AppBridgeState;
   /** Code the user pastes into the peer to bind the session, when available. */
   joinCode?: string;
+  /** Stable code of the failure that ended the session, if one did. Cleared when the bridge next starts. */
+  errorCode?: BridgeSessionErrorCode;
 }
 
 /** Options for {@link createAppBridge}. */
@@ -92,6 +114,7 @@ class AppBridgeController implements AppBridge {
   private readonly _stateListeners = new Set<(state: AppBridgeState) => void>();
   private readonly _remoteChangeListeners = new Set<(change: ProjectFileChange) => void>();
   private readonly _syncListeners = new Set<() => void>();
+  private readonly _payloadListeners = new Set<(message: WsMessage) => void>();
   private readonly _diagnosticVersions = new Map<string, number>();
   private readonly _featureDisposers: (() => void)[] = [];
   private _project: BridgeProject | undefined;
@@ -99,6 +122,7 @@ class AppBridgeController implements AppBridge {
   private _projectUnsubs: (() => void)[] = [];
   private _status: AppBridgeState = "disconnected";
   private _joinCode: string | undefined;
+  private _errorCode: BridgeSessionErrorCode | undefined;
 
   constructor(options: AppBridgeOptions) {
     this._options = options;
@@ -109,6 +133,7 @@ class AppBridgeController implements AppBridge {
       return;
     }
 
+    this._errorCode = undefined;
     this.attachFeatures();
 
     const project = new BridgeProject({
@@ -124,6 +149,12 @@ class AppBridgeController implements AppBridge {
     this._projectUnsubs = [
       project.session.addEventListener("status", (status) => {
         this.setStatus(status);
+      }),
+      project.session.addEventListener("error", (code) => {
+        this._errorCode = code;
+      }),
+      project.session.onPayload((message) => {
+        this.emitPayload(message);
       }),
       project.session.on("session:welcome", (msg) => {
         const token = (msg.payload as { bindingToken?: string } | undefined)?.bindingToken;
@@ -172,6 +203,7 @@ class AppBridgeController implements AppBridge {
     return {
       status: this._status,
       joinCode: this._joinCode,
+      errorCode: this._errorCode,
     };
   }
 
@@ -186,6 +218,17 @@ class AppBridgeController implements AppBridge {
     this._remoteChangeListeners.add(listener);
     return () => {
       this._remoteChangeListeners.delete(listener);
+    };
+  }
+
+  sendPayload(message: WsMessage): void {
+    this.requireProject().session.sendPayload(message);
+  }
+
+  onPayload(listener: (message: WsMessage) => void): () => void {
+    this._payloadListeners.add(listener);
+    return () => {
+      this._payloadListeners.delete(listener);
     };
   }
 
@@ -230,6 +273,12 @@ class AppBridgeController implements AppBridge {
   private emitDidSync(): void {
     for (const listener of this._syncListeners) {
       listener();
+    }
+  }
+
+  private emitPayload(message: WsMessage): void {
+    for (const listener of this._payloadListeners) {
+      listener(message);
     }
   }
 

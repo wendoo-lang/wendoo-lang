@@ -26,8 +26,11 @@ The bridge facade supports:
 
 - `start()` / `stop()` -- lifecycle management
 - `requestSync()` -- request a full project file sync from the VS Code extension
-- `snapshot()` -- current connection status and join code
+- `snapshot()` -- current connection status, join code, and the stable code of the
+  failure that ended the session, if one did
 - `onStateChange(...)` / `onRemoteChange(...)` -- event subscriptions
+- `sendPayload(...)` / `onPayload(...)` -- send and receive payload messages: messages
+  whose type lies outside the bridge protocol's own namespaces, carried verbatim
 
 Optional features (like compilation) attach through the `features` array and receive
 a `AppBridgeFeatureContext` with project file access, sync hooks, and diagnostic/status

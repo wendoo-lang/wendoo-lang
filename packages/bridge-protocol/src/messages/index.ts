@@ -35,4 +35,4 @@ export type {
   SessionHelloMessage,
   SessionHelloPayload,
 } from "./shared.js";
-export { sessionHelloPayloadSchema } from "./shared.js";
+export { BridgeSessionErrorCode, sessionHelloPayloadSchema } from "./shared.js";

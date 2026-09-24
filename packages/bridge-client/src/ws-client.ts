@@ -44,6 +44,11 @@ export class WsClient {
 
   onOpen?: () => void;
   onDisconnect?: () => void;
+  /**
+   * Called with every inbound message that is not a reply to a pending
+   * {@link request}, after the listeners registered for its type.
+   */
+  onMessage?: (msg: WsMessage) => void;
 
   private readonly pendingRequests = new Map<
     string,
@@ -200,6 +205,7 @@ export class WsClient {
         handler(msg);
       }
     }
+    this.onMessage?.(msg);
   }
 
   private handleDisconnect(): void {

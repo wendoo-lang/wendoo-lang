@@ -66,6 +66,7 @@ export type {
   SessionHelloPayload,
 } from "./messages/index.js";
 export {
+  BridgeSessionErrorCode,
   compileDiagnosticsPayloadSchema,
   compileStatusPayloadSchema,
   sessionHelloPayloadSchema,
@@ -80,7 +81,7 @@ export {
 export type { PeerSessionHelloMessage, PeerSessionHelloPayload } from "./peer-session.js";
 export { PeerSessionErrorCode } from "./peer-session.js";
 export type { WsMessage } from "./schemas.js";
-export { wsMessageSchema } from "./schemas.js";
+export { BRIDGE_PROTOCOL_NAMESPACES, wsMessageSchema } from "./schemas.js";
 
 /** Identifies which side of the bridge a session belongs to. */
 export type SessionRole = "app" | "extension";
