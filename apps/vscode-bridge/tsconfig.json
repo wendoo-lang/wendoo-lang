@@ -8,5 +8,8 @@
 	},
 	"include": ["src/**/*.ts"],
 	"exclude": ["src/**/*.spec.ts"],
-	"references": [{ "path": "../../packages/bridge-protocol/tsconfig.json" }]
+	"references": [
+		{ "path": "../../packages/bridge-protocol/tsconfig.json" },
+		{ "path": "../../packages/join-codes/tsconfig.json" }
+	]
 }

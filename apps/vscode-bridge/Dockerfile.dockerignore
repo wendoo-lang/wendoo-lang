@@ -4,6 +4,10 @@
 !packages/bridge-protocol/tsconfig.json
 !packages/bridge-protocol/src
 
+!packages/join-codes/package.json
+!packages/join-codes/tsconfig.json
+!packages/join-codes/src
+
 !packages/bridge-client/package.json
 !packages/bridge-client/tsconfig.json
 !packages/bridge-client/src

@@ -36,6 +36,7 @@ Wendoo draws inspiration from other tile-based programming systems past and pres
 | [@wendoo/assistant-relay](packages/assistant-relay/) | Assistant relay protocol -- the session handshake, turn events, and tool-call wire an assistant service speaks with a client |
 | [@wendoo/service-api](packages/service-api/) | Request/response schemas, shared enums, error shapes, and serialization formats for backend service APIs |
 | [@wendoo/cli](packages/cli/) | Command-line tools for Wendoo projects |
+| [@wendoo/join-codes](packages/join-codes/) | Generator of the three-word join codes people type to join a Wendoo session |
 | [@wendoo/bridge-protocol](packages/bridge-protocol/) | VS Code bridge network protocol types and schemas |
 | [@wendoo/bridge-client](packages/bridge-client/) | Client SDK for the VS Code bridge |
 | [@wendoo/bridge-app](packages/bridge-app/) | Opinionated layer atop bridge-client for the VS Code bridge |

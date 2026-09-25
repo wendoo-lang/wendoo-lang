@@ -1,0 +1,77 @@
+{
+  "name": "@wendoo/join-codes",
+  "version": "0.0.0",
+  "description": "Generator of the three-word join codes people type to join a Wendoo session",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "author": "wendoo-lang",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wendoo-lang/wendoo-lang.git",
+    "directory": "packages/join-codes"
+  },
+  "bugs": {
+    "url": "https://github.com/wendoo-lang/wendoo-lang/issues"
+  },
+  "homepage": "https://github.com/wendoo-lang/wendoo-lang/tree/main/packages/join-codes#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "browser": "./dist/index.js",
+      "import": "./dist/index.js"
+    }
+  },
+  "wendooBuild": {
+    "script": "build:prod",
+    "outputs": [
+      "dist"
+    ],
+    "postProcessed": false
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "build:prod": "wireit",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo tsconfig.prod.tsbuildinfo",
+    "watch": "tsc --build --watch",
+    "lint:only": "biome lint ./src",
+    "check:only": "biome check ./src",
+    "format:only": "biome format ./src",
+    "lint": "biome lint ./src --write",
+    "check": "biome check ./src --write",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.spec.json",
+    "format": "biome format ./src --write",
+    "test": "tsx --tsconfig tsconfig.spec.json --test $(find src -name '*.spec.ts')"
+  },
+  "wireit": {
+    "build:prod": {
+      "command": "tsc --build tsconfig.prod.json",
+      "files": [
+        "src/**",
+        "!src/**/*.spec.ts",
+        "tsconfig.json",
+        "tsconfig.prod.json",
+        "package-lock.json"
+      ],
+      "output": [
+        "dist/**",
+        "tsconfig.prod.tsbuildinfo"
+      ],
+      "clean": true,
+      "packageLocks": []
+    }
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.3.15",
+    "@types/node": "^25.3.0",
+    "tsx": "^4.21.0",
+    "typescript": "~5.9.3",
+    "wireit": "^0.14.13"
+  }
+}

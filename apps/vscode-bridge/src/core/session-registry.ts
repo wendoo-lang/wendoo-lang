@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type { AppSessionJoinCodeMessage, ExtensionAppStatusMessage, SessionRole } from "@wendoo/bridge-protocol";
+import { generateTriplet } from "@wendoo/join-codes";
 import type { WSContext } from "hono/ws";
 import { createBindingToken, generateBindingId, verifyBindingToken } from "#core/binding-token.js";
 import { logger } from "#core/logging/logger.js";
 import { safeSend } from "#transport/ws/safe-send.js";
-import { generateTriplet } from "#triplet.js";
 
 const JOIN_CODE_TTL_MS = 10 * 60 * 1000;
 const DISCONNECTED_SESSION_TTL_MS = 5 * 60 * 1000;

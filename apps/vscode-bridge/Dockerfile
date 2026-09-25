@@ -7,6 +7,11 @@ COPY packages/bridge-protocol/package.json packages/bridge-protocol/package.json
 COPY packages/bridge-protocol/tsconfig.json packages/bridge-protocol/tsconfig.json
 COPY packages/bridge-protocol/src packages/bridge-protocol/src
 
+# Copy join-codes (local dependency of vscode-bridge)
+COPY packages/join-codes/package.json packages/join-codes/package.json
+COPY packages/join-codes/tsconfig.json packages/join-codes/tsconfig.json
+COPY packages/join-codes/src packages/join-codes/src
+
 # Copy vscode-bridge
 COPY apps/vscode-bridge/package.json apps/vscode-bridge/package.json
 COPY apps/vscode-bridge/tsconfig.json apps/vscode-bridge/tsconfig.json
@@ -15,6 +20,10 @@ COPY apps/vscode-bridge/src apps/vscode-bridge/src
 
 # Build bridge-protocol first
 WORKDIR /workspace/packages/bridge-protocol
+RUN npm install && npm run build
+
+# Build join-codes
+WORKDIR /workspace/packages/join-codes
 RUN npm install && npm run build
 
 # Build vscode-bridge
@@ -29,6 +38,10 @@ WORKDIR /workspace
 # Copy built bridge-protocol (needed at runtime via file: reference)
 COPY --from=builder /workspace/packages/bridge-protocol/package.json packages/bridge-protocol/package.json
 COPY --from=builder /workspace/packages/bridge-protocol/dist packages/bridge-protocol/dist
+
+# Copy built join-codes (needed at runtime via file: reference)
+COPY --from=builder /workspace/packages/join-codes/package.json packages/join-codes/package.json
+COPY --from=builder /workspace/packages/join-codes/dist packages/join-codes/dist
 
 # Copy built vscode-bridge
 COPY --from=builder /workspace/apps/vscode-bridge/package.json apps/vscode-bridge/package.json

@@ -50,6 +50,8 @@
     { "path": "./packages/conformance/tsconfig.spec.json" },
     { "path": "./packages/docs/tsconfig.json" },
     { "path": "./packages/docs/tsconfig.spec.json" },
+    { "path": "./packages/join-codes/tsconfig.json" },
+    { "path": "./packages/join-codes/tsconfig.spec.json" },
     { "path": "./packages/service-api/tsconfig.json" },
     { "path": "./packages/service-api/tsconfig.spec.json" },
     { "path": "./packages/ts-compiler/tsconfig.json" },

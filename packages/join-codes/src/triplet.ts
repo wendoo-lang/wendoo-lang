@@ -3,8 +3,10 @@
  * Adventure Time-adjacent in vibe.
  */
 
+/** A source of random numbers in [0, 1), shaped like `Math.random`. */
 export type Rng = () => number;
 
+/** Words a triplet starts with. Every entry is lowercase ASCII letters. */
 export const FIRST_WORDS = [
   "alabaster",
   "amber",
@@ -323,6 +325,7 @@ export const FIRST_WORDS = [
   "shadowy",
 ] as const;
 
+/** Words a triplet has in the middle. Every entry is lowercase ASCII letters. */
 export const MIDDLE_WORDS = [
   "altar",
   "amulet",
@@ -606,6 +609,7 @@ export const MIDDLE_WORDS = [
   "pearl",
 ] as const;
 
+/** Words a triplet ends with. Every entry is lowercase ASCII letters. */
 export const LAST_WORDS = [
   "abyss",
   "altar",
@@ -885,6 +889,13 @@ function pick<T>(items: readonly T[]): T {
   return items[Math.floor(Math.random() * items.length)]!;
 }
 
+/**
+ * Returns a random triplet: one word each from {@link FIRST_WORDS},
+ * {@link MIDDLE_WORDS}, and {@link LAST_WORDS}, in that order, joined by `-`,
+ * for example `amber-anvil-abyss`. Draws with `Math.random`. While any two of
+ * the words are equal it draws all three again, at most 12 times, so a repeated
+ * word remains possible. Uniqueness is the caller's to check.
+ */
 export function generateTriplet(): string {
   let first = pick(FIRST_WORDS);
   let middle = pick(MIDDLE_WORDS);
