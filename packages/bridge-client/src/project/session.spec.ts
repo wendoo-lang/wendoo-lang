@@ -37,6 +37,10 @@ class MockWebSocket {
   simulateMessage(data: object): void {
     this.onmessage?.({ data: JSON.stringify(data) });
   }
+
+  simulateClose(): void {
+    this.onclose?.({});
+  }
 }
 
 function lastSocket(): MockWebSocket {
@@ -258,6 +262,62 @@ describe("ProjectSession", () => {
       assert.equal(session.status, "connected");
       assert.equal(session.sessionId, "s-2");
       assert.deepEqual(events.slice(-3), ["status:disconnected", "status:connecting", "status:connected"]);
+    });
+  });
+
+  describe("join code", () => {
+    /** Drops `ws`, lets the client reconnect, and returns the hello the new connection sends. */
+    function reconnectHello(ws: MockWebSocket): WsMessage | undefined {
+      ws.simulateClose();
+      mock.timers.tick(60_000);
+      const next = lastSocket();
+      assert.notEqual(next, ws);
+      next.simulateOpen();
+      return parseSent(next).find((msg) => msg.type === "session:hello");
+    }
+
+    it("presents on reconnect the join code a session:joinCode delivered", () => {
+      const session = createSession();
+      const ws = startSession(session);
+
+      ws.simulateMessage({ type: "session:joinCode", payload: { joinCode: "J-2" } });
+
+      assert.deepEqual(reconnectHello(ws)?.payload, { protocolVersion: PROTOCOL_VERSION, joinCode: "J-2" });
+      session.stop();
+    });
+
+    it("presents on reconnect the latest join code alongside the binding token it holds", () => {
+      const session = createSession();
+      const ws = startSession(session);
+      ws.simulateMessage({
+        type: "session:welcome",
+        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", joinCode: "J-1", bindingToken: "T-1" },
+      });
+
+      ws.simulateMessage({ type: "session:joinCode", payload: { joinCode: "J-3" } });
+
+      assert.deepEqual(reconnectHello(ws)?.payload, {
+        protocolVersion: PROTOCOL_VERSION,
+        bindingToken: "T-1",
+        sessionId: "s-1",
+        joinCode: "J-3",
+      });
+      session.stop();
+    });
+
+    it("keeps the constructor's join code when a welcome carrying another is rejected", () => {
+      const session = new ProjectSession<WsMessage, WsMessage>("app", "localhost:3000", {}, "J-0");
+      const rejectedSocket = startSession(session);
+      assert.equal((parseSent(rejectedSocket)[0]?.payload as { joinCode?: string } | undefined)?.joinCode, "J-0");
+
+      rejectedSocket.simulateMessage({
+        type: "session:welcome",
+        payload: { protocolVersion: PROTOCOL_VERSION + 1, joinCode: "J-9" },
+      });
+      const ws = startSession(session);
+
+      assert.equal((parseSent(ws)[0]?.payload as { joinCode?: string } | undefined)?.joinCode, "J-0");
+      session.stop();
     });
   });
 

@@ -114,6 +114,21 @@ client) and a `ServerMessage` union (sent by the bridge server to that client).
   `BridgeSessionErrorCode` in its `ErrorPayload.code`. `code` is optional and additive: an
   error without one keeps its existing meaning. A new failure adds a member whose JSDoc
   says who raises it.
+- `session:welcome` means "the session is connected"; when a relay sends it is relay
+  policy. The vscode-bridge relay welcomes a hello immediately. The Arcade relay
+  (pxt-wendoo `apps/bridge`) answers a hello with `session:joinCode` at once and welcomes
+  both members each time both roles of the pairing become bound: first when the pairing
+  forms, and again whenever a member binds back in, so a still-connected member receives
+  a further welcome on its open connection. A member returning with a binding token for
+  the session is a status change of the same session (same session id, join code, and
+  binding token). A hello for an occupied role without such a token is a new claimant:
+  it ends the session, closing every member's connection, and a new session with a new
+  session id and binding token opens under the same join code. A displaced member whose
+  role is vacant rejoins by presenting that code; one presenting it for the newcomer's
+  role is itself a new claimant. A session with no member also ends after a linger
+  timeout. Clients treat each welcome as "connected", refresh their connection-scoped
+  handshake on every welcome, and tolerate any of these timings, including a
+  `session:joinCode` that arrives before any welcome.
 - Role-specific message unions (`AppClientMessage`, `AppServerMessage`,
   `ExtensionClientMessage`, `ExtensionServerMessage`) aggregate shared + role-specific
   messages. Add new messages to the correct union(s).

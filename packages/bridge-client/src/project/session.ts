@@ -31,9 +31,14 @@ export interface SessionMeta {
 }
 
 /**
- * Session layer over {@link WsClient}: sends an initial `session:hello` on
- * connect, tracks the session id and binding token, and lets callers subscribe
- * to typed inbound messages.
+ * Session layer over {@link WsClient}: sends a `session:hello` on every
+ * connect, tracks the session id, binding token, and join code, and lets
+ * callers subscribe to typed inbound messages.
+ *
+ * Each hello presents the latest join code this session holds: the one passed
+ * to the constructor, replaced by any the bridge sends in an accepted
+ * `session:welcome` or in a `session:joinCode`, including when it reconnects
+ * after the bridge has ended the session that code belonged to.
  *
  * @typeParam TClient - Union of message types this side may send.
  * @typeParam TServer - Union of message types this side may receive.
@@ -51,6 +56,12 @@ export class ProjectSession<TClient extends WsMessage, TServer extends WsMessage
   private _joinCode: string | undefined;
   private _meta: SessionMeta;
 
+  /**
+   * @param wsPath - Path of the bridge endpoint to connect to.
+   * @param bridgeUrl - Bridge address as a host with an optional port.
+   * @param meta - Metadata that persists across reconnects.
+   * @param joinCode - Join code the first hello presents.
+   */
   constructor(wsPath: string, bridgeUrl: string, meta: SessionMeta, joinCode?: string) {
     this._wsPath = wsPath;
     this._bridgeUrl = bridgeUrl;
@@ -98,7 +109,7 @@ export class ProjectSession<TClient extends WsMessage, TServer extends WsMessage
     this._clientUnsubs.push(
       this._client.on("session:welcome", (msg: WsMessage) => {
         const payload = msg.payload as
-          | { protocolVersion?: number; sessionId?: string; bindingToken?: string }
+          | { protocolVersion?: number; sessionId?: string; bindingToken?: string; joinCode?: string }
           | undefined;
         if (payload?.protocolVersion !== PROTOCOL_VERSION) {
           this.fail(BridgeSessionErrorCode.PROTOCOL_VERSION_MISMATCH);
@@ -109,6 +120,15 @@ export class ProjectSession<TClient extends WsMessage, TServer extends WsMessage
         }
         if (payload?.bindingToken) {
           this._meta.bindingToken = payload.bindingToken;
+        }
+        if (payload?.joinCode) {
+          this._joinCode = payload.joinCode;
+        }
+      }),
+      this._client.on("session:joinCode", (msg: WsMessage) => {
+        const joinCode = (msg.payload as { joinCode?: string } | undefined)?.joinCode;
+        if (joinCode) {
+          this._joinCode = joinCode;
         }
       }),
       this._client.on("session:error", (msg: WsMessage) => {
