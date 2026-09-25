@@ -109,6 +109,18 @@ export class WsClient {
     }
   }
 
+  /**
+   * Sends `msg` on the open connection at once, ahead of any messages still
+   * queued. When called from {@link onOpen}, `msg` is the first frame of the
+   * new connection. Does nothing when the connection is not open; `msg` is
+   * never queued.
+   */
+  sendImmediate(msg: WsMessage): void {
+    if (this.state === "open" && this.ws) {
+      this.ws.send(JSON.stringify(msg));
+    }
+  }
+
   request(type: string, payload?: unknown, seq?: number): Promise<WsMessage> {
     const id = crypto.randomUUID();
     const msg: WsMessage = { type, id, payload, seq };

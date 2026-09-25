@@ -265,6 +265,53 @@ describe("ProjectSession", () => {
     });
   });
 
+  describe("wire order", () => {
+    const queued: readonly WsMessage[] = [
+      { type: "sample:first", payload: { n: 1 } },
+      { type: "sample:second", payload: { n: 2 } },
+      { type: "sample:third", payload: { n: 3 } },
+    ];
+
+    it("sends session:hello before the payloads sent while the first connection opens, in their order", () => {
+      const session = createSession();
+      session.start();
+      const ws = lastSocket();
+      for (const msg of queued) {
+        session.sendPayload(msg);
+      }
+
+      ws.simulateOpen();
+
+      const sent = parseSent(ws);
+      assert.equal(sent[0]?.type, "session:hello");
+      assert.deepEqual(sent.slice(1), queued);
+      session.stop();
+    });
+
+    it("sends session:hello before the payloads queued while reconnecting, in their order", () => {
+      const session = createSession();
+      const ws = startSession(session);
+      ws.simulateMessage({
+        type: "session:welcome",
+        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", joinCode: "J-1", bindingToken: "T-1" },
+      });
+      ws.simulateClose();
+      for (const msg of queued) {
+        session.sendPayload(msg);
+      }
+
+      mock.timers.tick(60_000);
+      const next = lastSocket();
+      assert.notEqual(next, ws);
+      next.simulateOpen();
+
+      const sent = parseSent(next);
+      assert.equal(sent[0]?.type, "session:hello");
+      assert.deepEqual(sent.slice(1), queued);
+      session.stop();
+    });
+  });
+
   describe("join code", () => {
     /** Drops `ws`, lets the client reconnect, and returns the hello the new connection sends. */
     function reconnectHello(ws: MockWebSocket): WsMessage | undefined {

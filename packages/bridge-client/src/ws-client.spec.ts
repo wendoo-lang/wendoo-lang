@@ -182,6 +182,35 @@ describe("WsClient", () => {
     });
   });
 
+  describe("sendImmediate", () => {
+    it("sends from onOpen ahead of the queued messages, which follow in order", () => {
+      const client = new WsClient();
+      const first: WsMessage = { type: "first" };
+      client.onOpen = () => {
+        client.sendImmediate(first);
+      };
+      client.connect("ws://localhost:9999");
+      const queued: WsMessage[] = [{ type: "a" }, { type: "b" }];
+      for (const m of queued) {
+        client.send(m);
+      }
+
+      lastSocket().simulateOpen();
+
+      assert.deepEqual(parseSent(lastSocket()), [first, ...queued]);
+    });
+
+    it("drops the message while connecting instead of queueing it", () => {
+      const client = new WsClient();
+      client.connect("ws://localhost:9999");
+      client.sendImmediate({ type: "dropped" });
+
+      lastSocket().simulateOpen();
+
+      assert.deepEqual(lastSocket().sent, []);
+    });
+  });
+
   // -----------------------------------------------------------------------
   // Queued messages sent upon connect (user-requested test)
   // -----------------------------------------------------------------------

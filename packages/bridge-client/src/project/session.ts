@@ -37,8 +37,9 @@ export interface SessionMeta {
 }
 
 /**
- * Session layer over {@link WsClient}: sends a `session:hello` on every
- * connect, tracks the session id, binding token, and join code, and lets
+ * Session layer over {@link WsClient}: sends a `session:hello` as the first
+ * frame of every connection, ahead of any messages queued while connecting or
+ * reconnecting, tracks the session id, binding token, and join code, and lets
  * callers subscribe to typed inbound messages.
  *
  * Each hello presents the latest join code this session holds: the one passed
@@ -81,7 +82,7 @@ export class ProjectSession<TClient extends WsMessage, TServer extends WsMessage
         if (this._meta.bindingToken) payload.bindingToken = this._meta.bindingToken;
         if (this._sessionId) payload.sessionId = this._sessionId;
         if (this._joinCode) payload.joinCode = this._joinCode;
-        this.send({ type: "session:hello", payload } as TClient);
+        this._client!.sendImmediate({ type: "session:hello", payload });
       }
     });
   }
