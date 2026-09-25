@@ -181,9 +181,17 @@ reconnect.
   assistant-content gating ride host-attested channels and
   point-of-use allowlists, outside this system.
 - Kid-facing resilience governs every surface here: mistakes are
-  diagnosed with stable codes and the system soldiers on; the only
-  hard stops are the version rejection and SESSION_REPLACED, both of
-  which name their remedy.
+  diagnosed with stable codes and the system soldiers on. The only
+  hard stops are the version rejection, SESSION_REPLACED, and an
+  endpoint discarding an outbound backlog that outgrew its bound
+  while its connection was down; each carries a stable code and a
+  remedy.
+- Recovery is always in place: no failure leaves an endpoint needing
+  an application reload to work again. Every terminal signal leaves
+  the endpoint's client able to start again in place and reach a
+  working session; the hold after SESSION_REPLACED forbids AUTOMATIC
+  reconnection, not the recovery path itself. The one exception is
+  the version rejection, whose remedy is updating the outdated party.
 
 ## Open re-derivations
 

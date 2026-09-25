@@ -60,7 +60,8 @@ src/
   reports it, before closing the connection, to a connection displaced by a new claimant
   for its role (the session ends) or by the same member returning with the session's
   binding token (the session continues under the returning connection). It never goes to
-  the other role's member.
+  the other role's member. `OUTBOUND_QUEUE_OVERFLOW` is raised by a client that queued more
+  outbound messages than it holds while its connection was not open; no one sends it.
 - `ErrorPayload` -- payload of `session:error` and `error`: a prose `message` and an
   optional `code` (`BridgeSessionErrorCode`).
 - The folder-host session's and the peer-session mechanism's types, constants, and

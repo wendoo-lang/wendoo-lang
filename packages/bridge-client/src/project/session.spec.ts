@@ -438,6 +438,76 @@ describe("ProjectSession", () => {
     });
   });
 
+  describe("outbound queue overflow", () => {
+    /** Messages a session's connection holds while it is down. */
+    const QUEUE_CAPACITY = 1000;
+
+    /** Opens a connection that the bridge welcomes with a join code and binding token, then drops it. */
+    function startWelcomedThenDropped(session: ProjectSession<WsMessage, WsMessage>): MockWebSocket {
+      const ws = startSession(session);
+      ws.simulateMessage({
+        type: "session:welcome",
+        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", joinCode: "J-1", bindingToken: "T-1" },
+      });
+      ws.simulateClose();
+      return ws;
+    }
+
+    /** Sends one more payload than the connection holds while it is down. */
+    function overflowQueue(session: ProjectSession<WsMessage, WsMessage>): void {
+      for (let n = 0; n <= QUEUE_CAPACITY; n++) {
+        session.sendPayload({ type: "sample:note", payload: { n } });
+      }
+    }
+
+    it("ends the session with OUTBOUND_QUEUE_OVERFLOW when more is sent while reconnecting than the queue holds", () => {
+      const session = createSession();
+      startWelcomedThenDropped(session);
+      const events = recordEvents(session);
+
+      overflowQueue(session);
+      mock.timers.tick(60_000);
+
+      assert.deepEqual(
+        { events, status: session.status, sockets: MockWebSocket.instances.length },
+        {
+          events: [`error:${BridgeSessionErrorCode.OUTBOUND_QUEUE_OVERFLOW}`, "status:disconnected"],
+          status: "disconnected",
+          sockets: 1,
+        }
+      );
+      assert.throws(() => session.sendPayload({ type: "sample:note" }));
+    });
+
+    it("starts again in place after an overflow, presenting the credentials it holds", () => {
+      const session = createSession();
+      const received: WsMessage[] = [];
+      session.onPayload((msg) => {
+        received.push(msg);
+      });
+      startWelcomedThenDropped(session);
+      overflowQueue(session);
+
+      const ws = startSession(session);
+      ws.simulateMessage({ type: "session:welcome", payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1" } });
+      const outbound = { type: "sample:note", payload: { n: "after" } };
+      session.sendPayload(outbound);
+      const inbound = { type: "sample:note", payload: { n: "from peer" } };
+      ws.simulateMessage(inbound);
+
+      assert.equal(session.status, "connected");
+      assert.deepEqual(parseSent(ws), [
+        {
+          type: "session:hello",
+          payload: { protocolVersion: PROTOCOL_VERSION, bindingToken: "T-1", sessionId: "s-1", joinCode: "J-1" },
+        },
+        outbound,
+      ]);
+      assert.deepEqual(received, [inbound]);
+      session.stop();
+    });
+  });
+
   describe("counterpart away", () => {
     it("emits counterpartAway and leaves the connection, join code, and binding token in place", () => {
       const session = createSession();
@@ -476,6 +546,30 @@ describe("ProjectSession", () => {
         joinCode: "J-1",
       });
       session.stop();
+    });
+  });
+
+  describe("stop", () => {
+    it("never reports connected after being stopped while connecting, and the socket sends nothing", () => {
+      const session = createSession();
+      session.start();
+      const ws = lastSocket();
+      const events = recordEvents(session);
+
+      session.stop();
+      ws.simulateOpen();
+      mock.timers.tick(60_000);
+
+      assert.deepEqual(
+        {
+          events,
+          status: session.status,
+          sent: parseSent(ws),
+          closed: ws.closed,
+          sockets: MockWebSocket.instances.length,
+        },
+        { events: ["status:disconnected"], status: "disconnected", sent: [], closed: true, sockets: 1 }
+      );
     });
   });
 });

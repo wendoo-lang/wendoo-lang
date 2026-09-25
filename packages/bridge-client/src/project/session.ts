@@ -110,6 +110,9 @@ export class ProjectSession<TClient extends WsMessage, TServer extends WsMessage
     this._client.onMessage = (msg) => {
       this.deliverPayload(msg);
     };
+    this._client.onQueueOverflow = () => {
+      this.fail(BridgeSessionErrorCode.OUTBOUND_QUEUE_OVERFLOW);
+    };
     this.setStatus("connecting");
     // Registered ahead of the caller's handlers: ending the session removes
     // every handler, so a rejected welcome or a coded error reaches no other.

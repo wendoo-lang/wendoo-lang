@@ -61,6 +61,31 @@ function parseSent(ws: MockWebSocket): WsMessage[] {
   return ws.sent.map((raw) => JSON.parse(raw) as WsMessage);
 }
 
+/**
+ * Records every call `client` makes to its callbacks and to a listener for
+ * `greeting`, in order, as `onOpen`, `onDisconnect`, `onQueueOverflow`,
+ * `onMessage:<type>`, and `listener:<type>`.
+ */
+function recordCallbacks(client: WsClient): string[] {
+  const calls: string[] = [];
+  client.onOpen = () => {
+    calls.push("onOpen");
+  };
+  client.onDisconnect = () => {
+    calls.push("onDisconnect");
+  };
+  client.onQueueOverflow = () => {
+    calls.push("onQueueOverflow");
+  };
+  client.onMessage = (msg) => {
+    calls.push(`onMessage:${msg.type}`);
+  };
+  client.on("greeting", (msg) => {
+    calls.push(`listener:${msg.type}`);
+  });
+  return calls;
+}
+
 // ---------------------------------------------------------------------------
 // Test suite
 // ---------------------------------------------------------------------------
@@ -125,6 +150,17 @@ describe("WsClient", () => {
       assert.equal(MockWebSocket.instances.length, 1);
     });
 
+    it("ignores connect() after close()", () => {
+      const client = new WsClient();
+      client.connect("ws://localhost:9999");
+      lastSocket().simulateOpen();
+      client.close();
+
+      client.connect("ws://localhost:9999");
+      assert.equal(client.connectionState, "closed");
+      assert.equal(MockWebSocket.instances.length, 1);
+    });
+
     it("transitions to closed and closes socket on close()", () => {
       const client = new WsClient();
       client.connect("ws://localhost:9999");
@@ -134,6 +170,72 @@ describe("WsClient", () => {
       client.close();
       assert.equal(client.connectionState, "closed");
       assert.ok(ws.closed);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // close() on a socket that has not opened yet
+  // -----------------------------------------------------------------------
+
+  describe("close() before the socket opens", () => {
+    /**
+     * Drives `ws` through everything a socket can do after its client closed --
+     * open, deliver a message, two heartbeat intervals, drop, and a reconnect
+     * window -- and returns what `client` and the wire showed for it.
+     */
+    function afterSocketActivity(client: WsClient, ws: MockWebSocket, calls: string[]) {
+      ws.simulateOpen();
+      ws.simulateMessage({ type: "greeting" });
+      mock.timers.tick(200);
+      ws.simulateClose();
+      mock.timers.tick(1000);
+      return {
+        closed: ws.closed,
+        sent: parseSent(ws),
+        calls,
+        state: client.connectionState,
+        sockets: MockWebSocket.instances.length,
+      };
+    }
+
+    it("closes the socket still connecting, which then sends nothing and reaches no callback", () => {
+      const client = new WsClient({ initialReconnectDelay: 10, heartbeatInterval: 100 });
+      const calls = recordCallbacks(client);
+      client.connect("ws://localhost:9999");
+      client.send({ type: "queued" });
+      const ws = lastSocket();
+
+      client.close();
+
+      assert.deepEqual(afterSocketActivity(client, ws, calls), {
+        closed: true,
+        sent: [],
+        calls: [],
+        state: "closed",
+        sockets: 1,
+      });
+    });
+
+    it("closes the retry socket in flight while reconnecting, which then sends nothing and reaches no callback", () => {
+      const client = new WsClient({ initialReconnectDelay: 10, heartbeatInterval: 100 });
+      client.connect("ws://localhost:9999");
+      lastSocket().simulateOpen();
+      lastSocket().simulateClose();
+      const calls = recordCallbacks(client);
+      client.send({ type: "queued" });
+      mock.timers.tick(10);
+      const retry = lastSocket();
+      assert.equal(MockWebSocket.instances.length, 2, "retry socket opened");
+
+      client.close();
+
+      assert.deepEqual(afterSocketActivity(client, retry, calls), {
+        closed: true,
+        sent: [],
+        calls: [],
+        state: "closed",
+        sockets: 2,
+      });
     });
   });
 
@@ -275,6 +377,32 @@ describe("WsClient", () => {
       assert.equal(sent.length, 2);
       assert.equal(sent[0]!.type, "first");
       assert.equal(sent[1]!.type, "second");
+    });
+  });
+
+  describe("queue overflow", () => {
+    it("closes, then calls onQueueOverflow once, when a send would grow the queue past maxQueueSize", () => {
+      const client = new WsClient({ initialReconnectDelay: 10, maxQueueSize: 2 });
+      client.connect("ws://localhost:9999");
+      lastSocket().simulateOpen();
+      lastSocket().simulateClose();
+      const calls = recordCallbacks(client);
+      client.onQueueOverflow = () => {
+        calls.push(`onQueueOverflow:${client.connectionState}`);
+        client.send({ type: "sent-from-callback" });
+      };
+      client.send({ type: "first" });
+      client.send({ type: "second" });
+      assert.deepEqual(calls, [], "a full queue is not yet an overflow");
+
+      client.send({ type: "third" });
+      client.send({ type: "fourth" });
+      mock.timers.tick(1000);
+
+      assert.deepEqual(
+        { calls, state: client.connectionState, sockets: MockWebSocket.instances.length },
+        { calls: ["onQueueOverflow:closed"], state: "closed", sockets: 1 }
+      );
     });
   });
 

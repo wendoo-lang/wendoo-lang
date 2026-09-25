@@ -17,7 +17,8 @@ every resource as something that must eventually be reclaimed.
 ## Tech Stack
 
 Hono (HTTP + WS), @hono/node-ws, pino (logging), zod (env validation),
-`@wendoo/bridge-protocol` (shared message types & schemas), Biome.
+`@wendoo/bridge-protocol` (shared message types & schemas), `@wendoo/join-codes`
+(join-code generator), Biome.
 
 ## Path Aliases (Node.js subpath imports)
 
@@ -101,9 +102,9 @@ validated by zod in `config/env.ts`). Verified with timing-safe comparison.
 
 ### Join Codes
 
-Each `AppSession` gets a unique three-word fantasy slug (`src/triplet.ts`). Tracked in a
-Set for uniqueness, refreshed every 10 minutes. On refresh, clients receive a
-`session:joinCode` push.
+Each `AppSession` gets a unique three-word fantasy slug (`generateTriplet` from
+`@wendoo/join-codes`). Tracked in a Set for uniqueness, refreshed every 10 minutes. On
+refresh, clients receive a `session:joinCode` push.
 
 ### Pending Requests
 

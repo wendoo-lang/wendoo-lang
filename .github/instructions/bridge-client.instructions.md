@@ -42,7 +42,13 @@ src/
 ## Key Exports
 
 - `WsClient` -- auto-reconnect WebSocket client (exponential backoff, request/response
-  correlation via `id`, event listeners, message queuing during reconnect)
+  correlation via `id`, event listeners, message queuing while connecting or reconnecting,
+  flushed in order on open). `sendImmediate` sends on an open connection ahead of the queue
+  and never queues; called from `onOpen`, its message is the connection's first frame.
+  `close()` is final: it closes the socket, open or still connecting, and discards the queue;
+  the client then sends nothing, opens no socket, and fires no callback or listener, and
+  `connect()` does nothing. A send that would grow the queue past `maxQueueSize` (default
+  1000) closes the client the same way and then calls `onQueueOverflow`, its last callback.
 - `ErrorCode` / `ProtocolError` -- error constants and typed error class
 - `FileSystem` / `NotifyingFileSystem` -- in-memory filesystem with change notifications
 - `Project` -- entry point. Constructed with `ProjectOptions`, owns Session + Files.
@@ -88,22 +94,27 @@ Three layers of message handling:
      token are unaffected; the next accepted `session:welcome` means the counterpart is
      connected again.
 
-Session handshake: on connect, sends `session:hello` declaring `PROTOCOL_VERSION`; the server
-responds with `session:welcome` (protocolVersion, sessionId, joinCode, bindingToken). Each hello
-presents the latest join code the session holds: the one passed to the constructor, replaced by
-any the bridge sends in an accepted `session:welcome` or in a `session:joinCode`.
+Session handshake: every connection's first frame is a `session:hello` declaring
+`PROTOCOL_VERSION`, sent via `sendImmediate`; messages sent while connecting or reconnecting
+follow it in the order they were sent. The server responds with `session:welcome`
+(protocolVersion, sessionId, joinCode, bindingToken). Each hello presents the latest join code
+the session holds: the one passed to the constructor, replaced by any the bridge sends in an
+accepted `session:welcome` or in a `session:joinCode`.
 
-A session ends on either failure:
+A session ends on any of these failures:
 
 - A `session:welcome` declaring no protocol version, or one other than `PROTOCOL_VERSION`:
   `BridgeSessionErrorCode.PROTOCOL_VERSION_MISMATCH`.
 - A `session:error` whose payload carries a `code`: that code. A `session:error` without a
   code leaves the session open.
+- The `WsClient` queue overflowing while the connection is not open:
+  `BridgeSessionErrorCode.OUTBOUND_QUEUE_OVERFLOW`. The queued messages are discarded and
+  nothing is sent.
 
-On either, the session sends `session:goodbye`, closes the connection without reconnecting,
-emits `"error"`, then `"status"` `"disconnected"`. The failing message reaches no `on`
-handler, and nothing in a rejected welcome is adopted. A later `start()` opens a new
-session.
+On a failing message, the session sends `session:goodbye`; on any failure, it closes the
+connection without reconnecting, emits `"error"`, then `"status"` `"disconnected"`. The
+failing message reaches no `on` handler, and nothing in a rejected welcome is adopted. A
+later `start()` opens a new session.
 
 ## ProjectFiles
 

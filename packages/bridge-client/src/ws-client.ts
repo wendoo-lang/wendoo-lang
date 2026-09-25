@@ -45,6 +45,13 @@ export class WsClient {
   onOpen?: () => void;
   onDisconnect?: () => void;
   /**
+   * Called once when a send would grow the queue of messages awaiting an open
+   * connection past `maxQueueSize`, after the client has closed itself as
+   * {@link close} does, discarding that message and every queued one. It is
+   * the last callback the client calls.
+   */
+  onQueueOverflow?: () => void;
+  /**
    * Called with every inbound message that is not a reply to a pending
    * {@link request}, after the listeners registered for its type.
    */
@@ -73,7 +80,7 @@ export class WsClient {
   }
 
   connect(url: string): void {
-    if (this.state === "open" || this.state === "connecting") {
+    if (this.state === "open" || this.state === "connecting" || this.state === "closed") {
       return;
     }
     this.url = url;
@@ -81,11 +88,18 @@ export class WsClient {
     this.openSocket();
   }
 
+  /**
+   * Stops the client for good: closes its socket, whether open or still
+   * connecting, rejects pending requests, and discards queued messages. From
+   * then on the client sends nothing, opens no socket, changes no state, and
+   * calls no callback or listener; `connect()` does nothing.
+   */
   close(): void {
     this.state = "closed";
     this.stopHeartbeat();
     this.clearReconnectTimer();
     this.rejectAllPending(new Error("client closed"));
+    this.queuedMessages.length = 0;
     this.ws?.close();
     this.ws = undefined;
   }
@@ -170,9 +184,10 @@ export class WsClient {
       this.handleDisconnect();
       return;
     }
+    this.ws = ws;
 
     ws.onopen = () => {
-      this.ws = ws;
+      if (this.state === "closed") return;
       this.state = "open";
       this.reconnectDelay = this.initialReconnectDelay;
       this.startHeartbeat();
@@ -181,6 +196,7 @@ export class WsClient {
     };
 
     ws.onmessage = (event: MessageEvent) => {
+      if (this.state === "closed") return;
       // Any received message counts as proof of life.
       this.missedHeartbeats = 0;
       let msg: WsMessage;
@@ -276,11 +292,9 @@ export class WsClient {
   }
 
   private enqueue(msg: WsMessage): void {
-    // Kill-switch: if the queue grows beyond the limit, the connection is
-    // unrecoverably behind. Drop all queued messages and force-close.
     if (this.queuedMessages.length >= this.maxQueueSize) {
-      this.queuedMessages.length = 0;
       this.close();
+      this.onQueueOverflow?.();
       return;
     }
     this.queuedMessages.push(msg);

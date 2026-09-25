@@ -41,8 +41,9 @@ export interface AppBridge {
    * Send a payload message to the peer verbatim. The message's type must lie
    * outside the bridge protocol's namespaces (`BRIDGE_PROTOCOL_NAMESPACES` in
    * `@wendoo/bridge-protocol`). A message sent while the connection is
-   * reconnecting is queued and sent once it reopens. Throws when the bridge is
-   * not started or its session has ended.
+   * reconnecting is queued and sent once it reopens; one that overflows the
+   * queue ends the session with `BridgeSessionErrorCode.OUTBOUND_QUEUE_OVERFLOW`.
+   * Throws when the bridge is not started or its session has ended.
    */
   sendPayload(message: WsMessage): void;
   /**

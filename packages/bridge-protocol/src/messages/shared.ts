@@ -19,6 +19,12 @@ export const BridgeSessionErrorCode = {
    * (the session continues under the returning connection).
    */
   SESSION_REPLACED: "BRIDGE_SESSION_SESSION_REPLACED",
+  /**
+   * This side queued more outbound messages than it holds while its
+   * connection was not open, so it discarded them and ended the session.
+   * Raised by a client; never sent in a `session:error`.
+   */
+  OUTBOUND_QUEUE_OVERFLOW: "BRIDGE_SESSION_OUTBOUND_QUEUE_OVERFLOW",
 } as const;
 
 /** Union of all {@link BridgeSessionErrorCode} values. */
