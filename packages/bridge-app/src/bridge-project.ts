@@ -6,6 +6,8 @@ import { CompilationManager, type CompilationProvider } from "./compilation.js";
 /** Options for {@link BridgeProject}. */
 export interface BridgeProjectOptions {
   bridgeUrl: string;
+  /** Path of the bridge endpoint to connect to. Defaults to `"app"`. */
+  wsPath?: string;
   initialFileSnapshot: FileSystemSnapshot;
   /** Token used to rebind to a previously established session. */
   bindingToken?: string;
@@ -27,7 +29,7 @@ export class BridgeProject extends Project<AppClientMessage, AppServerMessage> {
   constructor(options: BridgeProjectOptions) {
     const projectOptions: ProjectOptions<AppClientMessage, AppServerMessage> = {
       ...options,
-      wsPath: "app",
+      wsPath: options.wsPath ?? "app",
     };
     super(projectOptions);
     this.wireJoinCode();

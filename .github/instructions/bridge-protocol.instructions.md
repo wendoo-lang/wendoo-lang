@@ -2,7 +2,7 @@
 applyTo: "packages/bridge-protocol/**"
 ---
 
-<!-- Last reviewed: 2026-09-24 -->
+<!-- Last reviewed: 2026-09-25 -->
 
 # bridge-protocol -- Rules & Patterns
 
@@ -54,7 +54,9 @@ src/
   is the text before its first `:`, or the whole type when it has none.
 - `BridgeSessionErrorCode` -- constant object plus union type of the stable codes of
   bridge-session failures. `PROTOCOL_VERSION_MISMATCH` covers both directions: a client
-  refusing its bridge's welcome, and a bridge refusing a client's hello.
+  refusing its bridge's welcome, and a bridge refusing a client's hello. `SESSION_REPLACED`
+  is reported by a bridge to the member a new claimant for its role displaced, before it
+  closes that member's connection.
 - `ErrorPayload` -- payload of `session:error` and `error`: a prose `message` and an
   optional `code` (`BridgeSessionErrorCode`).
 - The folder-host session's and the peer-session mechanism's types, constants, and
@@ -84,6 +86,7 @@ client) and a `ServerMessage` union (sent by the bridge server to that client).
 |---|---|---|
 | `session:welcome` | server -> client | Session confirmation (sessionId, joinCode, bindingToken) |
 | `session:joinCode` | server -> client | Updated join code |
+| `session:counterpartAway` | server -> client | The session's counterpart disconnected; the session stays open |
 | `compile:diagnostics` | client -> server | Per-file diagnostic list |
 | `compile:status` | client -> server | Compilation result summary |
 
@@ -98,7 +101,10 @@ client) and a `ServerMessage` union (sent by the bridge server to that client).
 
 ## Rules
 
-- Types-and-schemas-only package. No runtime logic, no side effects.
+- Types-and-schemas-only package. No runtime logic, no side effects. The package declares
+  `"sideEffects": false`, so bundlers drop any module whose exports go unused; top-level
+  statements are imports, exports, and declarations with literal or schema-building
+  initializers.
 - All exports go through `src/index.ts`. Consumers import from
   `@wendoo/bridge-protocol`.
 - Use `import type` for type-only imports.
@@ -129,6 +135,11 @@ client) and a `ServerMessage` union (sent by the bridge server to that client).
   timeout. Clients treat each welcome as "connected", refresh their connection-scoped
   handshake on every welcome, and tolerate any of these timings, including a
   `session:joinCode` that arrives before any welcome.
+- `session:counterpartAway` is the inverse of the welcome: "your session's counterpart
+  disconnected". It carries no payload, and it is a status change of a live session, never
+  its end: the receiver keeps its connection, join code, and binding token, and the next
+  welcome means the counterpart is connected again. When a relay sends it is relay policy;
+  the vscode-bridge relay does not send it.
 - Role-specific message unions (`AppClientMessage`, `AppServerMessage`,
   `ExtensionClientMessage`, `ExtensionServerMessage`) aggregate shared + role-specific
   messages. Add new messages to the correct union(s).

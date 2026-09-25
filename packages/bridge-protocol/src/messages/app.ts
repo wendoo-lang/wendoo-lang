@@ -5,6 +5,7 @@ import type {
   FilesystemChangeMessage,
   FilesystemSyncMessage,
   GeneralErrorMessage,
+  SessionCounterpartAwayMessage,
   SessionErrorMessage,
   SessionGoodbyeMessage,
   SessionHelloMessage,
@@ -52,6 +53,7 @@ export interface AppSessionJoinCodeMessage {
 export type AppServerMessage =
   | AppSessionWelcomeMessage
   | AppSessionJoinCodeMessage
+  | SessionCounterpartAwayMessage
   | SessionErrorMessage
   | ControlPongMessage
   | GeneralErrorMessage

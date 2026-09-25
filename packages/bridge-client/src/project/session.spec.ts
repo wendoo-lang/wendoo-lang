@@ -345,6 +345,33 @@ describe("ProjectSession", () => {
       assert.equal(MockWebSocket.instances.length, 1);
     });
 
+    it("ends the session without reconnecting when the bridge reports SESSION_REPLACED and closes the socket", () => {
+      const session = createSession();
+      const ws = startSession(session);
+      ws.simulateMessage({
+        type: "session:welcome",
+        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", joinCode: "J-1", bindingToken: "T-1" },
+      });
+      const events = recordEvents(session);
+      const errors: WsMessage[] = [];
+      session.on("session:error", (msg) => {
+        errors.push(msg);
+      });
+
+      ws.simulateMessage({
+        type: "session:error",
+        payload: { message: "replaced", code: BridgeSessionErrorCode.SESSION_REPLACED },
+      });
+      ws.simulateClose();
+      mock.timers.tick(60_000);
+
+      assert.deepEqual(events, [`error:${BridgeSessionErrorCode.SESSION_REPLACED}`, "status:disconnected"]);
+      assert.deepEqual(errors, []);
+      assert.equal(parseSent(ws).at(-1)?.type, "session:goodbye");
+      assert.equal(ws.closed, true);
+      assert.equal(MockWebSocket.instances.length, 1);
+    });
+
     it("keeps the session open on a session:error without a code", () => {
       const session = createSession();
       const ws = startSession(session);
@@ -361,6 +388,47 @@ describe("ProjectSession", () => {
       assert.deepEqual(errors, [uncoded]);
       assert.equal(session.status, "connected");
       assert.equal(ws.closed, false);
+    });
+  });
+
+  describe("counterpart away", () => {
+    it("emits counterpartAway and leaves the connection, join code, and binding token in place", () => {
+      const session = createSession();
+      const ws = startSession(session);
+      ws.simulateMessage({
+        type: "session:welcome",
+        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", joinCode: "J-1", bindingToken: "T-1" },
+      });
+      const events = recordEvents(session);
+      let awayCount = 0;
+      session.addEventListener("counterpartAway", () => {
+        awayCount++;
+      });
+      const payloads: WsMessage[] = [];
+      session.onPayload((msg) => {
+        payloads.push(msg);
+      });
+
+      ws.simulateMessage({ type: "session:counterpartAway" });
+
+      assert.equal(awayCount, 1);
+      assert.deepEqual(events, []);
+      assert.deepEqual(payloads, []);
+      assert.equal(session.status, "connected");
+      assert.equal(session.sessionId, "s-1");
+      assert.equal(ws.closed, false);
+
+      ws.simulateClose();
+      mock.timers.tick(60_000);
+      const next = lastSocket();
+      next.simulateOpen();
+      assert.deepEqual(parseSent(next).find((msg) => msg.type === "session:hello")?.payload, {
+        protocolVersion: PROTOCOL_VERSION,
+        bindingToken: "T-1",
+        sessionId: "s-1",
+        joinCode: "J-1",
+      });
+      session.stop();
     });
   });
 });

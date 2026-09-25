@@ -2,13 +2,14 @@
 applyTo: "packages/bridge-client/**"
 ---
 
-<!-- Last reviewed: 2026-09-24 -->
+<!-- Last reviewed: 2026-09-25 -->
 
 # bridge-client -- Rules & Patterns
 
-Client-side SDK for vscode-bridge communication: WebSocket lifecycle, in-memory
-filesystem, and bidirectional sync. Consumed by `bridge-app`, `apps/ecosim`, and
-`apps/vscode-extension`. Message types and schemas live in `bridge-protocol`.
+Client-side SDK for talking to a Wendoo bridge relay: WebSocket lifecycle,
+in-memory filesystem, and bidirectional sync. Consumed by `bridge-app`,
+`apps/ecosim`, and `apps/vscode-extension`. Message types and schemas live in
+`bridge-protocol`.
 
 ## Build & Scripts
 
@@ -82,9 +83,15 @@ Three layers of message handling:
    - `"status"` (`ConnectionStatus`). Deduplicated: does not fire if the value is unchanged.
    - `"error"` (`BridgeSessionErrorCode`) -- the stable code of the failure that ended the
      session. Fires before `"status"` becomes `"disconnected"`.
+   - `"counterpartAway"` (no value) -- the bridge sent `session:counterpartAway`: the
+     session's counterpart disconnected. The session, its connection, join code, and binding
+     token are unaffected; the next accepted `session:welcome` means the counterpart is
+     connected again.
 
 Session handshake: on connect, sends `session:hello` declaring `PROTOCOL_VERSION`; the server
-responds with `session:welcome` (protocolVersion, sessionId, joinCode, bindingToken).
+responds with `session:welcome` (protocolVersion, sessionId, joinCode, bindingToken). Each hello
+presents the latest join code the session holds: the one passed to the constructor, replaced by
+any the bridge sends in an accepted `session:welcome` or in a `session:joinCode`.
 
 A session ends on either failure:
 

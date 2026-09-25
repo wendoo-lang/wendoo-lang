@@ -60,6 +60,7 @@ export type {
   FilesystemChangeMessage,
   FilesystemSyncMessage,
   GeneralErrorMessage,
+  SessionCounterpartAwayMessage,
   SessionErrorMessage,
   SessionGoodbyeMessage,
   SessionHelloMessage,

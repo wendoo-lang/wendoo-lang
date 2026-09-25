@@ -12,11 +12,22 @@ import type {
   ProjectFileSnapshot,
   ProjectFileSystem,
 } from "@wendoo/bridge-app";
+import * as root from "@wendoo/bridge-app";
 import {
   createCompilationFeature,
   type DiagnosticSnapshot,
   type ProjectFileCompiler,
 } from "@wendoo/bridge-app/compilation";
+import {
+  connectPeerSession,
+  type PeerSession,
+  PeerSessionError,
+  PeerSessionErrorCode,
+  type PeerSessionHelloMessage,
+  type PeerSessionKind,
+  type PeerSessionOptions,
+  type PeerSessionPort,
+} from "@wendoo/bridge-app/peer-session";
 
 type RootContracts = [
   AppBridge,
@@ -32,8 +43,23 @@ type RootContracts = [
 
 type CompilationContracts = [DiagnosticEntry, DiagnosticSnapshot, ProjectFileCompiler];
 
+type PeerSessionContracts = [
+  PeerSession<{ type: "sample:note" }>,
+  PeerSessionHelloMessage<"sample">,
+  PeerSessionKind<"sample">,
+  PeerSessionOptions<"sample", { type: "sample:note" }>,
+  PeerSessionPort<{ type: string }>,
+];
+
 void (0 as unknown as RootContracts);
 void (0 as unknown as CompilationContracts);
+void (0 as unknown as PeerSessionContracts);
+
+test("the peer-session entry point exports the mechanism the root exports", () => {
+  assert.equal(connectPeerSession, root.connectPeerSession);
+  assert.equal(PeerSessionError, root.PeerSessionError);
+  assert.equal(PeerSessionErrorCode, root.PeerSessionErrorCode);
+});
 
 function createDiagnostic(message: string): DiagnosticEntry {
   return {

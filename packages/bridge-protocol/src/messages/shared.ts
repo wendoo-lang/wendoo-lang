@@ -10,6 +10,12 @@ export const BridgeSessionErrorCode = {
    * that does not support the version a client's `session:hello` declared.
    */
   PROTOCOL_VERSION_MISMATCH: "BRIDGE_SESSION_PROTOCOL_VERSION_MISMATCH",
+  /**
+   * A new claimant for this side's role replaced it, ending the session.
+   * Reported by a bridge to the member it displaces, on the connection it then
+   * closes.
+   */
+  SESSION_REPLACED: "BRIDGE_SESSION_SESSION_REPLACED",
 } as const;
 
 /** Union of all {@link BridgeSessionErrorCode} values. */
@@ -86,6 +92,15 @@ export interface SessionHelloMessage {
   type: "session:hello";
   id?: string;
   payload?: SessionHelloPayload;
+}
+
+/**
+ * Sent by a bridge to tell a member that its session's counterpart has
+ * disconnected. The session stays open and keeps its join code and binding
+ * token; the next `session:welcome` means the counterpart is connected again.
+ */
+export interface SessionCounterpartAwayMessage {
+  type: "session:counterpartAway";
 }
 
 /** Sent by a client to gracefully end the session. */

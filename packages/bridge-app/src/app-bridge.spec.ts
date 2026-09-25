@@ -569,6 +569,63 @@ describe("createAppBridge", () => {
     assert.deepEqual(bridge.snapshot(), { status: "connected", joinCode: "JOIN-1", errorCode: undefined });
   });
 
+  it("connects to the app endpoint unless a wsPath is given", () => {
+    createBridge(new MemoryProjectFileSystem()).start();
+    const defaultUrl = lastSocket().url;
+
+    createAppBridge({
+      bridgeUrl: "localhost:3000",
+      wsPath: "sample/editor",
+      filesystem: new MemoryProjectFileSystem(),
+    }).start();
+
+    assert.equal(defaultUrl, "ws://localhost:3000/app");
+    assert.equal(lastSocket().url, "ws://localhost:3000/sample/editor");
+  });
+
+  it("reports a counterpart away until the next welcome, keeping the connection, join code, and token", () => {
+    const tokens: string[] = [];
+    const bridge = createAppBridge({
+      bridgeUrl: "localhost:3000",
+      filesystem: new MemoryProjectFileSystem(),
+      onBindingTokenChange: (token) => {
+        tokens.push(token);
+      },
+    });
+    const snapshots: AppBridgeSnapshot[] = [];
+    bridge.onStateChange(() => {
+      snapshots.push(bridge.snapshot());
+    });
+    bridge.start();
+    const socket = lastSocket();
+    socket.simulateOpen();
+    socket.simulateMessage({
+      type: "session:welcome",
+      payload: { protocolVersion: 1, sessionId: "session-1", joinCode: "JOIN-1", bindingToken: "token-1" },
+    });
+    const before = snapshots.length;
+
+    socket.simulateMessage({ type: "session:counterpartAway" });
+
+    assert.deepEqual(snapshots.slice(before), [
+      { status: "connected", joinCode: "JOIN-1", errorCode: undefined, counterpartAway: true },
+    ]);
+    assert.equal(socket.closed, false);
+    assert.deepEqual(tokens, ["token-1"]);
+
+    socket.simulateMessage({
+      type: "session:welcome",
+      payload: { protocolVersion: 1, sessionId: "session-1", joinCode: "JOIN-1", bindingToken: "token-1" },
+    });
+
+    assert.deepEqual(bridge.snapshot(), { status: "connected", joinCode: "JOIN-1", errorCode: undefined });
+
+    socket.simulateMessage({ type: "session:counterpartAway" });
+    bridge.stop();
+
+    assert.deepEqual(bridge.snapshot(), { status: "disconnected", joinCode: undefined, errorCode: undefined });
+  });
+
   it("carries a peer session bound over its payload messages", async () => {
     const bridge = createBridge(new MemoryProjectFileSystem());
     const port: PeerSessionPort<SampleMessage> = {

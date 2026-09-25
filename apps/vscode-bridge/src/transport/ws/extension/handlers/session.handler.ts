@@ -3,7 +3,7 @@ import type {
   ExtensionSessionWelcomeMessage,
   SessionErrorMessage,
 } from "@wendoo/bridge-protocol";
-import { PROTOCOL_VERSION, sessionHelloPayloadSchema } from "@wendoo/bridge-protocol";
+import { BridgeSessionErrorCode, PROTOCOL_VERSION, sessionHelloPayloadSchema } from "@wendoo/bridge-protocol";
 import { createBindingToken } from "#core/binding-token.js";
 import { logger } from "#core/logging/logger.js";
 import {
@@ -50,9 +50,13 @@ const hello: WsHandler = (ws, payload, id) => {
       id,
       payload: {
         message: `unsupported protocol version ${clientVersion}; server supports 1..${PROTOCOL_VERSION}`,
+        code: BridgeSessionErrorCode.PROTOCOL_VERSION_MISMATCH,
       },
     };
     safeSend(ws, JSON.stringify(err));
+    try {
+      ws.close(1000, "unsupported protocol version");
+    } catch {}
     return;
   }
 

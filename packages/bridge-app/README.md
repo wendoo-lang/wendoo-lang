@@ -3,7 +3,7 @@
 App-side client for the Wendoo bridge.
 
 Wraps `@wendoo/bridge-client` with app-role-specific behavior: automatic join code
-management and the `"app"` WebSocket path. Apps that connect to the bridge should depend on
+management and the `"app"` WebSocket path, or the path given as `wsPath`. Apps that connect to the bridge should depend on
 this package rather than using `bridge-client` directly.
 
 ## Usage
@@ -29,8 +29,9 @@ The bridge facade supports:
 - `start()` / `stop()` -- lifecycle management; after a failure ends the session, `start()`
   opens a new one
 - `requestSync()` -- request a full project file sync from the VS Code extension
-- `snapshot()` -- current connection status, join code, and the stable code of the
-  failure that ended the session, if one did
+- `snapshot()` -- current connection status, join code, the stable code of the
+  failure that ended the session, if one did, and `counterpartAway: true` while the
+  bridge reports the session's counterpart disconnected
 - `onStateChange(...)` / `onRemoteChange(...)` -- event subscriptions
 - `sendPayload(...)` / `onPayload(...)` -- send and receive payload messages: messages
   whose type lies outside the bridge protocol's own namespaces, carried verbatim

@@ -2,7 +2,7 @@
 applyTo: "packages/bridge-app/**"
 ---
 
-<!-- Last reviewed: 2026-09-24 -->
+<!-- Last reviewed: 2026-09-25 -->
 
 # bridge-app -- Rules & Patterns
 
@@ -16,7 +16,7 @@ behavior.
 It covers:
 
 - The app-role bridge connection (`createAppBridge`) over the `"app"`
-  WebSocket path.
+  WebSocket path, or another path the caller names.
 - The folder-host session (`connectFolderHostSession`): an app embedded in a
   host that owns a workspace folder.
 - The peer-session mechanism (`connectPeerSession`) that session
@@ -50,6 +50,7 @@ source, so a green suite does not prove `dist/` is current.
 | `@wendoo/bridge-app` | `src/index.ts` | The public modules in the layout below; not the internal, subpath, or Node-only ones |
 | `@wendoo/bridge-app/compilation` | `src/compilation.ts` | `createCompilationFeature`, `CompilationManager`, project compiler handles |
 | `@wendoo/bridge-app/manifest-files` | `src/manifest-files.ts` | Queries and edits over a manifest's `files` list |
+| `@wendoo/bridge-app/peer-session` | `src/peer-session.ts` | The peer-session mechanism: `connectPeerSession`, its kind, port, session, and error types, `PeerSessionHelloMessage`, and `PeerSessionErrorCode` |
 | `@wendoo/bridge-app/node` | `src/node.ts` | Node-only helpers: embedded-extension loading from disk and its Vite plugin |
 
 A module that imports Node built-ins is exported only through `./node`, never
@@ -66,7 +67,7 @@ src/
   project-file-bridge.ts             # app-host <-> bridge-client file shapes (internal)
   compilation.ts                     # compile features and managers (subpath export)
   folder-host-session.ts             # folder-host session: port, session, errors
-  peer-session.ts                    # peer-session mechanism: port, session, errors
+  peer-session.ts                    # peer-session mechanism: port, session, errors (subpath export)
   workspace-folder-project-store.ts  # ProjectStore persisted through a folder session
   app-environment-host.ts            # AppEnvironmentHost: project, environment, compiler, bridge
   extension-catalog.ts               # catalog, offers, shelf, compatibility, install actions
@@ -122,10 +123,11 @@ message types, `FOLDER_SESSION_PROTOCOL_VERSION`, and
 `FolderSessionErrorCode` in `bridge-protocol`; `FolderHostPort`,
 `connectFolderHostSession`, and `FolderSessionError` here.
 
-The root barrel re-exports the mechanism's hello message type and error-code
-object from `bridge-protocol`, so a kind's package needs only
-`@wendoo/bridge-app`. Session logic takes a port and never assumes how the
-port reaches the peer.
+`peer-session.ts` re-exports the mechanism's hello message type and
+error-code object from `bridge-protocol`, and both the root barrel and the
+`./peer-session` entry point carry them, so a kind's package needs only
+`@wendoo/bridge-app` or its `./peer-session` subpath. Session logic takes a
+port and never assumes how the port reaches the peer.
 
 ## Version Rules
 
@@ -155,6 +157,10 @@ For a peer session:
   types, version constants, and error codes belong in `bridge-protocol`.
 - All public exports go through `src/index.ts` or one of the subpath entry
   points. Consumers import from `@wendoo/bridge-app` or its subpaths.
+- The package declares `"sideEffects": false`, so bundlers drop any module
+  whose exports go unused. No module may run code on import that anything
+  relies on: top-level statements are imports, exports, and declarations with
+  literal or pure initializers.
 - Errors carry stable codes; specs assert codes, never message prose.
 - Use `import type` for type-only imports.
 - All unsubscribe functions return `() => void`.

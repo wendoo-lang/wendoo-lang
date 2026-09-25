@@ -41,6 +41,7 @@
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -56,6 +57,11 @@
       "types": "./dist/manifest-files.d.ts",
       "browser": "./dist/manifest-files.js",
       "import": "./dist/manifest-files.js"
+    },
+    "./peer-session": {
+      "types": "./dist/peer-session.d.ts",
+      "browser": "./dist/peer-session.js",
+      "import": "./dist/peer-session.js"
     },
     "./node": {
       "types": "./dist/node.d.ts",

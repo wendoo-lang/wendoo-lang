@@ -22,6 +22,12 @@ export interface SessionEventMap {
    * to open a new one.
    */
   error: BridgeSessionErrorCode;
+  /**
+   * The bridge reported that the session's counterpart disconnected. The
+   * session, its connection, join code, and binding token are unaffected; the
+   * next accepted `session:welcome` means the counterpart is connected again.
+   */
+  counterpartAway: undefined;
 }
 
 /** Mutable session-scoped metadata persisted across reconnects. */
@@ -136,6 +142,9 @@ export class ProjectSession<TClient extends WsMessage, TServer extends WsMessage
         if (code !== undefined) {
           this.fail(code);
         }
+      }),
+      this._client.on("session:counterpartAway", () => {
+        this.emit("counterpartAway", undefined);
       })
     );
     this.reregisterHandlers();

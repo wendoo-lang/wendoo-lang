@@ -61,11 +61,19 @@ export interface AppBridgeSnapshot {
   joinCode?: string;
   /** Stable code of the failure that ended the session, if one did. Cleared when the bridge next starts. */
   errorCode?: BridgeSessionErrorCode;
+  /**
+   * Present, and `true`, while the bridge reports the session's counterpart
+   * disconnected. Absent once the counterpart is connected again (the next
+   * accepted welcome) and whenever the bridge starts or stops.
+   */
+  counterpartAway?: true;
 }
 
 /** Options for {@link createAppBridge}. */
 export interface AppBridgeOptions {
   bridgeUrl: string;
+  /** Path of the bridge endpoint the app connects to. Defaults to `"app"`. */
+  wsPath?: string;
   filesystem: ProjectFileSystem;
   /** Optional features attached to the bridge for the duration of each session. */
   features?: readonly AppBridgeFeature[];
@@ -127,6 +135,7 @@ class AppBridgeController implements AppBridge {
   private _status: AppBridgeState = "disconnected";
   private _joinCode: string | undefined;
   private _errorCode: BridgeSessionErrorCode | undefined;
+  private _counterpartAway = false;
 
   constructor(options: AppBridgeOptions) {
     this._options = options;
@@ -142,6 +151,7 @@ class AppBridgeController implements AppBridge {
 
     const project = new BridgeProject({
       bridgeUrl: this._options.bridgeUrl,
+      wsPath: this._options.wsPath,
       initialFileSnapshot: toFileSystemSnapshot(this._options.filesystem.exportSnapshot()),
       bindingToken: this._options.bindingToken,
     });
@@ -159,6 +169,9 @@ class AppBridgeController implements AppBridge {
         this.setStatus("disconnected");
         this.releaseProject();
       }),
+      project.session.addEventListener("counterpartAway", () => {
+        this.setCounterpartAway(true);
+      }),
       project.session.onPayload((message) => {
         this.emitPayload(message);
       }),
@@ -168,6 +181,7 @@ class AppBridgeController implements AppBridge {
           this._options.bindingToken = token;
           this._options.onBindingTokenChange?.(token);
         }
+        this.setCounterpartAway(false);
       }),
       project.onJoinCodeChange((joinCode) => {
         this.setJoinCode(joinCode);
@@ -203,11 +217,15 @@ class AppBridgeController implements AppBridge {
   }
 
   snapshot(): AppBridgeSnapshot {
-    return {
+    const snapshot: AppBridgeSnapshot = {
       status: this._status,
       joinCode: this._joinCode,
       errorCode: this._errorCode,
     };
+    if (this._counterpartAway) {
+      snapshot.counterpartAway = true;
+    }
+    return snapshot;
   }
 
   onStateChange(listener: (state: AppBridgeState) => void): () => void {
@@ -355,10 +373,22 @@ class AppBridgeController implements AppBridge {
     }
   }
 
+  private setCounterpartAway(away: boolean): void {
+    if (this._counterpartAway === away) {
+      return;
+    }
+
+    this._counterpartAway = away;
+    for (const listener of this._stateListeners) {
+      listener(this._status);
+    }
+  }
+
   private releaseProject(): void {
     this.disposeProjectBindings();
     this._project = undefined;
     this.setJoinCode(undefined);
+    this.setCounterpartAway(false);
     this.disposeFeatures();
   }
 

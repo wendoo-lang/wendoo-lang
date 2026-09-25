@@ -1,6 +1,9 @@
 import type { PeerSessionHelloMessage } from "@wendoo/bridge-protocol";
 import { PeerSessionErrorCode } from "@wendoo/bridge-protocol";
 
+export type { PeerSessionHelloMessage };
+export { PeerSessionErrorCode };
+
 /**
  * A session kind: its name, which prefixes its message types, and the newest
  * protocol version this build speaks for it.

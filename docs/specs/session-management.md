@@ -1,0 +1,189 @@
+---
+title: Session management
+status: Accepted
+# Active status:   Draft -> Review -> Accepted -> Committed -> In-Progress -> Shipped
+# Terminal status: Rejected | Withdrawn | Superseded (set superseded-by)
+created: 2026-09-25
+updated: 2026-09-25
+---
+
+# Session Management
+
+The standing description of the Wendoo bridge session system and the
+contract by which applications slot into it. This document is the
+design's authoritative voice, written in present tense; workstream
+history lives with the workstreams. Where a piece is scheduled for
+re-derivation, this document states the current rule and marks it,
+and is updated to plain statements as pieces settle. The mechanism
+is lane-agnostic; each integration documents its concrete role
+assignments in its own repository.
+
+## The ontology
+
+A SESSION is the logical binding between two application endpoints --
+typically an editing environment bound to a host environment. It is
+embodied server-side as a relay pairing and durably identified
+by a binding id, presented to clients as a binding token.
+
+CONNECTED / DISCONNECTED is a STATUS on the session. Status gates what
+is possible on the session; it never drives the session's lifecycle.
+For editors specifically: status gates DELIVERY (sync, writes,
+catalog freshness), never AUTHORING -- editing continues while
+disconnected, with changes pending locally and the status clearly
+indicated.
+
+Session LIFECYCLE events are exactly three: formation, replacement,
+and end (explicit, or by sweep after a fully-disconnected linger).
+A member dropping and returning is a status transition of the same
+session. Wire-level handshake machinery -- sockets, hellos, welcomes
+-- is connection-scoped plumbing the session absorbs; no connectivity
+event creates or destroys a session.
+
+## Identity and credentials
+
+- The BINDING TOKEN is the continuity credential: it identifies the
+  session across disconnects and reclaims it during linger. A stale
+  token fails silently and the presenter proceeds by join code.
+- The JOIN CODE is the human entry credential: how a person connects
+  the two sides. Join codes are generated as word triplets (one
+  shared generator serves every relay) and ROTATE unconditionally on
+  a fixed interval -- rotation is engine behavior with no
+  configuration surface. Clients always present the latest code they
+  have received.
+- SESSION IDS are engine bookkeeping. They change at replacement.
+  Nothing user-facing keys continuity on a session id; product
+  continuity is anchored on the token and the code.
+- [Under re-derivation at the engine extraction: the precise
+  replacement/heal/rotation triangle -- the leading model is token = continuity, code = entry
+  credential, with an entry-grace window for rotation.]
+
+## Lifecycle in wire terms
+
+FORMATION. Each party connects to its role endpoint and sends
+`session:hello` declaring the protocol version it speaks. A valid
+hello is answered immediately with `session:joinCode`. The
+`session:welcome` is deferred until BOTH roles of the pairing are
+bound; it means "your session is connected", never "the relay heard
+you". Version rejection is immediate: `session:error` with a stable
+code, then the socket closes.
+
+STATUS. When a member drops, the session becomes disconnected for
+that side and the remaining member receives `session:counterpartAway`
+-- a payload-less status signal, cleared by the next welcome. The
+session lingers (retaining id, code, and binding identity) and is
+reclaimed by a returning member's token; the stable peer is then
+RE-WELCOMED. Every welcome, first or repeated, instructs an endpoint
+to refresh its connection-scoped handshake machinery; the session
+itself persists across welcomes.
+
+ENDING. A new claimant on an occupied role (no matching token) is
+REPLACEMENT: the one session-ending event besides explicit end and
+sweep. The displaced pairing's connections close; the successor
+session has fresh identity but adopts the presented join code, so the
+displaced peer heals automatically by code. The displaced same-role
+member receives the SESSION_REPLACED code and stops. A session with
+no members for longer than the linger window is swept.
+
+## The version discipline
+
+One version space per session kind. Each party declares the version
+it speaks; a receiver accepts any declared version at or below its
+own maximum and records it; only a NEWER declaration is rejected,
+with a stable code and a human remedy. Deployment cadence orders the
+parties -- from the most version-pinned (code embedded in end-user
+projects) through intermediaries on their own release cadence to
+evergreen applications -- and newer parties adapt down, never up.
+Payload message kinds carry no versions of their own. A lane's
+host-side emission channel, where one exists, carries the emitter's
+declared version in its framing [scheduled; ship-blocking].
+
+## The engine / application seam
+
+THE ENGINE (`@wendoo/bridge-session`, upstream, platform-clean) owns
+everything subtle and stateful about sessions:
+
+- the session state machine: formation, status, linger, sweep,
+  replacement, re-welcome;
+- binding ids, token minting and verification;
+- join-code generation (via `@wendoo/join-codes`), uniqueness, and
+  rotation;
+- rate protection (throttles, pending-request bookkeeping);
+- the emission points for every session signal (joinCode, welcome,
+  counterpartAway, coded errors);
+- [stated at the engine extraction: the liveness definition that
+  decides "disconnected"; session durability across service
+  restarts; and whether the endpoint peer-session mechanism is part
+  of the engine or a separate endpoint layer.]
+
+The engine is kind-blind and platform-blind: it never learns what a
+session kind means, what payloads contain, or which product it
+serves. It calls outward through an adapter interface -- send, close,
+on-pair, on-drop.
+
+APPLICATIONS (the relay services) own:
+
+- the route surface: generic `/{kind}/{role}` routes, or a fixed
+  role pair;
+- the FORWARDING POLICY, chosen once per service and part of its
+  identity: OPAQUE forwarding (every non-control message passes
+  byte-verbatim, unparsed -- payloads and whole session kinds evolve
+  without redeploying the relay) or DOMAIN ROUTING (recognized
+  message families dispatch through the service's own handlers);
+- deployment identity: configuration, secrets, hardening, cadence.
+
+Neither service contains session logic. Each is an adapter plus a
+deployment.
+
+## How applications slot in
+
+A SESSION KIND is declared by a kind package. The kind package owns the kind's whole
+identity: its name, its wire message types and their namespace, its
+protocol version, its role-path segments, and the connect function
+binding the endpoint mechanism to the kind. Kind packages live with
+their platform integration, never in core packages -- core stays
+greppably free of platform names. Kind names must not collide with
+the reserved bridge namespaces, or their payloads are never
+delivered.
+
+ENDPOINTS reach the wire through the role-generic client
+(`ProjectSession`, with its payload surface and session events) or
+the app-role wrapper (`AppBridge`). An endpoint's obligations:
+
+- open or refresh its connection-scoped handshake on EVERY welcome;
+- treat `counterpartAway` and the welcome as the session status
+  signals; never infer lifecycle from transport events;
+- key nothing on session ids; anchor continuity on token and code;
+- surface the session to product code as ONE object with stable
+  identity, a status field, and a first-class state-change event
+  surface [the canonical consumer surface is settled with the first
+  editor implementation].
+
+EDITOR-CLASS applications additionally follow the offline rule:
+authoring continues while disconnected, changes pend locally, the
+disconnected status is clearly indicated, and pends flush on
+reconnect.
+
+## Standing constraints
+
+- The relay is STATIONARY: payload evolution and new session kinds
+  never require a relay deployment; only control-envelope changes do.
+- Join-code uniqueness and pairing are per relay instance; the
+  system is single-instance by design until a deployment slice rules
+  otherwise.
+- Trust never derives from session traffic: provenance and
+  assistant-content gating ride host-attested channels and
+  point-of-use allowlists, outside this system.
+- Kid-facing resilience governs every surface here: mistakes are
+  diagnosed with stable codes and the system soldiers on; the only
+  hard stops are the version rejection and SESSION_REPLACED, both of
+  which name their remedy.
+
+## Open re-derivations
+
+Tracked in the owning workstreams: the replacement/heal/rotation
+triangle; the two-handshake sequence and possible vestigial
+peer-session machinery; SESSION_REPLACED's connection-vs-session
+layer semantics; the liveness owner; restart durability; the mapping
+of fixed-role-pair services onto {kind, role}. Each resolves inside the
+engine-extraction or editor work, and this document is updated to
+plain statements as they settle.

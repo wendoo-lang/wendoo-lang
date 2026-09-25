@@ -7,7 +7,8 @@
     "types": ["node"],
     "paths": {
       "@wendoo/bridge-app": ["./src/index.ts"],
-      "@wendoo/bridge-app/compilation": ["./src/compilation.ts"]
+      "@wendoo/bridge-app/compilation": ["./src/compilation.ts"],
+      "@wendoo/bridge-app/peer-session": ["./src/peer-session.ts"]
     }
   },
   "include": ["src/**/*.spec.ts"],
