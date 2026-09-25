@@ -55,8 +55,12 @@ src/
 - `BridgeSessionErrorCode` -- constant object plus union type of the stable codes of
   bridge-session failures. `PROTOCOL_VERSION_MISMATCH` covers both directions: a client
   refusing its bridge's welcome, and a bridge refusing a client's hello. `SESSION_REPLACED`
-  is reported by a bridge to the member a new claimant for its role displaced, before it
-  closes that member's connection.
+  means another connection of the receiver's role has taken its place: the receiving
+  client's hold on the session is over and it does not reconnect automatically. A bridge
+  reports it, before closing the connection, to a connection displaced by a new claimant
+  for its role (the session ends) or by the same member returning with the session's
+  binding token (the session continues under the returning connection). It never goes to
+  the other role's member.
 - `ErrorPayload` -- payload of `session:error` and `error`: a prose `message` and an
   optional `code` (`BridgeSessionErrorCode`).
 - The folder-host session's and the peer-session mechanism's types, constants, and

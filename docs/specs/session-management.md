@@ -80,9 +80,16 @@ ENDING. A new claimant on an occupied role (no matching token) is
 REPLACEMENT: the one session-ending event besides explicit end and
 sweep. The displaced pairing's connections close; the successor
 session has fresh identity but adopts the presented join code, so the
-displaced peer heals automatically by code. The displaced same-role
-member receives the SESSION_REPLACED code and stops. A session with
-no members for longer than the linger window is swept.
+displaced peer heals automatically by code. A session with no
+members for longer than the linger window is swept.
+
+SESSION_REPLACED is a client-hold signal, not a session-lifecycle
+statement: it tells one connection "another connection of your role
+has taken your place; do not reconnect automatically." It is sent in
+exactly two cases -- to the displaced same-role member at
+replacement (whose session ended), and to a member's superseded old
+connection when that member re-binds (whose session continues under
+the newcomer). It is never sent to the other role's member.
 
 ## The version discipline
 
@@ -182,8 +189,10 @@ reconnect.
 
 Tracked in the owning workstreams: the replacement/heal/rotation
 triangle; the two-handshake sequence and possible vestigial
-peer-session machinery; SESSION_REPLACED's connection-vs-session
-layer semantics; the liveness owner; restart durability; the mapping
+peer-session machinery; the liveness owner; restart durability
+(a counterpart-away signal today fires only on a real transport
+close, so its latency is unbounded for half-open drops until
+liveness has an owner); the mapping
 of fixed-role-pair services onto {kind, role}. Each resolves inside the
 engine-extraction or editor work, and this document is updated to
 plain statements as they settle.

@@ -11,9 +11,12 @@ export const BridgeSessionErrorCode = {
    */
   PROTOCOL_VERSION_MISMATCH: "BRIDGE_SESSION_PROTOCOL_VERSION_MISMATCH",
   /**
-   * A new claimant for this side's role replaced it, ending the session.
-   * Reported by a bridge to the member it displaces, on the connection it then
-   * closes.
+   * Another connection of this side's role has taken this connection's place:
+   * this client's hold on the session is over, and it does not reconnect
+   * automatically. Reported by a bridge, on the connection it then closes, to
+   * the connection displaced by a new claimant for its role (which ends the
+   * session) or by the same member returning with the session's binding token
+   * (the session continues under the returning connection).
    */
   SESSION_REPLACED: "BRIDGE_SESSION_SESSION_REPLACED",
 } as const;
