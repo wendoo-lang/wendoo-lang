@@ -32,6 +32,7 @@ Wendoo draws inspiration from other tile-based programming systems past and pres
 | [@wendoo/ui](packages/ui/) | Shared React UI -- shadcn/ui primitives + brain editor components |
 | [@wendoo/docs](packages/docs/) | Shared documentation subsystem -- renders as in-app sidebar or full-screen SPA |
 | [@wendoo/ts-compiler](packages/ts-compiler/) | TypeScript-to-Wendoo bytecode compiler |
+| [@wendoo/conformance](packages/conformance/) | Cross-VM conformance corpus -- the shared host profile, trace grammar, and goldens every Wendoo VM is verified against |
 | [@wendoo/assistant-bridge](packages/assistant-bridge/) | Assistant bridge -- the open tool contract, catalog digest, trace summarizer, target adapter interface, and rehearsal adapter kit |
 | [@wendoo/assistant-relay](packages/assistant-relay/) | Assistant relay protocol -- the session handshake, turn events, and tool-call wire an assistant service speaks with a client |
 | [@wendoo/service-api](packages/service-api/) | Request/response schemas, shared enums, error shapes, and serialization formats for backend service APIs |
@@ -40,6 +41,7 @@ Wendoo draws inspiration from other tile-based programming systems past and pres
 | [@wendoo/bridge-protocol](packages/bridge-protocol/) | VS Code bridge network protocol types and schemas |
 | [@wendoo/bridge-client](packages/bridge-client/) | Client SDK for the VS Code bridge |
 | [@wendoo/bridge-app](packages/bridge-app/) | Opinionated layer atop bridge-client for the VS Code bridge |
+| [@wendoo/bridge-session](packages/bridge-session/) | Session engine of the bridge relays -- pairing, binding tokens, linger, and replacement |
 
 ## Apps
 

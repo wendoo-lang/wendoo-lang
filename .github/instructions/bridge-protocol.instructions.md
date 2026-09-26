@@ -2,14 +2,14 @@
 applyTo: "packages/bridge-protocol/**"
 ---
 
-<!-- Last reviewed: 2026-09-25 -->
+<!-- Last reviewed: 2026-09-26 -->
 
 # bridge-protocol -- Rules & Patterns
 
 Protocol definition package for the Wendoo bridge WebSocket system: message types,
 Zod schemas, and filesystem notification payloads. Shared by `bridge-client`,
-`bridge-app`, and `apps/vscode-bridge`. Contains no runtime logic -- only types and
-validation schemas.
+`bridge-app`, `bridge-session`, and `apps/vscode-bridge`. Contains no runtime logic --
+only types and validation schemas.
 
 ## Build & Scripts
 
@@ -20,7 +20,8 @@ npm run check      # biome check --write
 ```
 
 No test files in this package. After changes, rebuild (`npm run build`) so downstream
-consumers (`bridge-client`, `bridge-app`, `vscode-bridge`) see updated types.
+consumers (`bridge-client`, `bridge-app`, `bridge-session`, `vscode-bridge`) see updated
+types.
 
 ## Source Layout
 
@@ -126,10 +127,11 @@ client) and a `ServerMessage` union (sent by the bridge server to that client).
   error without one keeps its existing meaning. A new failure adds a member whose JSDoc
   says who raises it.
 - `session:welcome` means "the session is connected"; when a relay sends it is relay
-  policy. The vscode-bridge relay welcomes a hello immediately. A pairing relay answers a
-  hello with `session:joinCode` at once and welcomes both members each time both roles of
-  the pairing become bound: first when the pairing forms, and again whenever a member binds
-  back in, so a still-connected member receives a further welcome on its open connection.
+  policy. The vscode-bridge relay welcomes a hello immediately. A pairing relay (the
+  `bridge-session` engine) answers a hello with `session:joinCode` at once and welcomes
+  both members each time both roles of the pairing become bound: first when the pairing
+  forms, and again whenever a member binds back in, so a still-connected member receives
+  a further welcome on its open connection.
   A member returning with a binding token for the session is a status change of the same
   session (same session id, join code, and binding token). A hello for an occupied role
   without such a token is a new claimant: it ends the session. The displaced member
@@ -152,5 +154,5 @@ client) and a `ServerMessage` union (sent by the bridge server to that client).
 - Role-specific message unions (`AppClientMessage`, `AppServerMessage`,
   `ExtensionClientMessage`, `ExtensionServerMessage`) aggregate shared + role-specific
   messages. Add new messages to the correct union(s).
-- `bridge-client` and `bridge-app` depend on this package. Changes here require
-  rebuilding downstream consumers.
+- `bridge-client`, `bridge-app`, and `bridge-session` depend on this package. Changes here
+  require rebuilding downstream consumers.

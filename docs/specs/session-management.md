@@ -155,8 +155,15 @@ everything subtle and stateful about sessions:
 
 The engine is kind-blind and platform-blind: it never learns what a
 session kind means, what payloads contain, or which product it
-serves. It calls outward through an adapter interface -- send, close,
-on-pair, on-drop.
+serves. It is the package `@wendoo/bridge-session`, whose `Relay`
+meets its transport through a two-sided adapter interface. An
+application registers each connection it opens with
+`connect(kind, role, socket)`, handing the engine a socket with two
+operations -- `send` one text frame, and `close` the connection --
+and reports that connection's events back through the handler
+`connect` returns: `receive` for each text frame, and `closed` once
+the connection has closed. Every session signal leaves the engine
+through `send`; the engine closes connections only through `close`.
 
 APPLICATIONS (the relay services) own:
 
@@ -166,7 +173,10 @@ APPLICATIONS (the relay services) own:
   identity: OPAQUE forwarding (every non-control message passes
   byte-verbatim, unparsed -- payloads and whole session kinds evolve
   without redeploying the relay) or DOMAIN ROUTING (recognized
-  message families dispatch through the service's own handlers);
+  message families dispatch through the service's own handlers)
+  [the engine's `Relay` performs opaque forwarding itself today; how
+  a domain-routing service supplies its policy to the engine is
+  stated when that service adopts the engine];
 - deployment identity: configuration, secrets, hardening, cadence.
 
 Neither service contains session logic. Each is an adapter plus a

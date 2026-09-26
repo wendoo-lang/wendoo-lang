@@ -8,7 +8,9 @@
 | [bridge-app](bridge-app/)                 | App-side client for the Wendoo bridge                                                                                           |
 | [bridge-client](bridge-client/)           | Client SDK for the Wendoo Lang VS Code bridge                                                                                   |
 | [bridge-protocol](bridge-protocol/)       | WebSocket protocol types and schemas for the Wendoo VS Code bridge                                                              |
+| [bridge-session](bridge-session/)         | Session engine of the Wendoo bridge relays: pairing, binding tokens, linger, and replacement                                    |
 | [cli](cli/)                               | Command-line tools for Wendoo projects                                                                                          |
+| [conformance](conformance/)               | Cross-VM conformance corpus: the shared host profile, trace grammar, and goldens every Wendoo VM is verified against            |
 | [core](core/)                             | Core implementation of the Wendoo language -- tile types, brain runtime, language service, and compiler                         |
 | [docs](docs/)                             | Shared documentation sidebar and rendering components for Wendoo web applications                                               |
 | [join-codes](join-codes/)                 | Generator of the three-word join codes people type to join a Wendoo session                                                     |
