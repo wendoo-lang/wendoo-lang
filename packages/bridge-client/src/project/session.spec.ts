@@ -323,36 +323,68 @@ describe("ProjectSession", () => {
       return parseSent(next).find((msg) => msg.type === "session:hello");
     }
 
-    it("presents on reconnect the join code a session:joinCode delivered", () => {
-      const session = createSession();
+    it("presents the constructor's join code until a welcome is accepted, then only its token and session id", () => {
+      const session = new ProjectSession<WsMessage, WsMessage>("app", "localhost:3000", {}, "J-0");
       const ws = startSession(session);
+      assert.deepEqual(parseSent(ws)[0]?.payload, { protocolVersion: PROTOCOL_VERSION, joinCode: "J-0" });
+      const beforeWelcome = reconnectHello(ws);
+      assert.deepEqual(beforeWelcome?.payload, { protocolVersion: PROTOCOL_VERSION, joinCode: "J-0" });
+      const welcomed = lastSocket();
 
-      ws.simulateMessage({ type: "session:joinCode", payload: { joinCode: "J-2" } });
+      welcomed.simulateMessage({
+        type: "session:welcome",
+        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", joinCode: "J-0", bindingToken: "T-1" },
+      });
 
-      assert.deepEqual(reconnectHello(ws)?.payload, { protocolVersion: PROTOCOL_VERSION, joinCode: "J-2" });
+      assert.deepEqual(reconnectHello(welcomed)?.payload, {
+        protocolVersion: PROTOCOL_VERSION,
+        bindingToken: "T-1",
+        sessionId: "s-1",
+      });
       session.stop();
     });
 
-    it("presents on reconnect the latest join code alongside the binding token it holds", () => {
+    it("never presents a join code the bridge sends, before or after a welcome", () => {
       const session = createSession();
       const ws = startSession(session);
-      ws.simulateMessage({
+      ws.simulateMessage({ type: "session:joinCode", payload: { joinCode: "J-1" } });
+      assert.deepEqual(reconnectHello(ws)?.payload, { protocolVersion: PROTOCOL_VERSION });
+      const welcomed = lastSocket();
+      welcomed.simulateMessage({
         type: "session:welcome",
         payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", joinCode: "J-1", bindingToken: "T-1" },
       });
 
-      ws.simulateMessage({ type: "session:joinCode", payload: { joinCode: "J-3" } });
+      welcomed.simulateMessage({ type: "session:joinCode", payload: { joinCode: "J-2" } });
 
-      assert.deepEqual(reconnectHello(ws)?.payload, {
+      assert.deepEqual(reconnectHello(welcomed)?.payload, {
         protocolVersion: PROTOCOL_VERSION,
         bindingToken: "T-1",
         sessionId: "s-1",
-        joinCode: "J-3",
       });
       session.stop();
     });
 
-    it("keeps the constructor's join code when a welcome carrying another is rejected", () => {
+    it("presents no join code when started again after a welcome was accepted", () => {
+      const session = new ProjectSession<WsMessage, WsMessage>("app", "localhost:3000", {}, "J-0");
+      const ws = startSession(session);
+      ws.simulateMessage({
+        type: "session:welcome",
+        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", joinCode: "J-0", bindingToken: "T-1" },
+      });
+      session.stop();
+
+      const restarted = startSession(session);
+
+      assert.deepEqual(parseSent(restarted)[0]?.payload, {
+        protocolVersion: PROTOCOL_VERSION,
+        bindingToken: "T-1",
+        sessionId: "s-1",
+      });
+      session.stop();
+    });
+
+    it("keeps presenting the constructor's join code after a welcome carrying another is rejected", () => {
       const session = new ProjectSession<WsMessage, WsMessage>("app", "localhost:3000", {}, "J-0");
       const rejectedSocket = startSession(session);
       assert.equal((parseSent(rejectedSocket)[0]?.payload as { joinCode?: string } | undefined)?.joinCode, "J-0");
@@ -479,7 +511,7 @@ describe("ProjectSession", () => {
       assert.throws(() => session.sendPayload({ type: "sample:note" }));
     });
 
-    it("starts again in place after an overflow, presenting the credentials it holds", () => {
+    it("starts again in place after an overflow, presenting its binding token and session id", () => {
       const session = createSession();
       const received: WsMessage[] = [];
       session.onPayload((msg) => {
@@ -499,7 +531,7 @@ describe("ProjectSession", () => {
       assert.deepEqual(parseSent(ws), [
         {
           type: "session:hello",
-          payload: { protocolVersion: PROTOCOL_VERSION, bindingToken: "T-1", sessionId: "s-1", joinCode: "J-1" },
+          payload: { protocolVersion: PROTOCOL_VERSION, bindingToken: "T-1", sessionId: "s-1" },
         },
         outbound,
       ]);
@@ -509,7 +541,7 @@ describe("ProjectSession", () => {
   });
 
   describe("counterpart away", () => {
-    it("emits counterpartAway and leaves the connection, join code, and binding token in place", () => {
+    it("emits counterpartAway and leaves the connection and binding token in place", () => {
       const session = createSession();
       const ws = startSession(session);
       ws.simulateMessage({
@@ -543,7 +575,6 @@ describe("ProjectSession", () => {
         protocolVersion: PROTOCOL_VERSION,
         bindingToken: "T-1",
         sessionId: "s-1",
-        joinCode: "J-1",
       });
       session.stop();
     });

@@ -9,6 +9,8 @@ export interface BridgeProjectOptions {
   /** Path of the bridge endpoint to connect to. Defaults to `"app"`. */
   wsPath?: string;
   initialFileSnapshot: FileSystemSnapshot;
+  /** Join code the session's hellos present until it accepts a welcome, joining the session that holds it. */
+  joinCode?: string;
   /** Token used to rebind to a previously established session. */
   bindingToken?: string;
   /** Optional provider that compiles project files and emits diagnostics over the bridge. */

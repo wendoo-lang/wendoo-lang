@@ -90,16 +90,19 @@ Three layers of message handling:
    - `"error"` (`BridgeSessionErrorCode`) -- the stable code of the failure that ended the
      session. Fires before `"status"` becomes `"disconnected"`.
    - `"counterpartAway"` (no value) -- the bridge sent `session:counterpartAway`: the
-     session's counterpart disconnected. The session, its connection, join code, and binding
-     token are unaffected; the next accepted `session:welcome` means the counterpart is
-     connected again.
+     session's counterpart disconnected. The session, its connection, and its binding token
+     are unaffected; the next accepted `session:welcome` means the counterpart is connected
+     again.
 
 Session handshake: every connection's first frame is a `session:hello` declaring
 `PROTOCOL_VERSION`, sent via `sendImmediate`; messages sent while connecting or reconnecting
 follow it in the order they were sent. The server responds with `session:welcome`
-(protocolVersion, sessionId, joinCode, bindingToken). Each hello presents the latest join code
-the session holds: the one passed to the constructor, replaced by any the bridge sends in an
-accepted `session:welcome` or in a `session:joinCode`.
+(protocolVersion, sessionId, joinCode, bindingToken). Each hello presents the binding token
+and session id the session holds. The join code passed to the constructor is an entry
+credential: hellos present it only until the session accepts a `session:welcome`, which
+discards it, so every later hello -- reconnects and `start()` included -- presents the token and
+session id alone. A join code the bridge sends, in a welcome or a `session:joinCode`, is for
+display and is never presented.
 
 A session ends on any of these failures:
 

@@ -583,6 +583,59 @@ describe("createAppBridge", () => {
     assert.equal(lastSocket().url, "ws://localhost:3000/sample/editor");
   });
 
+  it("presents the join code and binding token it is given in its first hello", () => {
+    createAppBridge({
+      bridgeUrl: "localhost:3000",
+      filesystem: new MemoryProjectFileSystem(),
+      joinCode: "JOIN-9",
+      bindingToken: "token-9",
+    }).start();
+    const socket = lastSocket();
+    socket.simulateOpen();
+
+    assert.deepEqual(parseSent(socket)[0], {
+      type: "session:hello",
+      payload: { protocolVersion: 1, bindingToken: "token-9", joinCode: "JOIN-9" },
+    });
+  });
+
+  it("presents the join code it is given until a welcome is accepted, then its binding token alone", () => {
+    const bridge = createAppBridge({
+      bridgeUrl: "localhost:3000",
+      filesystem: new MemoryProjectFileSystem(),
+      joinCode: "JOIN-9",
+    });
+    const replaced = {
+      type: "session:error",
+      payload: { message: "replaced", code: BridgeSessionErrorCode.SESSION_REPLACED },
+    };
+    bridge.start();
+    lastSocket().simulateOpen();
+    lastSocket().simulateMessage(replaced);
+    bridge.start();
+    const unwelcomed = lastSocket();
+    unwelcomed.simulateOpen();
+    unwelcomed.simulateMessage({
+      type: "session:welcome",
+      payload: { protocolVersion: 1, sessionId: "session-1", joinCode: "JOIN-9", bindingToken: "token-1" },
+    });
+    unwelcomed.simulateMessage({ type: "session:joinCode", payload: { joinCode: "JOIN-10" } });
+    unwelcomed.simulateMessage(replaced);
+
+    bridge.start();
+    const welcomed = lastSocket();
+    welcomed.simulateOpen();
+
+    assert.deepEqual(parseSent(unwelcomed)[0], {
+      type: "session:hello",
+      payload: { protocolVersion: 1, joinCode: "JOIN-9" },
+    });
+    assert.deepEqual(parseSent(welcomed)[0], {
+      type: "session:hello",
+      payload: { protocolVersion: 1, bindingToken: "token-1" },
+    });
+  });
+
   it("reports a counterpart away until the next welcome, keeping the connection, join code, and token", () => {
     const tokens: string[] = [];
     const bridge = createAppBridge({

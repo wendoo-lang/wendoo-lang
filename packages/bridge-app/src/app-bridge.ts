@@ -78,6 +78,12 @@ export interface AppBridgeOptions {
   filesystem: ProjectFileSystem;
   /** Optional features attached to the bridge for the duration of each session. */
   features?: readonly AppBridgeFeature[];
+  /**
+   * Join code the bridge presents to join the session that holds it, in the
+   * hellos of every session it opens until the bridge accepts a welcome.
+   * Cleared when the bridge accepts a welcome.
+   */
+  joinCode?: string;
   /** Persisted token used to rebind to a previously established session. */
   bindingToken?: string;
   /** Callback invoked whenever the server issues an updated binding token. */
@@ -154,6 +160,7 @@ class AppBridgeController implements AppBridge {
       bridgeUrl: this._options.bridgeUrl,
       wsPath: this._options.wsPath,
       initialFileSnapshot: toFileSystemSnapshot(this._options.filesystem.exportSnapshot()),
+      joinCode: this._options.joinCode,
       bindingToken: this._options.bindingToken,
     });
 
@@ -178,6 +185,7 @@ class AppBridgeController implements AppBridge {
       }),
       project.session.on("session:welcome", (msg) => {
         const token = (msg.payload as { bindingToken?: string } | undefined)?.bindingToken;
+        this._options.joinCode = undefined;
         if (token) {
           this._options.bindingToken = token;
           this._options.onBindingTokenChange?.(token);

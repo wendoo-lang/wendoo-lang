@@ -126,25 +126,29 @@ client) and a `ServerMessage` union (sent by the bridge server to that client).
   error without one keeps its existing meaning. A new failure adds a member whose JSDoc
   says who raises it.
 - `session:welcome` means "the session is connected"; when a relay sends it is relay
-  policy. The vscode-bridge relay welcomes a hello immediately. The Arcade relay
-  (pxt-wendoo `apps/bridge`) answers a hello with `session:joinCode` at once and welcomes
-  both members each time both roles of the pairing become bound: first when the pairing
-  forms, and again whenever a member binds back in, so a still-connected member receives
-  a further welcome on its open connection. A member returning with a binding token for
-  the session is a status change of the same session (same session id, join code, and
-  binding token). A hello for an occupied role without such a token is a new claimant:
-  it ends the session, closing every member's connection, and a new session with a new
-  session id and binding token opens under the same join code. A displaced member whose
-  role is vacant rejoins by presenting that code; one presenting it for the newcomer's
-  role is itself a new claimant. A session with no member also ends after a linger
-  timeout. Clients treat each welcome as "connected", refresh their connection-scoped
-  handshake on every welcome, and tolerate any of these timings, including a
-  `session:joinCode` that arrives before any welcome.
+  policy. The vscode-bridge relay welcomes a hello immediately. A pairing relay answers a
+  hello with `session:joinCode` at once and welcomes both members each time both roles of
+  the pairing become bound: first when the pairing forms, and again whenever a member binds
+  back in, so a still-connected member receives a further welcome on its open connection.
+  A member returning with a binding token for the session is a status change of the same
+  session (same session id, join code, and binding token). A hello for an occupied role
+  without such a token is a new claimant: it ends the session. The displaced member
+  receives `SESSION_REPLACED` and its connection closes; the other member stays connected
+  and is carried into the new session, which keeps the join code, and both it and the
+  newcomer are welcomed with the new session id and a new binding token. Tokens naming the
+  ended session never reach the successor, so a member absent at the replacement returns
+  to it only by a person entering the join code. A session with no member also ends after
+  a linger timeout. A hello presenting a verified binding token whose binding no live
+  session holds -- after a linger timeout, or after the relay restarts under an unchanged
+  binding secret -- re-forms the session under that binding with a new session id and join
+  code, and the counterpart's token binds into it. Clients treat each welcome as
+  "connected", refresh their connection-scoped handshake on every welcome, and tolerate any
+  of these timings, including a `session:joinCode` that arrives before any welcome.
 - `session:counterpartAway` is the inverse of the welcome: "your session's counterpart
   disconnected". It carries no payload, and it is a status change of a live session, never
-  its end: the receiver keeps its connection, join code, and binding token, and the next
-  welcome means the counterpart is connected again. When a relay sends it is relay policy;
-  the vscode-bridge relay does not send it.
+  its end: the receiver keeps its connection and binding token, and the next welcome means
+  the counterpart is connected again. When a relay sends it is relay policy; the
+  vscode-bridge relay does not send it.
 - Role-specific message unions (`AppClientMessage`, `AppServerMessage`,
   `ExtensionClientMessage`, `ExtensionServerMessage`) aggregate shared + role-specific
   messages. Add new messages to the correct union(s).

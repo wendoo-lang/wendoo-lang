@@ -24,8 +24,8 @@ export interface SessionEventMap {
   error: BridgeSessionErrorCode;
   /**
    * The bridge reported that the session's counterpart disconnected. The
-   * session, its connection, join code, and binding token are unaffected; the
-   * next accepted `session:welcome` means the counterpart is connected again.
+   * session, its connection, and its binding token are unaffected; the next
+   * accepted `session:welcome` means the counterpart is connected again.
    */
   counterpartAway: undefined;
 }
@@ -39,13 +39,14 @@ export interface SessionMeta {
 /**
  * Session layer over {@link WsClient}: sends a `session:hello` as the first
  * frame of every connection, ahead of any messages queued while connecting or
- * reconnecting, tracks the session id, binding token, and join code, and lets
- * callers subscribe to typed inbound messages.
+ * reconnecting, tracks the session id and binding token, and lets callers
+ * subscribe to typed inbound messages.
  *
- * Each hello presents the latest join code this session holds: the one passed
- * to the constructor, replaced by any the bridge sends in an accepted
- * `session:welcome` or in a `session:joinCode`, including when it reconnects
- * after the bridge has ended the session that code belonged to.
+ * Each hello presents the binding token and session id this session holds.
+ * Until this session accepts a `session:welcome`, each hello also presents
+ * the join code passed to the constructor; the first accepted welcome
+ * discards it, so every later hello, on a reconnect or after `start()`,
+ * presents the token and session id alone.
  *
  * @typeParam TClient - Union of message types this side may send.
  * @typeParam TServer - Union of message types this side may receive.
@@ -60,6 +61,7 @@ export class ProjectSession<TClient extends WsMessage, TServer extends WsMessage
   private _wsPath: string;
   private _bridgeUrl: string;
   private _sessionId: string | undefined;
+  /** The join code hellos present; `undefined` once a welcome has been accepted. */
   private _joinCode: string | undefined;
   private _meta: SessionMeta;
 
@@ -67,7 +69,7 @@ export class ProjectSession<TClient extends WsMessage, TServer extends WsMessage
    * @param wsPath - Path of the bridge endpoint to connect to.
    * @param bridgeUrl - Bridge address as a host with an optional port.
    * @param meta - Metadata that persists across reconnects.
-   * @param joinCode - Join code the first hello presents.
+   * @param joinCode - Join code the hellos present until a welcome is accepted.
    */
   constructor(wsPath: string, bridgeUrl: string, meta: SessionMeta, joinCode?: string) {
     this._wsPath = wsPath;
@@ -119,7 +121,7 @@ export class ProjectSession<TClient extends WsMessage, TServer extends WsMessage
     this._clientUnsubs.push(
       this._client.on("session:welcome", (msg: WsMessage) => {
         const payload = msg.payload as
-          | { protocolVersion?: number; sessionId?: string; bindingToken?: string; joinCode?: string }
+          | { protocolVersion?: number; sessionId?: string; bindingToken?: string }
           | undefined;
         if (payload?.protocolVersion !== PROTOCOL_VERSION) {
           this.fail(BridgeSessionErrorCode.PROTOCOL_VERSION_MISMATCH);
@@ -131,15 +133,7 @@ export class ProjectSession<TClient extends WsMessage, TServer extends WsMessage
         if (payload?.bindingToken) {
           this._meta.bindingToken = payload.bindingToken;
         }
-        if (payload?.joinCode) {
-          this._joinCode = payload.joinCode;
-        }
-      }),
-      this._client.on("session:joinCode", (msg: WsMessage) => {
-        const joinCode = (msg.payload as { joinCode?: string } | undefined)?.joinCode;
-        if (joinCode) {
-          this._joinCode = joinCode;
-        }
+        this._joinCode = undefined;
       }),
       this._client.on("session:error", (msg: WsMessage) => {
         const code = (msg.payload as ErrorPayload | undefined)?.code;

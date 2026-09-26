@@ -16,6 +16,7 @@ export interface ProjectOptions<TClient extends WsMessage = WsMessage, TServer e
   wsPath: string;
   /** Initial filesystem snapshot the project starts with. */
   initialFileSnapshot: FileSystemSnapshot;
+  /** Join code the session's hellos present until it accepts a `session:welcome`. */
   joinCode?: string;
   /** Token used to rebind to a previously established session. */
   bindingToken?: string;
