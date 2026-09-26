@@ -42,11 +42,10 @@ export interface SessionMeta {
  * reconnecting, tracks the session id and binding token, and lets callers
  * subscribe to typed inbound messages.
  *
- * Each hello presents the binding token and session id this session holds.
- * Until this session accepts a `session:welcome`, each hello also presents
- * the join code passed to the constructor; the first accepted welcome
- * discards it, so every later hello, on a reconnect or after `start()`,
- * presents the token and session id alone.
+ * Each hello presents the binding token this session holds. Until this
+ * session accepts a `session:welcome`, each hello also presents the join code
+ * passed to the constructor; the first accepted welcome discards it, so every
+ * later hello, on a reconnect or after `start()`, presents the token alone.
  *
  * @typeParam TClient - Union of message types this side may send.
  * @typeParam TServer - Union of message types this side may receive.
@@ -82,7 +81,6 @@ export class ProjectSession<TClient extends WsMessage, TServer extends WsMessage
           protocolVersion: PROTOCOL_VERSION,
         };
         if (this._meta.bindingToken) payload.bindingToken = this._meta.bindingToken;
-        if (this._sessionId) payload.sessionId = this._sessionId;
         if (this._joinCode) payload.joinCode = this._joinCode;
         this._client!.sendImmediate({ type: "session:hello", payload });
       }
@@ -149,10 +147,29 @@ export class ProjectSession<TClient extends WsMessage, TServer extends WsMessage
     this._client.connect(url);
   }
 
+  /**
+   * Closes the connection. The session lives on at the bridge, its
+   * counterpart told it is away, and a later `start()` binds back into it
+   * with the binding token. Does nothing when not started.
+   */
   stop(): void {
     if (!this._client) return;
     this.closeClient();
     this.setStatus("disconnected");
+  }
+
+  /**
+   * Ends the session on purpose: sends `session:goodbye` on the open
+   * connection, which tells the bridge to end the session and its
+   * counterpart that it has ended, then closes the connection as `stop()`
+   * does. When the connection is not open, nothing reaches the bridge and
+   * the session lives on there as after `stop()`. Does nothing when not
+   * started.
+   */
+  end(): void {
+    if (!this._client) return;
+    this._client.send({ type: "session:goodbye" });
+    this.stop();
   }
 
   /**
@@ -255,7 +272,6 @@ export class ProjectSession<TClient extends WsMessage, TServer extends WsMessage
   private closeClient(): void {
     for (const unsub of this._clientUnsubs) unsub();
     this._clientUnsubs = [];
-    this._client!.send({ type: "session:goodbye" });
     this._client!.close();
     this._client = undefined;
   }

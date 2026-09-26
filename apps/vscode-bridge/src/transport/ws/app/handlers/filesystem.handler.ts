@@ -1,77 +1,38 @@
 import type { FilesystemChangeMessage, FilesystemSyncMessage } from "@wendoo/bridge-protocol";
 import { filesystemNotificationSchema, filesystemSyncPayloadSchema } from "@wendoo/bridge-protocol";
-import { logger } from "#core/logging/logger.js";
-import { getAppSession, getExtensionsByAppSessionId } from "#core/session-registry.js";
-import { safeSend } from "#transport/ws/safe-send.js";
 import type { WsHandler, WsHandlerMap } from "#transport/ws/types.js";
 
-const filesystemChange: WsHandler = (ws, payload, id, seq) => {
-  const appSession = getAppSession(ws);
-  if (!appSession) {
-    logger.warn("filesystem:change from unregistered app session");
-    return;
-  }
-
-  const parsed = filesystemNotificationSchema.safeParse(payload);
+const filesystemChange: WsHandler = (frame, logger) => {
+  const parsed = filesystemNotificationSchema.safeParse(frame.payload);
   if (!parsed.success) {
     logger.warn({ err: parsed.error }, "invalid filesystem:change payload");
     return;
   }
-
-  const extensions = getExtensionsByAppSessionId(appSession.id);
-  if (extensions.length === 0) {
-    return;
-  }
-
-  const msg: FilesystemChangeMessage = { type: "filesystem:change", id, payload: parsed.data, seq };
-  const raw = JSON.stringify(msg);
-  for (const ext of extensions) {
-    if (!safeSend(ext.ws, raw)) {
-      logger.warn(
-        { extensionSessionId: ext.id, appSessionId: appSession.id },
-        "failed to relay filesystem:change to extension"
-      );
-    }
-  }
+  const msg: FilesystemChangeMessage = {
+    type: "filesystem:change",
+    id: frame.id,
+    payload: parsed.data,
+    seq: frame.seq,
+  };
+  frame.forward(JSON.stringify(msg));
 };
 
-const filesystemSync: WsHandler = (ws, payload, id, seq) => {
-  const appSession = getAppSession(ws);
-  if (!appSession) {
-    logger.warn("filesystem:sync from unregistered app session");
-    return;
-  }
-
-  const parsed = filesystemSyncPayloadSchema.safeParse(payload);
+const filesystemSync: WsHandler = (frame, logger) => {
+  const parsed = filesystemSyncPayloadSchema.safeParse(frame.payload);
   if (!parsed.success) {
     logger.warn({ err: parsed.error }, "invalid filesystem:sync payload");
     return;
   }
-
-  const extensions = getExtensionsByAppSessionId(appSession.id);
-  if (extensions.length === 0) {
-    logger.info({ appSessionId: appSession.id, id }, "filesystem:sync response from app but no extensions bound");
-    return;
-  }
-
+  const msg: FilesystemSyncMessage = { type: "filesystem:sync", id: frame.id, payload: parsed.data, seq: frame.seq };
   const entryCount = parsed.data.entries?.length ?? 0;
-  logger.info(
-    { appSessionId: appSession.id, id, entryCount, extensionCount: extensions.length },
-    "relaying filesystem:sync response to extensions"
-  );
-
-  const msg: FilesystemSyncMessage = { type: "filesystem:sync", id, payload: parsed.data, seq };
-  const raw = JSON.stringify(msg);
-  for (const ext of extensions) {
-    if (!safeSend(ext.ws, raw)) {
-      logger.warn(
-        { extensionSessionId: ext.id, appSessionId: appSession.id },
-        "failed to relay filesystem:sync to extension"
-      );
-    }
+  if (frame.forward(JSON.stringify(msg))) {
+    logger.info({ id: frame.id, entryCount }, "relayed a filesystem:sync snapshot to the extension");
+  } else {
+    logger.info({ id: frame.id }, "dropped a filesystem:sync snapshot with no extension connected");
   }
 };
 
+/** Forwards an app's filesystem changes and snapshots to its extension, dropping any whose payload is invalid. */
 export const filesystemHandlers: WsHandlerMap = {
   "filesystem:change": filesystemChange,
   "filesystem:sync": filesystemSync,

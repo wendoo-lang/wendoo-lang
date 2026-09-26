@@ -20,6 +20,7 @@ export type {
   AppBridgeOptions,
   AppBridgeSnapshot,
   AppBridgeState,
+  AppBridgeWelcome,
   DiagnosticEntry,
   ProjectFileChange,
   ProjectFileSnapshot,

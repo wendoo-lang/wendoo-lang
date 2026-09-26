@@ -14,6 +14,7 @@ import {
   type ProjectFileSystem,
   type ProjectManager,
 } from "@wendoo/app-host";
+import { BridgeSessionErrorCode } from "@wendoo/bridge-protocol";
 import type { IBrainDef, WendooBrain } from "@wendoo/core/app";
 import { BrainDef, CoreTypeIds, coreModule, List, mkSensorTileId } from "@wendoo/core/app";
 import type { IBrainActionTileDef, IBrainTileDef } from "@wendoo/core/brain";
@@ -1829,5 +1830,156 @@ describe("AppEnvironmentHost broken-tile brain diagnostics", () => {
       host.dispose();
       restoreLocalStorage();
     }
+  });
+});
+
+type WsCallback = ((...args: unknown[]) => void) | null;
+
+/** A WebSocket stand-in the bridge specs open, feed, and inspect by hand. */
+class MockWebSocket {
+  static instances: MockWebSocket[] = [];
+
+  onopen: WsCallback = null;
+  onclose: WsCallback = null;
+  onmessage: WsCallback = null;
+  onerror: WsCallback = null;
+  readonly sent: string[] = [];
+  closed = false;
+
+  constructor(readonly url: string) {
+    MockWebSocket.instances.push(this);
+  }
+
+  send(data: string): void {
+    this.sent.push(data);
+  }
+
+  close(): void {
+    this.closed = true;
+  }
+
+  simulateOpen(): void {
+    this.onopen?.({});
+  }
+
+  simulateMessage(data: unknown): void {
+    this.onmessage?.({ data: JSON.stringify(data) });
+  }
+
+  /** The type and payload of every message this socket sent, in order. */
+  sentMessages(): { type: string; payload?: Record<string, unknown> }[] {
+    return this.sent.map((data) => JSON.parse(data) as { type: string; payload?: Record<string, unknown> });
+  }
+}
+
+describe("AppEnvironmentHost bridge", () => {
+  /** The socket the host's bridge opened last, opened. */
+  function openLatest(): MockWebSocket {
+    const socket = MockWebSocket.instances.at(-1);
+    assert.ok(socket, "expected the bridge to open a socket");
+    socket.simulateOpen();
+    return socket;
+  }
+
+  /** A `session:welcome` carrying `bindingToken`. */
+  function welcome(bindingToken: string): object {
+    return {
+      type: "session:welcome",
+      payload: { protocolVersion: 1, sessionId: "s-1", joinCode: "spent-code", bindingToken },
+    };
+  }
+
+  /**
+   * Runs `body` with an initialized host whose bridge connects to a mock
+   * relay and keeps its binding token in `tokens`, restoring the globals
+   * afterwards.
+   */
+  async function withBridgeHost(
+    tokens: Map<string, string>,
+    body: (host: AppEnvironmentHost) => void | Promise<void>
+  ): Promise<void> {
+    const restoreLocalStorage = installEmptyLocalStorage();
+    const originalWebSocket = globalThis.WebSocket;
+    MockWebSocket.instances = [];
+    (globalThis as Record<string, unknown>).WebSocket = MockWebSocket;
+    const host = new AppEnvironmentHost({
+      projectManager: stubProjectManager(createInMemoryProjectFileSystem()),
+      modules: [coreModule()],
+      mounts: [declarationMount([{ path: "wendoo.core.d.ts", content: CORE_AMBIENT }])],
+      bridgeUrl: "localhost:3000",
+      loadBindingToken: () => tokens.get("token"),
+      saveBindingToken: (token) => {
+        tokens.set("token", token);
+      },
+    });
+    try {
+      await host.initialize("p1");
+      await body(host);
+    } finally {
+      host.dispose();
+      (globalThis as Record<string, unknown>).WebSocket = originalWebSocket;
+      restoreLocalStorage();
+    }
+  }
+
+  it("reports the bridge paired from each welcome until its counterpart is away, and the code of a failure that ends it", async () => {
+    await withBridgeHost(new Map(), (host) => {
+      const pairedChanges: boolean[] = [];
+      host.subscribeToBridgePaired(() => {
+        pairedChanges.push(host.getBridgePairedSnapshot());
+      });
+      host.connectBridge();
+      const socket = openLatest();
+      socket.simulateMessage({ type: "session:joinCode", payload: { joinCode: "open-code" } });
+
+      assert.equal(host.getBridgePairedSnapshot(), false);
+      assert.equal(host.getBridgeJoinCodeSnapshot(), "open-code");
+
+      socket.simulateMessage(welcome("token-1"));
+      assert.equal(host.getBridgePairedSnapshot(), true);
+      assert.equal(host.getBridgeJoinCodeSnapshot(), undefined);
+
+      socket.simulateMessage({ type: "session:counterpartAway" });
+      assert.equal(host.getBridgePairedSnapshot(), false);
+
+      socket.simulateMessage(welcome("token-1"));
+      socket.simulateMessage({
+        type: "session:error",
+        payload: { message: "ended", code: BridgeSessionErrorCode.SESSION_ENDED },
+      });
+
+      assert.equal(host.getBridgePairedSnapshot(), false);
+      assert.equal(host.getBridgeErrorCodeSnapshot(), BridgeSessionErrorCode.SESSION_ENDED);
+      assert.equal(host.getBridgeStatusSnapshot(), "disconnected");
+      assert.deepEqual(pairedChanges, [true, false, true, false]);
+
+      host.connectBridge();
+
+      assert.equal(host.getBridgeErrorCodeSnapshot(), undefined);
+    });
+  });
+
+  it("ends the bridge's session on purpose and discards the bridge, so the next connect presents the token loaded then", async () => {
+    const tokens = new Map<string, string>();
+    await withBridgeHost(tokens, (host) => {
+      host.connectBridge();
+      const socket = openLatest();
+      socket.simulateMessage(welcome("token-1"));
+      assert.equal(tokens.get("token"), "token-1");
+
+      host.endBridge();
+
+      assert.deepEqual(socket.sentMessages().at(-1), { type: "session:goodbye" });
+      assert.equal(socket.closed, true);
+      assert.equal(host.getBridgeStatusSnapshot(), "disconnected");
+      assert.equal(host.getBridgePairedSnapshot(), false);
+
+      tokens.delete("token");
+      host.connectBridge();
+      const fresh = openLatest();
+
+      assert.notEqual(fresh, socket);
+      assert.deepEqual(fresh.sentMessages()[0], { type: "session:hello", payload: { protocolVersion: 1 } });
+    });
   });
 });

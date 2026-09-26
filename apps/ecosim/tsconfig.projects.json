@@ -19,6 +19,7 @@
         "src/build-defines.d.ts",
         "src/phaser-matter.d.ts",
         "src/components/BrainDiagnostics.tsx",
+        "src/components/BridgeConnectionStatus.tsx",
         "src/components/CompileDiagnosticsConsole.tsx",
         "src/components/ConsoleOutputList.tsx",
         "src/components/UninstallImpactMessage.tsx"

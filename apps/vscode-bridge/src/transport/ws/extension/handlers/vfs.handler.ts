@@ -1,97 +1,50 @@
 import type { FilesystemChangeMessage, FilesystemSyncMessage, SessionErrorMessage } from "@wendoo/bridge-protocol";
 import { filesystemNotificationSchema } from "@wendoo/bridge-protocol";
-import type { WSContext } from "hono/ws";
-import { logger } from "#core/logging/logger.js";
-import { addPendingRequest } from "#core/pending-requests.js";
-import { getAppSessionById, getExtensionSession } from "#core/session-registry.js";
-import { safeSend } from "#transport/ws/safe-send.js";
+import type { RelayFrame } from "@wendoo/bridge-session";
 import type { WsHandler, WsHandlerMap } from "#transport/ws/types.js";
 
-function sendChangeError(ws: WSContext, id: string | undefined, message: string): void {
-  if (!id) return;
-  const err: SessionErrorMessage = { type: "session:error", id, payload: { message } };
-  safeSend(ws, JSON.stringify(err));
+/** Answers `frame` with a `session:error` carrying its id and `message`; does nothing when `frame` has no id. */
+function sendChangeError(frame: RelayFrame, message: string): void {
+  if (!frame.id) return;
+  const err: SessionErrorMessage = { type: "session:error", id: frame.id, payload: { message } };
+  frame.reply(JSON.stringify(err));
 }
 
-const filesystemChange: WsHandler = (ws, payload, id, seq) => {
-  const extSession = getExtensionSession(ws);
-  if (!extSession) {
-    logger.warn("filesystem:change from unregistered extension session");
-    sendChangeError(ws, id, "unregistered session");
-    return;
-  }
-
-  if (!extSession.appSessionId) {
-    logger.warn({ sessionId: extSession.id }, "filesystem:change from extension with no paired app");
-    sendChangeError(ws, id, "no paired app");
-    return;
-  }
-
-  const parsed = filesystemNotificationSchema.safeParse(payload);
+const filesystemChange: WsHandler = (frame, logger) => {
+  const parsed = filesystemNotificationSchema.safeParse(frame.payload);
   if (!parsed.success) {
     logger.warn({ err: parsed.error }, "invalid filesystem:change payload");
-    sendChangeError(ws, id, "invalid payload");
+    sendChangeError(frame, "invalid payload");
     return;
   }
-
-  const appSession = getAppSessionById(extSession.appSessionId);
-  if (!appSession) {
-    logger.warn({ appSessionId: extSession.appSessionId }, "paired app session not found");
-    sendChangeError(ws, id, "app offline");
-    return;
-  }
-
-  const msg: FilesystemChangeMessage = { type: "filesystem:change", id, payload: parsed.data, seq };
-  if (!safeSend(appSession.ws, JSON.stringify(msg))) {
-    logger.warn(
-      { appSessionId: extSession.appSessionId, extensionSessionId: extSession.id },
-      "failed to relay filesystem:change to app"
-    );
-    sendChangeError(ws, id, "relay failed");
-    return;
-  }
-
-  if (id) {
-    addPendingRequest(id, ws, extSession.appSessionId, parsed.data);
+  const msg: FilesystemChangeMessage = {
+    type: "filesystem:change",
+    id: frame.id,
+    payload: parsed.data,
+    seq: frame.seq,
+  };
+  if (!frame.forward(JSON.stringify(msg))) {
+    logger.warn({ id: frame.id }, "filesystem:change from an extension with no app connected");
+    sendChangeError(frame, "no app connected");
   }
 };
 
-const filesystemSync: WsHandler = (ws, _payload, id, seq) => {
-  const extSession = getExtensionSession(ws);
-  if (!extSession) {
-    logger.warn("filesystem:sync from unregistered extension session");
-    sendChangeError(ws, id, "unregistered session");
-    return;
-  }
-
-  if (!extSession.appSessionId) {
-    logger.warn({ sessionId: extSession.id }, "filesystem:sync from extension with no paired app");
-    sendChangeError(ws, id, "no paired app");
-    return;
-  }
-
-  const appSession = getAppSessionById(extSession.appSessionId);
-  if (!appSession) {
-    logger.warn({ appSessionId: extSession.appSessionId }, "paired app session not found");
-    sendChangeError(ws, id, "app offline");
-    return;
-  }
-
-  logger.info(
-    { extensionSessionId: extSession.id, appSessionId: appSession.id, id },
-    "relaying filesystem:sync request to app"
-  );
-
-  const msg: FilesystemSyncMessage = { type: "filesystem:sync", id, seq };
-  if (!safeSend(appSession.ws, JSON.stringify(msg))) {
-    logger.warn(
-      { appSessionId: extSession.appSessionId, extensionSessionId: extSession.id },
-      "failed to relay filesystem:sync to app"
-    );
-    sendChangeError(ws, id, "relay failed");
+const filesystemSync: WsHandler = (frame, logger) => {
+  const msg: FilesystemSyncMessage = { type: "filesystem:sync", id: frame.id, seq: frame.seq };
+  if (frame.forward(JSON.stringify(msg))) {
+    logger.info({ id: frame.id }, "relayed a filesystem:sync request to the app");
+  } else {
+    logger.warn({ id: frame.id }, "filesystem:sync from an extension with no app connected");
+    sendChangeError(frame, "no app connected");
   }
 };
 
+/**
+ * Forwards an extension's filesystem changes and snapshot requests to its app.
+ * A change with an invalid payload, and either message while no app is
+ * connected, is answered with a `session:error` carrying the message's id
+ * instead.
+ */
 export const vfsHandlers: WsHandlerMap = {
   "filesystem:change": filesystemChange,
   "filesystem:sync": filesystemSync,

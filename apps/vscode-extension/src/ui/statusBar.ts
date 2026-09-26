@@ -11,10 +11,7 @@ export function createStatusBarItem(
 
   function update(): void {
     const status = projectManager.status;
-    const appBound = projectManager.appBound;
-    const appClientConnected = projectManager.appClientConnected;
     const pendingChanges = projectManager.pendingChanges;
-    const waitingForApp = appBound || projectManager.hasBindingToken;
     const workspaceFolderName = projectManager.workspaceFolderName;
 
     switch (status) {
@@ -34,7 +31,7 @@ export function createStatusBarItem(
         item.backgroundColor = undefined;
         break;
       case "connected":
-        if (appBound && appClientConnected) {
+        if (projectManager.paired) {
           const counts = projectManager.diagnosticsManager.compileCounts;
           if (counts.errors > 0) {
             item.text = `$(error) Wendoo: ${counts.errors} error(s)`;
@@ -49,7 +46,7 @@ export function createStatusBarItem(
             item.tooltip = "Connected to bridge and bound to app";
             item.backgroundColor = undefined;
           }
-        } else if (waitingForApp) {
+        } else if (projectManager.hasBindingToken) {
           item.text = `$(warning) Wendoo: Waiting for ${workspaceFolderName}`;
           item.tooltip =
             pendingChanges > 0
@@ -70,8 +67,7 @@ export function createStatusBarItem(
 
   context.subscriptions.push(
     projectManager.onDidChangeStatus(update),
-    projectManager.onDidChangeAppBound(update),
-    projectManager.onDidChangeAppClientConnected(update),
+    projectManager.onDidChangePaired(update),
     projectManager.onDidChangePendingChanges(update),
     projectManager.diagnosticsManager.onDidChangeCounts(update),
     item

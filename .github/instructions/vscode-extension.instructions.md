@@ -2,19 +2,21 @@
 applyTo: "apps/vscode-extension/**"
 ---
 
-<!-- Last reviewed: 2026-04-02 -->
+<!-- Last reviewed: 2026-09-26 -->
 
 # VS Code Extension -- Rules & Patterns
 
-VS Code web extension that connects to the vscode-bridge, exposes a virtual `wendoo://`
-filesystem, and displays TypeScript diagnostics from the remote compiler.
+VS Code web extension that pairs with a Wendoo app through the vscode-bridge service,
+exposes a virtual `wendoo://` filesystem, and displays TypeScript diagnostics from the
+remote compiler.
 
 ## Tech Stack
 
 `@wendoo/bridge-client` (Project, IFileSystem, FileSystemNotification),
-`@wendoo/bridge-protocol` (typed message unions), esbuild (bundler), Biome.
+`@wendoo/bridge-protocol` (typed message unions), `@wendoo/app-host`,
+`@wendoo/bridge-app`, `@wendoo/service-api`, esbuild (bundler), Biome.
 
-**Not used here:** `bridge-app`, `@wendoo/core`, `@wendoo/ui`.
+**Not used here:** `@wendoo/core`, `@wendoo/ui`.
 
 ## Web Extension Constraint
 
@@ -49,7 +51,10 @@ src/
   extension.ts                       # activate() / deactivate()
   commands/index.ts                  # all command registrations
   services/
+    bridge-session.ts                # bridge-mode activation: filesystem, views, commands
     project-manager.ts               # central orchestrator
+    bridge-pairing.ts                # paired state + token saving from session signals
+    session-recovery.ts              # recovery notification per session error code
     wendoo-fs-provider.ts         # FileSystemProvider + FileDecorationProvider
     diagnostics-manager.ts           # DiagnosticCollection for compile errors
   state/context.ts                   # wendoo.enabled context key
@@ -65,14 +70,33 @@ Central orchestrator (`src/services/project-manager.ts`). Owns the `Project` ins
 
 - Creates `Project<ExtensionClientMessage, ExtensionServerMessage>` with `wsPath: "extension"`.
 - Reads `wendoo.bridgeUrl` from VS Code configuration for the bridge hostname.
-- Saves/restores the HMAC binding token via `context.globalState` key `"wendoo.bindingToken"`.
+- Restores the binding token from `context.globalState` key `"wendoo.bindingToken"` and
+  presents it on connect; saves the token of every accepted `session:welcome` there.
+- Reads the session's signals through a `BridgePairing`: the session is PAIRED from each
+  accepted `session:welcome` until `session:counterpartAway` or a connection change. Each
+  time it becomes paired, the manager syncs files and replays pending changes.
+- Every coded session failure ends the connection without reconnecting, and the manager
+  shows a warning offering the ways back in place, per `sessionRecoveryOffer` in
+  `services/session-recovery.ts` (specs assert the offered action ids, never the wording):
+
+  | Code | Actions |
+  |---|---|
+  | `SESSION_REPLACED` (another VS Code window re-bound with the same token) | Reconnect -- a join code cannot enter a role that is held |
+  | `JOIN_CODE_UNKNOWN` (the entered code opens no vacant role) | Enter Join Code |
+  | `SESSION_ENDED` (the app or an operator ended the session) | Enter Join Code, Reconnect (re-forms the session by the saved token) |
+  | `OUTBOUND_QUEUE_OVERFLOW` (changes queued while offline outgrew the bound) | Reconnect |
+  | `PROTOCOL_VERSION_MISMATCH` | Check for Updates, Reconnect |
+
+- `disconnect()` (the Disconnect commands) ends the session on purpose -- the app is told
+  `SESSION_ENDED` -- then closes the Wendoo tabs and workspace folder and drops the saved
+  binding token and project name.
 - After a successful sync, adds `wendoo://` to `workspace.workspaceFolders`
   and calls `typescript.restartTsServer`.
 - `DiagnosticsManager` suppresses Wendoo's relayed `MC5002`
   TypeScript-checker diagnostics so the Problems panel shows the built-in
   TypeScript diagnostics once instead of duplicates.
 - **Pending changes:** file writes that fail (app offline) go into a deduplication queue.
-  On reconnect, the queue is replayed and then a full sync runs.
+  When the session is paired again, the queue is replayed and then a full sync runs.
   - `write` / `delete` / `mkdir` / `rmdir` / `rename`: deduplicate by `action:path` (last wins)
   - `import`: always appended (no deduplication)
 
@@ -96,10 +120,11 @@ Central orchestrator (`src/services/project-manager.ts`). Owns the `Project` ins
 | Condition | Text |
 |---|---|
 | disconnected | `$(debug-disconnect) Wendoo: Disconnected` |
-| connecting / reconnecting | `$(sync~spin) Wendoo: Connecting...` |
-| connected + bound + clientConnected | `$(pass-filled) Wendoo: Connected` |
-| connected + bound + client offline | `$(warning) Wendoo: App Offline (N pending)` |
-| connected + not bound | `$(warning) Wendoo: No App` |
+| connecting | `$(sync~spin) Wendoo: Connecting...` |
+| reconnecting | `$(sync~spin) Wendoo: Reconnecting...` |
+| connected + paired | `$(pass-filled) Wendoo: Connected` (or the compile error/warning count) |
+| connected + not paired + holds a binding token | `$(warning) Wendoo: Waiting for <project>` |
+| connected + not paired + no binding token | `$(warning) Wendoo: No App` |
 
 ### Context Key
 
@@ -117,5 +142,7 @@ folder changes and `wendoo.json` create/delete.
 
 ## Adding a Message Handler
 
-Add a case to the `project.session.onMessage` handler in `ProjectManager`. Use the
-typed unions from `@wendoo/bridge-protocol`; do not invent ad-hoc message shapes.
+Subscribe with `project.session.on(type, handler)` in `ProjectManager.connect()` and push
+the unsubscribe onto `_unsubs`. Use the typed unions from `@wendoo/bridge-protocol`; do
+not invent ad-hoc message shapes. Session status comes from the session signals
+(`session:welcome`, `counterpartAway`, coded errors), never from transport events.

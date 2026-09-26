@@ -92,7 +92,7 @@ export class ScriptedPeer {
   /**
    * Sends `session:hello` with `fields` merged over the current protocol
    * version and returns the relay's first answer. Pass any combination of
-   * credentials -- `joinCode`, `bindingToken`, `sessionId` -- or none, and
+   * credentials -- `joinCode`, `bindingToken` -- or none, and
    * `protocolVersion` to declare a version other than the current one.
    */
   async hello(fields: Partial<SessionHelloPayload> = {}): Promise<WsMessage> {

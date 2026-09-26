@@ -84,8 +84,9 @@ export class BridgeProject extends Project<AppClientMessage, AppServerMessage> {
 
   private wireJoinCode(): void {
     this._sessionUnsubs.push(
-      this.session.on("session:welcome", (msg) => {
-        this.setJoinCode(msg.payload.joinCode);
+      // A welcome means both roles are bound, so no code joins the session.
+      this.session.on("session:welcome", () => {
+        this.setJoinCode(undefined);
       })
     );
     this._sessionUnsubs.push(

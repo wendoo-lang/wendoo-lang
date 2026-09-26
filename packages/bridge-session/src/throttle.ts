@@ -1,14 +1,17 @@
-import type { IncomingMessage } from "node:http";
-import type { Context } from "hono";
-
 interface Bucket {
   tokens: number;
   lastRefill: number;
 }
 
+/** How long a {@link TokenBucketMap} keeps a bucket nobody has drawn on, in milliseconds. */
 const STALE_BUCKET_MS = 5 * 60 * 1000;
+/** How often a {@link TokenBucketMap} discards its stale buckets, in milliseconds. */
 const SWEEP_INTERVAL_MS = 60 * 1000;
 
+/**
+ * A rate limiter holding up to `capacity` tokens, refilled continuously at
+ * `refillRate` tokens per second. It starts full.
+ */
 export class TokenBucket {
   private tokens: number;
   private lastRefill: number;
@@ -21,6 +24,7 @@ export class TokenBucket {
     this.lastRefill = Date.now();
   }
 
+  /** Takes `n` tokens and returns `true`, or returns `false` and takes none when fewer than `n` remain. */
   consume(n = 1): boolean {
     const now = Date.now();
     const elapsed = (now - this.lastRefill) / 1000;
@@ -32,6 +36,12 @@ export class TokenBucket {
   }
 }
 
+/**
+ * Rate limiters keyed by string, such as a client address, each holding up to
+ * `capacity` tokens refilled continuously at `refillRate` tokens per second,
+ * and starting full. A key's bucket is discarded once nobody has drawn on it
+ * for five minutes. Call {@link dispose} when done with the map.
+ */
 export class TokenBucketMap {
   private readonly buckets = new Map<string, Bucket>();
   private readonly sweepTimer: ReturnType<typeof setInterval>;
@@ -40,13 +50,11 @@ export class TokenBucketMap {
     private readonly capacity: number,
     private readonly refillRate: number
   ) {
-    // Periodically remove buckets that haven't been accessed recently
-    // to prevent unbounded memory growth from many unique client IPs.
     this.sweepTimer = setInterval(() => this.sweep(), SWEEP_INTERVAL_MS);
-    // .unref() allows the Node process to exit even if this timer is pending
     this.sweepTimer.unref();
   }
 
+  /** Takes `n` tokens from `key`'s bucket and returns `true`, or returns `false` and takes none when fewer than `n` remain. */
   consume(key: string, n = 1): boolean {
     const now = Date.now();
     let bucket = this.buckets.get(key);
@@ -72,17 +80,9 @@ export class TokenBucketMap {
     }
   }
 
+  /** Stops discarding stale buckets and discards every bucket. */
   dispose(): void {
     clearInterval(this.sweepTimer);
     this.buckets.clear();
   }
-}
-
-export function getClientIp(c: Context): string {
-  const forwarded = c.req.header("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  const realIp = c.req.header("x-real-ip");
-  if (realIp) return realIp;
-  const incoming = (c.env as Record<string, unknown>).incoming as IncomingMessage | undefined;
-  return incoming?.socket?.remoteAddress ?? "unknown";
 }

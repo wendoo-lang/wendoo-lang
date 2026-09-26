@@ -4,30 +4,40 @@ This document describes how to publish `@wendoo/*` packages to npm.
 
 ## Package Dependency Order
 
-Packages have internal `file:` dependencies that form a directed graph:
+Packages have internal `file:` dependencies that form a directed graph (the
+`wendoo` package lives in `packages/cli`):
 
 ```
-assistant-relay   (no local deps)
 bridge-protocol   (no local deps)
 core              (no local deps)
-assistant-bridge  -> assistant-relay, core
-bridge-client     -> bridge-protocol, core
+assistant-relay   -> core
 service-api       -> core
-ts-compiler       -> core
 ui                -> core
 app-host          -> core, service-api
 docs              -> core, ui
+ts-compiler       -> core, service-api
+bridge-client     -> bridge-protocol, core, service-api
+assistant-bridge  -> app-host, assistant-relay, core
+assistant-panel   -> assistant-bridge, assistant-relay, core, ui
 bridge-app        -> app-host, bridge-client, bridge-protocol, core, ts-compiler
-wendoo     -> app-host, service-api
+wendoo            -> app-host, assistant-bridge, service-api
+```
+
+Private packages (not published to npm):
+
+```
+join-codes        (no local deps)
+bridge-session    -> bridge-protocol, join-codes
+conformance       -> core
 ```
 
 Private apps (not published to npm):
 
 ```
-ecosim            -> app-host, assistant-bridge, bridge-app, core, docs, ts-compiler, ui
+ecosim            -> app-host, assistant-bridge, assistant-panel, assistant-relay, bridge-app, core, docs, ts-compiler, ui, wendoo (dev)
 ecosim-rbx        -> core
-vscode-bridge     -> bridge-protocol
-vscode-extension  -> app-host, bridge-app, bridge-client, bridge-protocol, service-api
+vscode-bridge     -> bridge-protocol, bridge-session
+vscode-extension  -> app-host, bridge-app, bridge-client, bridge-protocol, service-api (all dev)
 ```
 
 The release scripts handle dependency ordering automatically -- see "Running a Release"
@@ -85,8 +95,8 @@ cd packages/bridge-client
 npm run release:patch   # or release:minor / release:major
 ```
 
-This will release `core`, then `bridge-protocol`, then `bridge-client` -- each bumped by
-`patch`, each waiting for CI before proceeding. For a leaf package like `core` with no
+This will release `core`, `bridge-protocol`, and `service-api`, then `bridge-client` --
+each bumped by `patch`, each waiting for CI before proceeding. For a leaf package like `core` with no
 local deps, only `core` itself is released.
 
 ### Releasing Everything That Changed

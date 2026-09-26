@@ -1,20 +1,29 @@
 import { randomBytes } from "node:crypto";
 import { pino } from "pino";
-import type { RelayOptions } from "../relay.js";
+import type { RelayOptions, RelayTimings } from "../relay.js";
 import { assertJoinCode, assertWelcome, ScriptedPeer, type Welcome } from "./scripted-peer.js";
-import { type RelayServer, startRelayServer } from "./server.js";
+import { type RelayServer, type RelayServerStarter, startRelayServer } from "./server.js";
 import { delay } from "./wait.js";
 
-/** Options for {@link startTestRelay}. */
-export interface TestRelayOptions {
+/** Options for {@link startTestRelay}. The timings default to the relay's own. */
+export interface TestRelayOptions extends RelayTimings {
   /**
    * Secret that signs the binding tokens the relay issues, kept across
    * {@link TestRelay.restart}. When omitted, every start and restart uses a
    * new random secret, so tokens issued before a restart stop verifying.
    */
   bindingSecret?: RelayOptions["bindingSecret"];
-  /** How long a session with no bound member lasts before it ends, in milliseconds. Defaults to the relay's own. */
-  lingerMs?: RelayOptions["lingerMs"];
+  /**
+   * Starts the server the test relay runs, at every start and restart. When
+   * omitted, a server accepting an endpoint at `/{kind}/{role}` runs.
+   */
+  server?: RelayServerStarter;
+  /**
+   * Path, without its leading `/`, of the connection {@link TestRelay.settle}
+   * opens. The server must accept a connection there. Defaults to
+   * `probe/witness`.
+   */
+  probePath?: string;
 }
 
 /** Two scripted peers of one kind, paired by {@link TestRelay.pair}, with the welcome each received. */
@@ -32,8 +41,9 @@ export interface TestRelay {
   /** The relay's address as a bare loopback host and port, for a bridge client's bridge URL. */
   readonly address: string;
   /**
-   * Opens a scripted peer connected to `/{path}`, where `path` is
-   * `{kind}/{role}`. The peer is closed by {@link closePeers}.
+   * Opens a scripted peer connected to `/{path}`, where `path` names a route
+   * the server accepts an endpoint at: `{kind}/{role}` on the default server.
+   * The peer is closed by {@link closePeers}.
    */
   connect(path: string): Promise<ScriptedPeer>;
   /**
@@ -45,8 +55,9 @@ export interface TestRelay {
   pair(firstPath: string, secondPath: string): Promise<ScriptedPair>;
   /**
    * Resolves after a round trip through the relay on a connection of its
-   * own, giving the relay time to handle the closes of connections whose
-   * close has already completed on the client side.
+   * own, opened at the `probePath` the relay was started with, giving the
+   * relay time to handle the closes of connections whose close has already
+   * completed on the client side.
    */
   settle(): Promise<void>;
   /**
@@ -69,15 +80,16 @@ export interface TestRelay {
 
 /** Starts a {@link TestRelay}. Resolves once it is listening. */
 export async function startTestRelay(options: TestRelayOptions = {}): Promise<TestRelay> {
-  const { lingerMs } = options;
+  const { bindingSecret, server: startServer = startRelayServer, probePath = "probe/witness", ...timings } = options;
+  const { lingerMs } = timings;
   const logger = pino({ level: "silent" });
   const start = (port: number) =>
-    startRelayServer({
+    startServer({
       host: "127.0.0.1",
       port,
-      bindingSecret: options.bindingSecret ?? randomBytes(32).toString("hex"),
+      bindingSecret: bindingSecret ?? randomBytes(32).toString("hex"),
       logger,
-      lingerMs,
+      ...timings,
     });
   let server: RelayServer = await start(0);
   const { port } = server;
@@ -90,7 +102,7 @@ export async function startTestRelay(options: TestRelayOptions = {}): Promise<Te
   };
 
   const settle = async (): Promise<void> => {
-    const probe = await ScriptedPeer.open(port, "probe/witness");
+    const probe = await ScriptedPeer.open(port, probePath);
     await probe.ping();
     await probe.close();
   };

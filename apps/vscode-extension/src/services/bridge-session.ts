@@ -45,8 +45,8 @@ export function activateBridgeSession(context: vscode.ExtensionContext): Project
   createStatusBarItem(context, projectManager);
 
   context.subscriptions.push(
-    projectManager.onDidChangeAppBound(async (bound) => {
-      if (bound && !treeView.visible) {
+    projectManager.onDidChangePaired(async (paired) => {
+      if (paired && !treeView.visible) {
         await setWendooEnabled(true);
         vscode.commands.executeCommand("wendoo.sessions.focus");
       }

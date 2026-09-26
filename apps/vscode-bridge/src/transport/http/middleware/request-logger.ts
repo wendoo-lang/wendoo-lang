@@ -1,16 +1,19 @@
-import type { Context, Next } from "hono";
-import { logger } from "#core/logging/logger.js";
+import type { MiddlewareHandler } from "hono";
+import type { Logger } from "pino";
 
-export async function requestLogger(c: Context, next: Next) {
-  const start = Date.now();
-  const { method, path } = c.req;
+/** Returns middleware logging each request to `logger` as it arrives and again, with its status and duration, once answered. */
+export function requestLogger(logger: Logger): MiddlewareHandler {
+  return async (c, next) => {
+    const start = Date.now();
+    const { method, path } = c.req;
 
-  logger.info({ method, path }, "incoming request");
+    logger.info({ method, path }, "incoming request");
 
-  await next();
+    await next();
 
-  const duration = Date.now() - start;
-  const status = c.res.status;
+    const duration = Date.now() - start;
+    const status = c.res.status;
 
-  logger.info({ method, path, status, duration }, "request completed");
+    logger.info({ method, path, status, duration }, "request completed");
+  };
 }

@@ -32,11 +32,12 @@ catalog freshness), never AUTHORING -- editing continues while
 disconnected, with changes pending locally and the status clearly
 indicated.
 
-Session LIFECYCLE events are exactly three: formation, replacement,
-and end (explicit, or by sweep after a fully-disconnected linger).
-Sweep ends the session; the binding persists in the tokens its
-members hold and can re-form a session. A member dropping and
-returning is a status transition of the same session. Wire-level handshake machinery -- sockets, hellos, welcomes
+Session LIFECYCLE events are exactly two: formation, and end --
+explicit, by a member or an operator, or by sweep after a
+fully-disconnected linger. Either end ends the session; the binding
+persists in the tokens its members hold and can re-form a session. A
+member dropping and returning is a status transition of the same
+session. Wire-level handshake machinery -- sockets, hellos, welcomes
 -- is connection-scoped plumbing the session absorbs; no connectivity
 event creates or destroys a session.
 
@@ -44,83 +45,136 @@ event creates or destroys a session.
 
 - The BINDING TOKEN is the durable credential, and the only one an
   endpoint holds once its session is established: it identifies the
-  session across disconnects and reclaims it during linger. A token
-  naming a session that replacement ended never reaches the
-  successor: it fails silently, and its holder reaches the successor
-  only by a person entering a join code.
+  session across disconnects and reclaims it during linger.
 - BINDINGS SURVIVE SERVICE RESTARTS. A token carries no expiry and
   verifies for as long as the service's signing secret is unchanged.
   A hello presenting a verified token whose binding no live session
-  holds -- after a restart, or after a sweep -- re-forms the session
-  under that binding, with a fresh session id and a fresh join code;
-  the counterpart's token binds into it, both members are welcomed,
-  and each welcome carries a token identical to the one presented.
-  No one enters a code. Session ids and join codes re-mint at every
-  restart; the displays follow the pushed code. A service without a
-  durable secret verifies no token issued before its restart, and so
-  ends its sessions at restart.
+  holds -- after a restart, a sweep, or an explicit end -- re-forms
+  the session under that binding, with a fresh session id and a fresh
+  join code; the counterpart's token binds into it, both members are
+  welcomed, and each welcome carries a token identical to the one
+  presented. No one enters a code. Session ids and join codes re-mint
+  at every restart; the displays follow the pushed code. A service
+  without a durable secret verifies no token issued before its
+  restart, and so ends its sessions at restart.
 - The JOIN CODE is the ephemeral entry credential: how a person
   connects the two sides. Join codes are generated as word triplets
-  (one shared generator serves every relay) and ROTATE
-  unconditionally on a fixed interval -- rotation is engine behavior
-  with no configuration surface.
+  (one shared generator serves every relay), and no code in service
+  joins two sessions of a kind. Minting draws a bounded number of
+  triplets; should every draw be taken, it appends a random suffix
+  to a triplet rather than draw again.
+- A join code EXISTS EXACTLY WHILE ITS SESSION HAS A VACANT ROLE. The
+  relay mints one when a session forms (its first member awaiting the
+  second) and again each time a member's connection closes, and sends
+  it to each connected member as `session:joinCode`; the code leaves
+  service the moment both roles are bound, and when the session ends.
+  Every minted code is new: never one in service, never one in
+  quarantine. A session whose roles are both bound holds no code, so
+  no code in service ever targets an occupied role. The code belongs
+  to the session's vacancy, not to a member: the relay sends it to
+  whichever members are connected, whatever their role, and which side
+  displays a code and which side enters one is each lane's to decide.
+- Join codes ROTATE unconditionally: rotation is engine behavior
+  with no configuration surface. Every ten minutes, every code in
+  service -- a waiting or lingering session's -- is replaced by a
+  newly minted one, which each connected member receives as
+  `session:joinCode`. For two minutes after a rotation (or until the
+  next rotation, if that comes first) a hello presenting a session's
+  previous code still joins it, so a person partway through typing a
+  code is never stranded by a rotation; answers and welcomes always
+  carry the current code.
+- A code that leaves service -- replaced by rotation once its grace
+  ends, taken out of service when both roles bind or a member drops,
+  or held by a session that ends -- is QUARANTINED: it is not minted
+  again for the linger window (five minutes), so a person typing a
+  code that has just gone stale cannot land in a stranger's freshly
+  minted session.
 - A code is presented only until acceptance. An endpoint's hellos
   carry a join code only until one of them is accepted (welcomed):
   the code a person entered, or none from the endpoint whose first
   hello asks the relay to mint the session's code. Acceptance spends
   the code; every later hello, reconnects included, presents the
-  token alone. A code the relay sends -- answering a hello, pushed at
-  rotation, or carried in a welcome -- feeds the endpoint's display
-  and is never presented.
+  token alone. A code the relay sends answering a hello, or pushed
+  when a role falls vacant or at rotation, feeds the endpoint's
+  display; the code a welcome carries has already left service and is
+  displayed nowhere, and a welcome takes any displayed code down. No
+  code the relay sends is ever presented.
 - A presented code therefore always expresses current human intent,
-  so a hello presenting both a join code and a token is matched by
-  the code first and by the token only when the code matches
-  nothing. Rotation never strands an established endpoint, which
-  holds no code to go stale.
-- SESSION IDS are engine bookkeeping. They change at replacement.
-  Nothing user-facing keys continuity on a session id; product
+  and a hello presenting one is matched by the code alone. A code in
+  service joins its session's vacant role. A code that opens no vacant
+  role -- no session of the kind holds it, or its session has the
+  hello's role bound -- is REFUSED: the relay answers the hello with
+  `session:error` carrying `JOIN_CODE_UNKNOWN` and closes the
+  connection, and the endpoint holds without reconnecting until a
+  person enters a current code, in place. (A hello presenting, with
+  the code, the token of the member holding its role is that member's
+  own supersession; see ENDING.) A hello presenting no code is matched
+  by its token, and a hello presenting neither forms a new session.
+  Rotation never strands an established endpoint, which holds no code
+  to go stale.
+- SESSION IDS are engine bookkeeping: welcomes carry them, hellos
+  never present them, and a session re-formed from a token gets a new
+  one. Nothing user-facing keys continuity on a session id; product
   continuity is anchored on the token.
 
 ## Lifecycle in wire terms
 
 FORMATION. Each party connects to its role endpoint and sends
 `session:hello` declaring the protocol version it speaks. A valid
-hello is answered immediately with `session:joinCode`. The
-`session:welcome` is deferred until BOTH roles of the pairing are
-bound; it means "your session is connected", never "the relay heard
-you". Version rejection is immediate: `session:error` with a stable
-code, then the socket closes.
+hello is answered immediately with `session:joinCode`, carrying the
+session's most recent code. The `session:welcome` is deferred until
+BOTH roles of the pairing are bound; it means "your session is
+connected", never "the relay heard you". Its join code is the one
+that just left service as the second role bound; it joins nothing,
+and no endpoint displays it.
+Version rejection is immediate: `session:error` with a stable code,
+then the socket closes.
 
 STATUS. When a member drops, the session becomes disconnected for
 that side and the remaining member receives `session:counterpartAway`
--- a payload-less status signal, cleared by the next welcome. The
-session lingers (retaining id, code, and binding identity) and is
-reclaimed by a returning member's token; the stable peer is then
-RE-WELCOMED. Every welcome, first or repeated, instructs an endpoint
-to refresh its connection-scoped handshake machinery; the session
-itself persists across welcomes.
+-- a payload-less status signal, cleared by the next welcome -- and
+then `session:joinCode` carrying the code minted for the vacant role.
+The session lingers (retaining its id and binding identity, its code
+rotating as every code in service does) and is reclaimed by a
+returning member's token, or joined by a person entering its current
+code; the stable peer is then RE-WELCOMED. Every welcome, first or
+repeated, instructs an endpoint to refresh its connection-scoped
+handshake machinery; the session itself persists across welcomes.
 
-ENDING. A new claimant on an occupied role (no matching token) is
-REPLACEMENT: the one session-ending event besides explicit end and
-sweep. The session ends and a successor with fresh identity -- a new
-session id and binding -- takes its place under the join code the
-claimant presented. Only the displaced member's connection closes.
-The other role's member, when connected, is MIGRATED: re-bound into
-the successor in place, on its open connection, and re-welcomed with
-the successor's session id and a fresh binding token, alongside the
-claimant's own welcome. A member absent at the replacement holds a
-token naming the ended session; it fails silently on return, and
-that member rejoins by a person entering the join code. A session
-with no members for longer than the linger window is swept.
+LIVENESS is the engine's. A connection that sends nothing for one
+minute is closed by the relay, and its member has dropped exactly as
+on any closed connection. Endpoints send `control:ping` every fifteen
+seconds, which the relay answers with `control:pong`, so a live
+endpoint never trips the timeout; a half-open connection -- one whose
+far end is gone without a close -- is detected within about a minute,
+which bounds how long its role stays held and how late its
+counterpart learns it is away.
 
-SESSION_REPLACED is a client-hold signal, not a session-lifecycle
-statement: it tells one connection "another connection of your role
-has taken your place; do not reconnect automatically." It is sent in
-exactly two cases -- to the displaced same-role member at
-replacement (whose session ended), and to a member's superseded old
-connection when that member re-binds (whose session continues under
-the newcomer). It is never sent to the other role's member, which at
-replacement is migrated instead.
+ENDING. A session ends in exactly two ways. EXPLICIT END: a member
+sends `session:goodbye`, or an operator ends the session. The relay
+ends the session at once -- its codes leave service and its pairing
+is gone -- and closes both members' connections, first sending each
+member that did not ask for the end a `session:error` carrying
+`SESSION_ENDED` (an operator end tells both). SWEEP: a session with
+no members for longer than the linger window ends. An end is final
+for the session, not for the binding: a later, deliberate connect
+presenting a member's token re-forms a session under it (see
+Identity and credentials).
+
+There is no replacement. Because a session whose roles are bound holds
+no code, no hello claims an occupied role by code. The one takeover is
+SUPERSESSION: a hello presenting a member's own token while an older
+connection of that member still holds the role takes the role over.
+The older connection receives `session:error` carrying
+`SESSION_REPLACED` and closes; the session continues under the newer
+connection, and a connected counterpart is re-welcomed.
+
+SESSION_REPLACED and SESSION_ENDED are client-hold signals: each tells
+one connection "do not reconnect automatically". SESSION_REPLACED is
+sent in exactly one case, to a member's older connection when that
+member re-binds by its token, and never to the other role's member.
+SESSION_ENDED is sent only by an explicit end, to the members that did
+not ask for it.
 
 ## The version discipline
 
@@ -135,23 +189,62 @@ Payload message kinds carry no versions of their own. A lane's
 host-side emission channel, where one exists, carries the emitter's
 declared version in its framing.
 
+## The two-layer handshake
+
+Two handshakes stack, and each answers one question.
+
+The RELAY layer answers "is the session connected?": `session:hello`,
+answered by `session:joinCode`, then `session:welcome` once both roles
+are bound, repeated whenever a member binds back in. It is spoken
+between each endpoint and the relay, and the engine owns it.
+
+The KIND layer answers "do the two endpoints speak a common version
+of their kind?". On every welcome, each endpoint opens a fresh peer
+session over the payload channel: each sends `<kind>:hello` declaring
+the version it speaks, and sends nothing else of the kind until it has
+received the peer's hello; each adapts down, refusing only a newer
+version. Because welcomes gate the kind layer, both kind hellos travel
+over a connected session and neither is lost. A peer session covers
+one connection of the peer: a message arriving before the peer's hello
+belongs to the peer's previous session and is dropped, and a message
+arriving after the peer's hello but before the endpoint subscribes is
+held for its first subscriber. The kind layer is endpoint mechanism
+(the peer-session mechanism of the app-role package), not engine: the
+relay forwards its messages as payloads and never reads them.
+
 ## The engine / application seam
 
 THE ENGINE (`@wendoo/bridge-session`, upstream, platform-clean) owns
 everything subtle and stateful about sessions:
 
 - the session state machine: formation, status, linger, sweep,
-  replacement, re-welcome;
+  explicit end, supersession, re-welcome;
 - binding ids, token minting and verification, and re-forming a
   session from a verified token whose binding no live session holds;
-- join-code generation (via `@wendoo/join-codes`), uniqueness, and
-  rotation;
-- rate protection (throttles, pending-request bookkeeping);
+- join codes: generation (via `@wendoo/join-codes`), uniqueness, the
+  vacancy-only lifecycle, the refusal of a code that opens no vacant
+  role, rotation with its entry grace, and the quarantine of retired
+  codes;
+- liveness: each connection's activity timeout, which closes a silent
+  connection into the normal drop path;
+- rate protection: each connection's message allowance, a burst and
+  then a steady rate, beyond which a message is answered with an
+  `error` message and dropped;
+- request bookkeeping: the correlation that returns a reply -- a
+  message carrying the `id` of one the engine forwarded, within a
+  thirty-second reply deadline -- to the connection whose message it
+  answers, byte-verbatim; after the deadline a message carrying that
+  `id` is an ordinary one;
 - the emission points for every session signal (joinCode, welcome,
   counterpartAway, coded errors);
-- [stated at the engine extraction: the liveness definition that
-  decides "disconnected", and whether the endpoint peer-session
-  mechanism is part of the engine or a separate endpoint layer.]
+- operator inspection and administration: a read-only snapshot of
+  every session (its kind, session id, its join code while a role is
+  vacant, and each role connected or lingering, with the connected
+  member's id and when the role entered its state), ending a session
+  by id at once, telling each member `SESSION_ENDED`, and
+  disconnecting a member by id, which then returns by its token like
+  any dropped member. An application may expose these on an operator
+  console.
 
 The engine is kind-blind and platform-blind: it never learns what a
 session kind means, what payloads contain, or which product it
@@ -164,20 +257,28 @@ and reports that connection's events back through the handler
 `connect` returns: `receive` for each text frame, and `closed` once
 the connection has closed. Every session signal leaves the engine
 through `send`; the engine closes connections only through `close`.
+An application may also hand the engine a FRAME HANDLER, which
+settles every message outside the control namespaces that is not a
+reply: it forwards the message to the sender's peer, as received or
+rewritten, replies to the sender, or drops it. A message the handler
+forwards carrying an `id` has its peer's reply correlated back like
+any forwarded message's, without passing through the handler.
+Without a frame handler the engine forwards every such message
+byte-verbatim.
 
 APPLICATIONS (the relay services) own:
 
 - the route surface: generic `/{kind}/{role}` routes, or a fixed
-  role pair;
+  pair of role routes mapped onto a single kind;
 - the FORWARDING POLICY, chosen once per service and part of its
   identity: OPAQUE forwarding (every non-control message passes
   byte-verbatim, unparsed -- payloads and whole session kinds evolve
   without redeploying the relay) or DOMAIN ROUTING (recognized
-  message families dispatch through the service's own handlers)
-  [the engine's `Relay` performs opaque forwarding itself today; how
-  a domain-routing service supplies its policy to the engine is
-  stated when that service adopts the engine];
-- deployment identity: configuration, secrets, hardening, cadence.
+  message families dispatch through the service's own handlers). A
+  domain-routing service supplies its policy as the engine's frame
+  handler; an opaque one supplies none;
+- deployment identity: configuration, secrets, hardening at the
+  transport (such as per-address admission limits), cadence.
 
 Neither service contains session logic. Each is an adapter plus a
 deployment.
@@ -195,16 +296,20 @@ delivered.
 
 ENDPOINTS reach the wire through the role-generic client
 (`ProjectSession`, with its payload surface and session events) or
-the app-role wrapper (`AppBridge`). An endpoint's obligations:
+the app-role wrapper (`AppBridge`, which reports every welcome it
+accepts as a first-class welcome event and ends a session on purpose
+with `end()`). An endpoint's obligations:
 
 - open or refresh its connection-scoped handshake on EVERY welcome,
-  keeping the binding token each one carries -- a migrating welcome
-  carries a new one;
+  keeping the binding token each one carries;
 - treat `counterpartAway` and the welcome as the session status
   signals; never infer lifecycle from transport events;
 - key nothing on session ids; anchor continuity on the token alone,
   present a join code only until acceptance, and treat every code
   the relay sends as display;
+- keep its connection active with `control:ping`, and close it --
+  never end the session -- when it goes away for a reload or a
+  restart; end the session with `session:goodbye` only on purpose;
 - surface the session to product code as ONE object with stable
   identity, a status field, and a first-class state-change event
   surface [the canonical consumer surface is settled with the first
@@ -227,27 +332,23 @@ reconnect.
   point-of-use allowlists, outside this system.
 - Kid-facing resilience governs every surface here: mistakes are
   diagnosed with stable codes and the system soldiers on. The only
-  hard stops are the version rejection, SESSION_REPLACED, and an
-  endpoint discarding an outbound backlog that outgrew its bound
-  while its connection was down; each carries a stable code and a
-  remedy.
+  hard stops are the version rejection, `JOIN_CODE_UNKNOWN`,
+  `SESSION_REPLACED`, `SESSION_ENDED`, and an endpoint discarding an
+  outbound backlog that outgrew its bound while its connection was
+  down; each carries a stable code and a remedy.
 - Recovery is always in place: no failure leaves an endpoint needing
   an application reload to work again. Every terminal signal leaves
-  the endpoint's client able to start again in place; the hold after
-  SESSION_REPLACED forbids AUTOMATIC reconnection, not the recovery
-  path itself. A member superseded by its own re-bind still holds a
-  token for the live session, so starting again takes it back; a
-  member displaced at replacement holds a token for the ended one,
-  and its path back is a person entering the join code, in place.
-  The one exception is the version rejection, whose remedy is
-  updating the outdated party.
+  the endpoint's client able to start again in place; a hold forbids
+  AUTOMATIC reconnection, not the recovery path itself. A member
+  superseded by its own re-bind still holds a token for the live
+  session, so starting again takes it back; an endpoint refused for
+  its code enters a current one; an endpoint told its session ended
+  connects again deliberately, by its token (re-forming the session)
+  or by a code. The one exception is the version rejection, whose
+  remedy is updating the outdated party.
 
 ## Open re-derivations
 
-Tracked in the owning workstreams: the two-handshake sequence and
-possible vestigial peer-session machinery; the liveness owner (a
-counterpart-away signal today fires only on a real transport close,
-so its latency is unbounded for half-open drops until liveness has
-an owner); the mapping of fixed-role-pair services onto {kind,
-role}. Each resolves inside the engine-extraction or editor work,
-and this document is updated to plain statements as they settle.
+Tracked in the owning workstreams: the canonical consumer surface
+(marked above). It resolves inside the editor work, and this document
+is updated to plain statements as it settles.

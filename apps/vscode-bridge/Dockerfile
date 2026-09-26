@@ -12,6 +12,11 @@ COPY packages/join-codes/package.json packages/join-codes/package.json
 COPY packages/join-codes/tsconfig.json packages/join-codes/tsconfig.json
 COPY packages/join-codes/src packages/join-codes/src
 
+# Copy bridge-session (local dependency of vscode-bridge)
+COPY packages/bridge-session/package.json packages/bridge-session/package.json
+COPY packages/bridge-session/tsconfig.json packages/bridge-session/tsconfig.json
+COPY packages/bridge-session/src packages/bridge-session/src
+
 # Copy vscode-bridge
 COPY apps/vscode-bridge/package.json apps/vscode-bridge/package.json
 COPY apps/vscode-bridge/tsconfig.json apps/vscode-bridge/tsconfig.json
@@ -24,6 +29,10 @@ RUN npm install && npm run build
 
 # Build join-codes
 WORKDIR /workspace/packages/join-codes
+RUN npm install && npm run build
+
+# Build bridge-session
+WORKDIR /workspace/packages/bridge-session
 RUN npm install && npm run build
 
 # Build vscode-bridge
@@ -43,12 +52,19 @@ COPY --from=builder /workspace/packages/bridge-protocol/dist packages/bridge-pro
 COPY --from=builder /workspace/packages/join-codes/package.json packages/join-codes/package.json
 COPY --from=builder /workspace/packages/join-codes/dist packages/join-codes/dist
 
+# Copy built bridge-session (needed at runtime via file: reference)
+COPY --from=builder /workspace/packages/bridge-session/package.json packages/bridge-session/package.json
+COPY --from=builder /workspace/packages/bridge-session/dist packages/bridge-session/dist
+
 # Copy built vscode-bridge
 COPY --from=builder /workspace/apps/vscode-bridge/package.json apps/vscode-bridge/package.json
 COPY --from=builder /workspace/apps/vscode-bridge/dist apps/vscode-bridge/dist
 
 # Install deps for each package so transitive dependencies are resolved
 WORKDIR /workspace/packages/bridge-protocol
+RUN npm install --omit=dev
+
+WORKDIR /workspace/packages/bridge-session
 RUN npm install --omit=dev
 
 WORKDIR /workspace/apps/vscode-bridge

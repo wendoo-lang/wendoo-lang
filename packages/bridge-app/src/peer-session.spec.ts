@@ -153,6 +153,23 @@ describe("peer session messages", () => {
     receiver.dispose();
   });
 
+  it("drops a message that arrives before the peer's hello", async () => {
+    const port = scriptedPeer([
+      documentMessage("from the peer's previous session"),
+      { type: "sample:hello", payload: { protocolVersion: 1 } },
+      documentMessage(DOCUMENT_TEXT),
+    ]);
+    const session = await connectPeerSession<"sample", SampleDocumentMessage>({ kind: SAMPLE_KIND, port });
+
+    const received: string[] = [];
+    session.onMessage((message) => {
+      received.push(message.payload.content);
+    });
+
+    assert.deepEqual(received, [DOCUMENT_TEXT]);
+    session.dispose();
+  });
+
   it("replays a message that arrives with the peer's hello to the first listener", async () => {
     const port = scriptedPeer([
       { type: "sample:hello", payload: { protocolVersion: 1 } },

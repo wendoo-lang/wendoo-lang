@@ -53,6 +53,11 @@ function parseSent(ws: MockWebSocket): WsMessage[] {
   return ws.sent.map((raw) => JSON.parse(raw) as WsMessage);
 }
 
+/** Whether `ws` has sent a `session:goodbye`. */
+function sentGoodbye(ws: MockWebSocket): boolean {
+  return parseSent(ws).some((msg) => msg.type === "session:goodbye");
+}
+
 function createSession(): ProjectSession<WsMessage, WsMessage> {
   return new ProjectSession<WsMessage, WsMessage>("app", "localhost:3000", {});
 }
@@ -197,7 +202,7 @@ describe("ProjectSession", () => {
 
       assert.deepEqual(events, [`error:${BridgeSessionErrorCode.PROTOCOL_VERSION_MISMATCH}`, "status:disconnected"]);
       assert.equal(session.status, "disconnected");
-      assert.equal(parseSent(ws).at(-1)?.type, "session:goodbye");
+      assert.equal(sentGoodbye(ws), false);
       assert.equal(ws.closed, true);
     });
 
@@ -323,7 +328,7 @@ describe("ProjectSession", () => {
       return parseSent(next).find((msg) => msg.type === "session:hello");
     }
 
-    it("presents the constructor's join code until a welcome is accepted, then only its token and session id", () => {
+    it("presents the constructor's join code until a welcome is accepted, then only its token", () => {
       const session = new ProjectSession<WsMessage, WsMessage>("app", "localhost:3000", {}, "J-0");
       const ws = startSession(session);
       assert.deepEqual(parseSent(ws)[0]?.payload, { protocolVersion: PROTOCOL_VERSION, joinCode: "J-0" });
@@ -339,7 +344,6 @@ describe("ProjectSession", () => {
       assert.deepEqual(reconnectHello(welcomed)?.payload, {
         protocolVersion: PROTOCOL_VERSION,
         bindingToken: "T-1",
-        sessionId: "s-1",
       });
       session.stop();
     });
@@ -360,7 +364,6 @@ describe("ProjectSession", () => {
       assert.deepEqual(reconnectHello(welcomed)?.payload, {
         protocolVersion: PROTOCOL_VERSION,
         bindingToken: "T-1",
-        sessionId: "s-1",
       });
       session.stop();
     });
@@ -379,7 +382,6 @@ describe("ProjectSession", () => {
       assert.deepEqual(parseSent(restarted)[0]?.payload, {
         protocolVersion: PROTOCOL_VERSION,
         bindingToken: "T-1",
-        sessionId: "s-1",
       });
       session.stop();
     });
@@ -417,7 +419,7 @@ describe("ProjectSession", () => {
 
       assert.deepEqual(events, [`error:${BridgeSessionErrorCode.PROTOCOL_VERSION_MISMATCH}`, "status:disconnected"]);
       assert.deepEqual(errors, []);
-      assert.equal(parseSent(ws).at(-1)?.type, "session:goodbye");
+      assert.equal(sentGoodbye(ws), false);
       assert.equal(ws.closed, true);
 
       mock.timers.tick(60_000);
@@ -446,10 +448,26 @@ describe("ProjectSession", () => {
 
       assert.deepEqual(events, [`error:${BridgeSessionErrorCode.SESSION_REPLACED}`, "status:disconnected"]);
       assert.deepEqual(errors, []);
-      assert.equal(parseSent(ws).at(-1)?.type, "session:goodbye");
+      assert.equal(sentGoodbye(ws), false);
       assert.equal(ws.closed, true);
       assert.equal(MockWebSocket.instances.length, 1);
     });
+
+    for (const code of [BridgeSessionErrorCode.JOIN_CODE_UNKNOWN, BridgeSessionErrorCode.SESSION_ENDED]) {
+      it(`ends the session without reconnecting when the bridge reports ${code} and closes the socket`, () => {
+        const session = createSession();
+        const ws = startSession(session);
+        const events = recordEvents(session);
+
+        ws.simulateMessage({ type: "session:error", id: "hello", payload: { message: "held", code } });
+        ws.simulateClose();
+        mock.timers.tick(60_000);
+
+        assert.deepEqual(events, [`error:${code}`, "status:disconnected"]);
+        assert.equal(ws.closed, true);
+        assert.equal(MockWebSocket.instances.length, 1);
+      });
+    }
 
     it("keeps the session open on a session:error without a code", () => {
       const session = createSession();
@@ -511,7 +529,7 @@ describe("ProjectSession", () => {
       assert.throws(() => session.sendPayload({ type: "sample:note" }));
     });
 
-    it("starts again in place after an overflow, presenting its binding token and session id", () => {
+    it("starts again in place after an overflow, presenting its binding token", () => {
       const session = createSession();
       const received: WsMessage[] = [];
       session.onPayload((msg) => {
@@ -531,7 +549,7 @@ describe("ProjectSession", () => {
       assert.deepEqual(parseSent(ws), [
         {
           type: "session:hello",
-          payload: { protocolVersion: PROTOCOL_VERSION, bindingToken: "T-1", sessionId: "s-1" },
+          payload: { protocolVersion: PROTOCOL_VERSION, bindingToken: "T-1" },
         },
         outbound,
       ]);
@@ -574,13 +592,59 @@ describe("ProjectSession", () => {
       assert.deepEqual(parseSent(next).find((msg) => msg.type === "session:hello")?.payload, {
         protocolVersion: PROTOCOL_VERSION,
         bindingToken: "T-1",
-        sessionId: "s-1",
       });
       session.stop();
     });
   });
 
-  describe("stop", () => {
+  describe("stop and end", () => {
+    it("stops by closing the connection without a goodbye, and starts again presenting its binding token", () => {
+      const session = createSession();
+      const ws = startSession(session);
+      ws.simulateMessage({
+        type: "session:welcome",
+        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", joinCode: "J-1", bindingToken: "T-1" },
+      });
+
+      session.stop();
+
+      assert.equal(sentGoodbye(ws), false);
+      assert.equal(ws.closed, true);
+      assert.equal(session.status, "disconnected");
+      const restarted = startSession(session);
+      assert.deepEqual(parseSent(restarted)[0]?.payload, { protocolVersion: PROTOCOL_VERSION, bindingToken: "T-1" });
+      session.stop();
+    });
+
+    it("ends the session with a goodbye on its open connection, then closes it without reconnecting", () => {
+      const session = createSession();
+      const ws = startSession(session);
+      const events = recordEvents(session);
+      session.sendPayload({ type: "sample:note" });
+
+      session.end();
+      mock.timers.tick(60_000);
+
+      assert.deepEqual(
+        parseSent(ws).map((msg) => msg.type),
+        ["session:hello", "sample:note", "session:goodbye"]
+      );
+      assert.equal(ws.closed, true);
+      assert.deepEqual(events, ["status:disconnected"]);
+      assert.equal(MockWebSocket.instances.length, 1);
+      assert.throws(() => session.sendPayload({ type: "sample:note" }));
+    });
+
+    it("does nothing when ended while not started", () => {
+      const session = createSession();
+      const events = recordEvents(session);
+
+      session.end();
+
+      assert.deepEqual(events, []);
+      assert.equal(MockWebSocket.instances.length, 0);
+    });
+
     it("never reports connected after being stopped while connecting, and the socket sends nothing", () => {
       const session = createSession();
       session.start();

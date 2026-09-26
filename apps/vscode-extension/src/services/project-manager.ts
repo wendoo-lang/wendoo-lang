@@ -1,13 +1,15 @@
 import { fileContentText } from "@wendoo/app-host";
 import { type ConnectionStatus, type FileSystemNotification, Project } from "@wendoo/bridge-client";
-import type { ExtensionClientMessage, ExtensionServerMessage } from "@wendoo/bridge-protocol";
+import type { BridgeSessionErrorCode, ExtensionClientMessage, ExtensionServerMessage } from "@wendoo/bridge-protocol";
 
 type ExtensionProject = Project<ExtensionClientMessage, ExtensionServerMessage>;
 
 import * as vscode from "vscode";
 import { WENDOO_JSON } from "../wendoo-json";
+import { BridgePairing } from "./bridge-pairing";
 import { BuildMembershipTracker } from "./build-membership-tracker";
 import { DiagnosticsManager } from "./diagnostics-manager";
+import { SessionRecoveryAction, sessionRecoveryOffer } from "./session-recovery";
 import { WENDOO_SCHEME, WendooFileSystemProvider } from "./wendoo-fs-provider";
 
 const BINDING_TOKEN_KEY = "wendoo.bindingToken";
@@ -37,8 +39,7 @@ function pendingChangeKey(ev: FileSystemNotification): string | undefined {
 
 export class ProjectManager implements vscode.Disposable {
   private _project: ExtensionProject | undefined;
-  private _appBound = false;
-  private _appClientConnected = false;
+  private _pairing: BridgePairing | undefined;
   private _hasBindingToken = false;
   private _pendingChanges: FileSystemNotification[] = [];
   private readonly _unsubs: (() => void)[] = [];
@@ -55,11 +56,9 @@ export class ProjectManager implements vscode.Disposable {
   private readonly _onDidChangeStatus = new vscode.EventEmitter<ConnectionStatus>();
   readonly onDidChangeStatus = this._onDidChangeStatus.event;
 
-  private readonly _onDidChangeAppBound = new vscode.EventEmitter<boolean>();
-  readonly onDidChangeAppBound = this._onDidChangeAppBound.event;
-
-  private readonly _onDidChangeAppClientConnected = new vscode.EventEmitter<boolean>();
-  readonly onDidChangeAppClientConnected = this._onDidChangeAppClientConnected.event;
+  private readonly _onDidChangePaired = new vscode.EventEmitter<boolean>();
+  /** Fires with {@link paired} each time it changes. */
+  readonly onDidChangePaired = this._onDidChangePaired.event;
 
   private readonly _onDidChangePendingChanges = new vscode.EventEmitter<number>();
   readonly onDidChangePendingChanges = this._onDidChangePendingChanges.event;
@@ -84,12 +83,9 @@ export class ProjectManager implements vscode.Disposable {
     return this._project?.session.status ?? "disconnected";
   }
 
-  get appBound(): boolean {
-    return this._appBound;
-  }
-
-  get appClientConnected(): boolean {
-    return this._appClientConnected;
+  /** `true` while the session is paired with a connected Wendoo app: welcomed, and not told the app is away since. */
+  get paired(): boolean {
+    return this._pairing?.paired ?? false;
   }
 
   get hasBindingToken(): boolean {
@@ -139,51 +135,28 @@ export class ProjectManager implements vscode.Disposable {
       bindingToken,
     });
 
+    const pairing = new BridgePairing(project.session, (token) => {
+      this._globalState?.update(BINDING_TOKEN_KEY, token);
+      this._hasBindingToken = true;
+    });
+    this._pairing = pairing;
+
     this._unsubs.push(
       project.session.addEventListener("status", (status) => {
         this._onDidChangeStatus.fire(status);
-        if (status === "connected") {
-          if (this._appBound) {
-            this._appBound = false;
-            this._onDidChangeAppBound.fire(false);
-          }
-          if (this._appClientConnected) {
-            this._appClientConnected = false;
-            this._onDidChangeAppClientConnected.fire(false);
-          }
-        } else if (status === "disconnected") {
+        if (status === "disconnected") {
           this.disconnectActive();
           this.closeWendooTabs();
           this.removeWorkspaceFolder();
         }
-      })
-    );
-
-    this._unsubs.push(
-      project.session.on("session:appStatus", (msg) => {
-        const bound = msg.payload?.bound ?? false;
-        const clientConnected = msg.payload?.clientConnected ?? false;
-        if (bound) {
-          const p = msg.payload;
-          if (p?.bindingToken) {
-            this._globalState?.update(BINDING_TOKEN_KEY, p.bindingToken);
-            this._hasBindingToken = true;
-          }
-        }
-        const wasBound = this._appBound;
-        const wasClientConnected = this._appClientConnected;
-        if (this._appBound !== bound) {
-          this._appBound = bound;
-          this._onDidChangeAppBound.fire(bound);
-        }
-        if (this._appClientConnected !== clientConnected) {
-          this._appClientConnected = clientConnected;
-          this._onDidChangeAppClientConnected.fire(clientConnected);
-        }
-        if (bound && clientConnected) {
-          if (!wasBound || !wasClientConnected) {
-            this.syncWithRetry(project);
-          }
+      }),
+      project.session.addEventListener("error", (code) => {
+        void this.offerRecovery(code);
+      }),
+      pairing.onDidChange(() => {
+        this._onDidChangePaired.fire(pairing.paired);
+        if (pairing.paired) {
+          this.syncWithRetry(project);
           if (this._pendingChanges.length > 0) {
             this.syncAndClearPending();
           }
@@ -215,7 +188,31 @@ export class ProjectManager implements vscode.Disposable {
     this._onDidChangeProject.fire();
   }
 
+  /** Tells the user why the session's connection ended and runs the recovery action they choose. */
+  private async offerRecovery(code: BridgeSessionErrorCode): Promise<void> {
+    const offer = sessionRecoveryOffer(code);
+    const label = await vscode.window.showWarningMessage(offer.message, ...offer.choices.map((choice) => choice.label));
+    const chosen = offer.choices.find((choice) => choice.label === label);
+    switch (chosen?.action) {
+      case SessionRecoveryAction.RECONNECT:
+        this.connect();
+        break;
+      case SessionRecoveryAction.ENTER_JOIN_CODE:
+        void vscode.commands.executeCommand("wendoo.connect");
+        break;
+      case SessionRecoveryAction.CHECK_FOR_UPDATES:
+        void vscode.commands.executeCommand("workbench.extensions.action.checkForUpdates");
+        break;
+    }
+  }
+
+  /**
+   * Ends the session on purpose -- the Wendoo app is told it ended -- and
+   * forgets it: closes the Wendoo tabs and workspace folder and drops the
+   * saved binding token and project name.
+   */
   disconnect(): void {
+    this._project?.session.end();
     this.disconnectActive();
     this.closeWendooTabs();
     this.removeWorkspaceFolder();
@@ -313,6 +310,9 @@ export class ProjectManager implements vscode.Disposable {
     if (!this._project) return;
     for (const unsub of this._unsubs) unsub();
     this._unsubs.length = 0;
+    const wasPaired = this.paired;
+    this._pairing?.dispose();
+    this._pairing = undefined;
     this._project.session.stop();
     this._project = undefined;
     this._fsProvider.setFileSystems(undefined, undefined);
@@ -320,13 +320,8 @@ export class ProjectManager implements vscode.Disposable {
     this._buildMembership.refresh(undefined);
     this._onDidChangeProject.fire();
     this._onDidChangeStatus.fire("disconnected");
-    if (this._appBound) {
-      this._appBound = false;
-      this._onDidChangeAppBound.fire(false);
-    }
-    if (this._appClientConnected) {
-      this._appClientConnected = false;
-      this._onDidChangeAppClientConnected.fire(false);
+    if (wasPaired) {
+      this._onDidChangePaired.fire(false);
     }
     if (this._pendingChanges.length > 0) {
       this._pendingChanges.length = 0;
@@ -482,8 +477,7 @@ export class ProjectManager implements vscode.Disposable {
     this._buildMembership.dispose();
     this._onDidChangeProject.dispose();
     this._onDidChangeStatus.dispose();
-    this._onDidChangeAppBound.dispose();
-    this._onDidChangeAppClientConnected.dispose();
+    this._onDidChangePaired.dispose();
     this._onDidChangePendingChanges.dispose();
     for (const d of this._disposables) d.dispose();
   }

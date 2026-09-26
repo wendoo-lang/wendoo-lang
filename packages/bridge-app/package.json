@@ -86,7 +86,7 @@
     "lint": "biome lint ./src --write",
     "check": "biome check ./src --write",
     "pretest": "npm run build:prod",
-    "test": "tsx --tsconfig tsconfig.spec.json --test $(find src -name '*.spec.ts')",
+    "test": "tsx --disable-warning=ExperimentalWarning --tsconfig tsconfig.spec.json --test $(find src -name '*.spec.ts')",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.spec.json",
     "format": "biome format ./src --write",
     "release:patch": "node ../../scripts/release.js patch",

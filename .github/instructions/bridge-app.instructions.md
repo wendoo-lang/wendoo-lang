@@ -2,7 +2,7 @@
 applyTo: "packages/bridge-app/**"
 ---
 
-<!-- Last reviewed: 2026-09-25 -->
+<!-- Last reviewed: 2026-09-26 -->
 
 # bridge-app -- Rules & Patterns
 
@@ -91,6 +91,28 @@ src/
 Specs sit beside their modules as `*.spec.ts`; `public-api.spec.ts` pins the
 public contracts of the root and `./compilation` entry points.
 
+## The App Bridge
+
+`createAppBridge` returns the app-role connection an app drives; `AppEnvironmentHost`
+wraps one for the apps built on it.
+
+- `stop()` closes the connection and the session lives on at the relay, so a reload or
+  restart binds back in by the binding token. `end()` ends the session on purpose: over an
+  open connection the relay ends it and tells the counterpart `SESSION_ENDED`; with no open
+  connection it is `stop()`. Both keep the binding token.
+- `onWelcome` reports every welcome the bridge accepts, first and repeated, with the binding
+  token it carries, once the snapshot reflects it. Key per-welcome work (a fresh peer
+  session, pairing state) on it.
+- The snapshot's `joinCode` is the code for the session's vacant role: it follows every
+  `session:joinCode` and is cleared at each welcome, because both roles are then bound.
+  `errorCode` holds the code of a failure that ended the connection until the next
+  `start()`; `counterpartAway` is set from the relay's signal until the next welcome.
+- `AppEnvironmentHost` exposes the bridge to app UI as snapshot/subscribe pairs -- status,
+  join code, error code, and paired (from each welcome until the counterpart is away or the
+  connection is no longer open) -- plus `connectBridge()`, `disconnectBridge()`, and
+  `endBridge()`, which ends the session and discards the bridge so the next connect loads
+  the binding token afresh.
+
 ## Session Kinds
 
 A session kind is one wire surface between two parties, with one version.
@@ -145,8 +167,10 @@ For a peer session:
   hello.
 - A kind's payload messages carry no version of their own; they ride the
   kind's version, and the mechanism carries them verbatim.
-- Payload messages received while no listener is attached are replayed to
-  the next listener that attaches.
+- A message received before the peer's hello belongs to the peer's previous
+  session and is dropped. Payload messages received after the peer's hello
+  while no listener is attached are replayed to the next listener that
+  attaches.
 - One session covers one connection of the peer; open a new session when the
   peer reconnects.
 

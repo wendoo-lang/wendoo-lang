@@ -41,7 +41,7 @@ Wendoo draws inspiration from other tile-based programming systems past and pres
 | [@wendoo/bridge-protocol](packages/bridge-protocol/) | VS Code bridge network protocol types and schemas |
 | [@wendoo/bridge-client](packages/bridge-client/) | Client SDK for the VS Code bridge |
 | [@wendoo/bridge-app](packages/bridge-app/) | Opinionated layer atop bridge-client for the VS Code bridge |
-| [@wendoo/bridge-session](packages/bridge-session/) | Session engine of the bridge relays -- pairing, binding tokens, linger, and replacement |
+| [@wendoo/bridge-session](packages/bridge-session/) | Session engine of the bridge relays -- pairing, binding tokens, join codes, liveness, and ending |
 
 ## Apps
 

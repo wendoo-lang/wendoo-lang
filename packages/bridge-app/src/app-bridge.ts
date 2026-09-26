@@ -27,14 +27,35 @@ export interface AppBridge {
    * stopped, so a later call opens a new session.
    */
   start(): void;
-  /** Close the bridge connection and release resources. */
+  /**
+   * Close the bridge connection and release resources. The session lives on
+   * at the relay, and a later `start()` binds back into it by the binding
+   * token.
+   */
   stop(): void;
+  /**
+   * End the session on purpose, then close the connection and release
+   * resources as `stop()` does. On an open connection the relay ends the
+   * session and tells its counterpart `BridgeSessionErrorCode.SESSION_ENDED`;
+   * while the connection is not open nothing reaches the relay, and this is
+   * `stop()`. The binding token is kept: a later `start()` presenting it
+   * re-forms a session under the same binding.
+   */
+  end(): void;
   /** Request a full project file resync from the peer. */
   requestSync(): Promise<void>;
   /** Read the current connection state. */
   snapshot(): AppBridgeSnapshot;
   /** Subscribe to connection-state changes. Returns an unsubscribe function. */
   onStateChange(listener: (state: AppBridgeState) => void): () => void;
+  /**
+   * Subscribe to the session's welcomes: every `session:welcome` the bridge
+   * accepts, first and repeated, each meaning the session is connected with
+   * its counterpart. The listener is called once the snapshot reflects the
+   * welcome, and stays subscribed across `start()`/`stop()` cycles. Returns
+   * an unsubscribe function.
+   */
+  onWelcome(listener: (welcome: AppBridgeWelcome) => void): () => void;
   /** Subscribe to project file changes pushed by the remote peer. */
   onRemoteChange(listener: (change: ProjectFileChange) => void): () => void;
   /**
@@ -55,10 +76,22 @@ export interface AppBridge {
   onPayload(listener: (message: WsMessage) => void): () => void;
 }
 
+/** A `session:welcome` the bridge accepted, as {@link AppBridge.onWelcome} reports it. */
+export interface AppBridgeWelcome {
+  /** The binding token the welcome carries, or `undefined` when it carries none. */
+  readonly bindingToken: string | undefined;
+}
+
 /** Snapshot of the bridge connection state. */
 export interface AppBridgeSnapshot {
   status: AppBridgeState;
-  /** Code the user pastes into the peer to bind the session, when available. */
+  /**
+   * The code a person enters on the counterpart's side to join the session:
+   * the latest code the relay sent while one of the session's roles is
+   * vacant. Absent before the first, from each accepted welcome (both roles
+   * bound, so no code joins the session) until the relay sends another, and
+   * whenever the bridge stops.
+   */
   joinCode?: string;
   /** Stable code of the failure that ended the session, if one did. Cleared when the bridge next starts. */
   errorCode?: BridgeSessionErrorCode;
@@ -131,6 +164,7 @@ export function createAppBridge(options: AppBridgeOptions): AppBridge {
 class AppBridgeController implements AppBridge {
   private readonly _options: AppBridgeOptions;
   private readonly _stateListeners = new Set<(state: AppBridgeState) => void>();
+  private readonly _welcomeListeners = new Set<(welcome: AppBridgeWelcome) => void>();
   private readonly _remoteChangeListeners = new Set<(change: ProjectFileChange) => void>();
   private readonly _syncListeners = new Set<() => void>();
   private readonly _payloadListeners = new Set<(message: WsMessage) => void>();
@@ -191,6 +225,7 @@ class AppBridgeController implements AppBridge {
           this._options.onBindingTokenChange?.(token);
         }
         this.setCounterpartAway(false);
+        this.emitWelcome({ bindingToken: token });
       }),
       project.onJoinCodeChange((joinCode) => {
         this.setJoinCode(joinCode);
@@ -220,6 +255,17 @@ class AppBridgeController implements AppBridge {
     this.releaseProject();
   }
 
+  end(): void {
+    const project = this._project;
+    if (!project) {
+      this.stop();
+      return;
+    }
+
+    project.session.end();
+    this.releaseProject();
+  }
+
   async requestSync(): Promise<void> {
     const project = this.requireProject();
     await project.requestSync();
@@ -241,6 +287,13 @@ class AppBridgeController implements AppBridge {
     this._stateListeners.add(listener);
     return () => {
       this._stateListeners.delete(listener);
+    };
+  }
+
+  onWelcome(listener: (welcome: AppBridgeWelcome) => void): () => void {
+    this._welcomeListeners.add(listener);
+    return () => {
+      this._welcomeListeners.delete(listener);
     };
   }
 
@@ -303,6 +356,12 @@ class AppBridgeController implements AppBridge {
   private emitDidSync(): void {
     for (const listener of this._syncListeners) {
       listener();
+    }
+  }
+
+  private emitWelcome(welcome: AppBridgeWelcome): void {
+    for (const listener of this._welcomeListeners) {
+      listener(welcome);
     }
   }
 

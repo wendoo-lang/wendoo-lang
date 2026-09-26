@@ -76,8 +76,9 @@ export interface PeerSession<TMessage> {
 
 /**
  * Open a peer session of `kind` over `port`: sends this side's hello and
- * waits for the peer's. A peer declaring any version up to the kind's
- * `protocolVersion` is accepted and its version recorded on the session.
+ * waits for the peer's, dropping any other message that arrives before it. A
+ * peer declaring any version up to the kind's `protocolVersion` is accepted
+ * and its version recorded on the session.
  * Rejects with {@link PeerSessionError} carrying
  * `PROTOCOL_VERSION_NEWER` when the peer declares a newer version. A
  * session covers one connection of the peer; open a new session when the
@@ -93,10 +94,12 @@ export function connectPeerSession<TKind extends string, TMessage extends { type
   const helloType: `${TKind}:hello` = `${kind.kind}:hello`;
   const listeners = new Set<(message: TMessage) => void>();
   const buffered: TMessage[] = [];
+  let established = false;
 
   return new Promise<PeerSession<TMessage>>((resolve, reject) => {
     const unsubscribe = port.onMessage((message) => {
       if (message.type !== helloType) {
+        if (!established) return;
         const sessionMessage = message as TMessage;
         if (listeners.size === 0) {
           buffered.push(sessionMessage);
@@ -118,6 +121,7 @@ export function connectPeerSession<TKind extends string, TMessage extends { type
         );
         return;
       }
+      established = true;
       resolve({
         peerProtocolVersion,
         postMessage(sessionMessage: TMessage): void {

@@ -37,7 +37,7 @@ export function SettingsDialog({ open, onOpenChange, onBridgeDisabled }: Setting
     store.updateAppSettings(draft);
     if (wasShowingBridge && !draft.showBridgePanel && store.getUiPreferences().bridgeEnabled) {
       store.updateUiPreferences({ bridgeEnabled: false });
-      store.disconnectBridge();
+      store.endBridge();
       clearBindingToken();
       onBridgeDisabled?.();
     }

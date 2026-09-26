@@ -11,14 +11,29 @@ export const BridgeSessionErrorCode = {
    */
   PROTOCOL_VERSION_MISMATCH: "BRIDGE_SESSION_PROTOCOL_VERSION_MISMATCH",
   /**
-   * Another connection of this side's role has taken this connection's place:
+   * A newer connection of the same member has taken this connection's place:
    * this client's hold on the session is over, and it does not reconnect
-   * automatically. Reported by a bridge, on the connection it then closes, to
-   * the connection displaced by a new claimant for its role (which ends the
-   * session) or by the same member returning with the session's binding token
-   * (the session continues under the returning connection).
+   * automatically. Reported by a bridge, on the connection it then closes,
+   * when a hello presenting the session's binding token binds the member's
+   * role while this connection still holds it. The session continues under
+   * the newer connection.
    */
   SESSION_REPLACED: "BRIDGE_SESSION_SESSION_REPLACED",
+  /**
+   * The join code this connection's hello presented opens no vacant role: no
+   * session holds it, or the session holding it already has this connection's
+   * role bound. The client does not reconnect automatically; a person enters
+   * a current code to connect. Reported by a bridge, in answer to the hello,
+   * on the connection it then closes.
+   */
+  JOIN_CODE_UNKNOWN: "BRIDGE_SESSION_JOIN_CODE_UNKNOWN",
+  /**
+   * The session was ended on purpose: its other member sent
+   * `session:goodbye`, or an operator ended it. The client does not reconnect
+   * automatically; connecting again is a deliberate act. Reported by a
+   * bridge, on the connection it then closes.
+   */
+  SESSION_ENDED: "BRIDGE_SESSION_SESSION_ENDED",
   /**
    * This side queued more outbound messages than it holds while its
    * connection was not open, so it discarded them and ended the session.
@@ -88,7 +103,6 @@ export interface GeneralErrorMessage {
 /** Schema for the `session:hello` payload. */
 export const sessionHelloPayloadSchema = z.object({
   protocolVersion: z.number(),
-  sessionId: z.string().optional(),
   joinCode: z.string().optional(),
   bindingToken: z.string().optional(),
 });
@@ -105,14 +119,18 @@ export interface SessionHelloMessage {
 
 /**
  * Sent by a bridge to tell a member that its session's counterpart has
- * disconnected. The session stays open and keeps its join code and binding
- * token; the next `session:welcome` means the counterpart is connected again.
+ * disconnected. The session stays open and keeps its binding token; the next
+ * `session:welcome` means the counterpart is connected again.
  */
 export interface SessionCounterpartAwayMessage {
   type: "session:counterpartAway";
 }
 
-/** Sent by a client to gracefully end the session. */
+/**
+ * Sent by a client to end its session on purpose. The bridge closes both
+ * members' connections, first telling the other member with a
+ * `session:error` carrying `SESSION_ENDED`.
+ */
 export interface SessionGoodbyeMessage {
   type: "session:goodbye";
   id?: string;

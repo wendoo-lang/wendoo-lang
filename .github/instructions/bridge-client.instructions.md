@@ -2,7 +2,7 @@
 applyTo: "packages/bridge-client/**"
 ---
 
-<!-- Last reviewed: 2026-09-25 -->
+<!-- Last reviewed: 2026-09-26 -->
 
 # bridge-client -- Rules & Patterns
 
@@ -98,11 +98,22 @@ Session handshake: every connection's first frame is a `session:hello` declaring
 `PROTOCOL_VERSION`, sent via `sendImmediate`; messages sent while connecting or reconnecting
 follow it in the order they were sent. The server responds with `session:welcome`
 (protocolVersion, sessionId, joinCode, bindingToken). Each hello presents the binding token
-and session id the session holds. The join code passed to the constructor is an entry
-credential: hellos present it only until the session accepts a `session:welcome`, which
-discards it, so every later hello -- reconnects and `start()` included -- presents the token and
-session id alone. A join code the bridge sends, in a welcome or a `session:joinCode`, is for
-display and is never presented.
+the session holds. The join code passed to the constructor is an entry credential: hellos
+present it only until the session accepts a `session:welcome`, which discards it, so every
+later hello -- reconnects and `start()` included -- presents the token alone. A join code the
+bridge sends is never presented: a `session:joinCode` feeds a display, and a welcome's code has
+already left service and feeds none.
+The session id a welcome carries is kept as `sessionId` and never presented. The `WsClient`
+sends `control:ping` every 15 seconds while connected, which keeps the connection inside the
+bridge's activity timeout.
+
+`stop()` closes the connection and nothing more: the session lives on at the bridge, its
+counterpart told it is away, and a later `start()` binds back in with the token -- the call
+for a reload, a restart, or a disposal. `end()` ends the session on purpose: it sends
+`session:goodbye` on the open connection, which tells the bridge to end the session and its
+counterpart that it has ended, then stops as `stop()` does; when the connection is not open,
+nothing reaches the bridge and the session lives on as after `stop()`. No other path sends
+`session:goodbye`.
 
 A session ends on any of these failures:
 
@@ -114,10 +125,12 @@ A session ends on any of these failures:
   `BridgeSessionErrorCode.OUTBOUND_QUEUE_OVERFLOW`. The queued messages are discarded and
   nothing is sent.
 
-On a failing message, the session sends `session:goodbye`; on any failure, it closes the
-connection without reconnecting, emits `"error"`, then `"status"` `"disconnected"`. The
-failing message reaches no `on` handler, and nothing in a rejected welcome is adopted. A
-later `start()` opens a new session.
+On any failure, the session closes the connection without reconnecting, emits `"error"`,
+then `"status"` `"disconnected"`. The failing message reaches no `on` handler, and nothing in
+a rejected welcome is adopted. A later `start()` opens a new session. The codes a bridge
+reports -- `SESSION_REPLACED`, `JOIN_CODE_UNKNOWN`, `SESSION_ENDED`, and a bridge's
+`PROTOCOL_VERSION_MISMATCH` -- all end the session this way; the session interprets none of
+them further.
 
 ## ProjectFiles
 
@@ -134,4 +147,5 @@ Two `NotifyingFileSystem` wrappers around a shared `FileSystem`:
 - Use `import type` for type-only imports within the package.
 - All unsubscribe functions return `() => void`.
 - `send()`, `sendPayload()`, and `request()` throw if the session is not started. `on()` and
-  `onPayload()` do not -- handlers queue for the next start.
+  `onPayload()` do not -- handlers queue for the next start. `stop()` and `end()` do nothing
+  when the session is not started.

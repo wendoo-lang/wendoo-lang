@@ -15,14 +15,7 @@ export type {
   CompileStatusPayload,
 } from "./compile.js";
 export { compileDiagnosticsPayloadSchema, compileStatusPayloadSchema } from "./compile.js";
-export type {
-  ExtensionAppStatusMessage,
-  ExtensionAppStatusPayload,
-  ExtensionClientMessage,
-  ExtensionServerMessage,
-  ExtensionSessionWelcomeMessage,
-  ExtensionSessionWelcomePayload,
-} from "./extension.js";
+export type { ExtensionClientMessage, ExtensionServerMessage } from "./extension.js";
 export type {
   ControlPingMessage,
   ControlPongMessage,

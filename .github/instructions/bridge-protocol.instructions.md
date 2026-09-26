@@ -27,7 +27,7 @@ types.
 
 ```
 src/
-  index.ts           # barrel (all public exports), PROTOCOL_VERSION, SessionRole
+  index.ts           # barrel (all public exports), PROTOCOL_VERSION
   schemas.ts         # base wsMessageSchema (Zod), BRIDGE_PROTOCOL_NAMESPACES
   notifications.ts   # FileSystemNotification + FilesystemSyncPayload (Zod)
   folder-session.ts  # folder-host session: messages, version, FolderSessionErrorCode
@@ -42,7 +42,6 @@ src/
 
 ## Key Exports
 
-- `SessionRole` -- `"app" | "extension"`, identifies the connecting client role.
 - `wsMessageSchema` -- Zod schema for the base WebSocket message envelope
   (`type`, optional `id`, optional `payload`, optional `seq`).
 - `filesystemNotificationSchema` -- Zod discriminated union on `action`:
@@ -56,13 +55,17 @@ src/
 - `BridgeSessionErrorCode` -- constant object plus union type of the stable codes of
   bridge-session failures. `PROTOCOL_VERSION_MISMATCH` covers both directions: a client
   refusing its bridge's welcome, and a bridge refusing a client's hello. `SESSION_REPLACED`
-  means another connection of the receiver's role has taken its place: the receiving
-  client's hold on the session is over and it does not reconnect automatically. A bridge
-  reports it, before closing the connection, to a connection displaced by a new claimant
-  for its role (the session ends) or by the same member returning with the session's
-  binding token (the session continues under the returning connection). It never goes to
-  the other role's member. `OUTBOUND_QUEUE_OVERFLOW` is raised by a client that queued more
-  outbound messages than it holds while its connection was not open; no one sends it.
+  means a newer connection of the same member has taken the receiver's place: a bridge
+  reports it, before closing the connection, when a hello presenting the session's binding
+  token binds the member's role while the older connection still holds it; the session
+  continues under the newer connection, and the code never goes to the other role's
+  member. `JOIN_CODE_UNKNOWN` answers a hello whose join code opens no vacant role (no
+  session holds it, or its session has the hello's role bound); the bridge closes the
+  connection after it. `SESSION_ENDED` tells a member its session was ended on purpose --
+  by the other member's `session:goodbye` or by an operator -- before the bridge closes
+  its connection. A client receiving any of these three does not reconnect automatically.
+  `OUTBOUND_QUEUE_OVERFLOW` is raised by a client that queued more outbound messages than
+  it holds while its connection was not open; no one sends it.
 - `ErrorPayload` -- payload of `session:error` and `error`: a prose `message` and an
   optional `code` (`BridgeSessionErrorCode`).
 - The folder-host session's and the peer-session mechanism's types, constants, and
@@ -78,21 +81,21 @@ client) and a `ServerMessage` union (sent by the bridge server to that client).
 | Type | Direction | Purpose |
 |---|---|---|
 | `session:hello` | client -> server | Initiate/authenticate session |
-| `session:goodbye` | either | Graceful close |
+| `session:goodbye` | client -> server | End the session on purpose |
+| `session:joinCode` | server -> client | The session's join code, for display |
+| `session:welcome` | server -> client | The session is connected (sessionId, joinCode, bindingToken) |
+| `session:counterpartAway` | server -> client | The session's counterpart disconnected; the session stays open |
 | `session:error` | either | Session-scoped error; one carrying a `code` ends the session |
 | `error` | either | General error |
 | `control:ping` | client -> server | Heartbeat request |
 | `control:pong` | server -> client | Heartbeat response |
 | `filesystem:change` | either | Single file/dir operation |
-| `filesystem:sync` | server -> client | Full filesystem snapshot |
+| `filesystem:sync` | either | Full filesystem snapshot, or a request for one |
 
 ### App-only messages
 
 | Type | Direction | Purpose |
 |---|---|---|
-| `session:welcome` | server -> client | Session confirmation (sessionId, joinCode, bindingToken) |
-| `session:joinCode` | server -> client | Updated join code |
-| `session:counterpartAway` | server -> client | The session's counterpart disconnected; the session stays open |
 | `compile:diagnostics` | client -> server | Per-file diagnostic list |
 | `compile:status` | client -> server | Compilation result summary |
 
@@ -100,8 +103,6 @@ client) and a `ServerMessage` union (sent by the bridge server to that client).
 
 | Type | Direction | Purpose |
 |---|---|---|
-| `session:welcome` | server -> client | Session confirmation (sessionId only) |
-| `session:appStatus` | server -> client | App binding/connection status |
 | `compile:diagnostics` | server -> client | Forwarded diagnostics from app |
 | `compile:status` | server -> client | Forwarded compile status from app |
 
@@ -126,31 +127,35 @@ client) and a `ServerMessage` union (sent by the bridge server to that client).
   `BridgeSessionErrorCode` in its `ErrorPayload.code`. `code` is optional and additive: an
   error without one keeps its existing meaning. A new failure adds a member whose JSDoc
   says who raises it.
-- `session:welcome` means "the session is connected"; when a relay sends it is relay
-  policy. The vscode-bridge relay welcomes a hello immediately. A pairing relay (the
-  `bridge-session` engine) answers a hello with `session:joinCode` at once and welcomes
-  both members each time both roles of the pairing become bound: first when the pairing
-  forms, and again whenever a member binds back in, so a still-connected member receives
-  a further welcome on its open connection.
-  A member returning with a binding token for the session is a status change of the same
-  session (same session id, join code, and binding token). A hello for an occupied role
-  without such a token is a new claimant: it ends the session. The displaced member
-  receives `SESSION_REPLACED` and its connection closes; the other member stays connected
-  and is carried into the new session, which keeps the join code, and both it and the
-  newcomer are welcomed with the new session id and a new binding token. Tokens naming the
-  ended session never reach the successor, so a member absent at the replacement returns
-  to it only by a person entering the join code. A session with no member also ends after
-  a linger timeout. A hello presenting a verified binding token whose binding no live
-  session holds -- after a linger timeout, or after the relay restarts under an unchanged
-  binding secret -- re-forms the session under that binding with a new session id and join
-  code, and the counterpart's token binds into it. Clients treat each welcome as
-  "connected", refresh their connection-scoped handshake on every welcome, and tolerate any
-  of these timings, including a `session:joinCode` that arrives before any welcome.
+- `session:welcome` means "the session is connected". Every relay runs on the
+  `bridge-session` engine, which answers a hello with `session:joinCode` at once and
+  welcomes both members each time both roles of the pairing become bound: first when the
+  pairing forms, and again whenever a member binds back in, so a still-connected member
+  receives a further welcome on its open connection. A member returning with a binding
+  token for the session is a status change of the same session (same session id and
+  binding token). A join code is in service only while a role of its session is vacant:
+  minted when the session forms and each time a member drops, pushed to each connected
+  member as `session:joinCode`, and taken out of service when both roles bind, so the
+  code a welcome carries is for display and no longer joins. A hello presenting a code
+  that opens no vacant role is refused with `JOIN_CODE_UNKNOWN`; a hello presenting the
+  token of the member holding its role supersedes that member's older connection, which
+  receives `SESSION_REPLACED`. `session:goodbye` ends the session: the other member
+  receives `SESSION_ENDED`, and both connections close. A session with no member also ends
+  after a linger timeout. A hello presenting a verified binding token whose binding no live
+  session holds -- after a linger timeout, an explicit end, or a relay restart under an
+  unchanged binding secret -- re-forms the session under that binding with a new session
+  id and join code, and the counterpart's token binds into it. The engine rotates every
+  join code in service every ten minutes, pushing the new code to each connected member as
+  `session:joinCode`; for two minutes the previous code still joins. A connection that
+  sends nothing for a minute is closed; clients keep theirs active with `control:ping`.
+  Clients treat each welcome as "connected", refresh their connection-scoped handshake on
+  every welcome, and tolerate any of these timings, including a `session:joinCode` that
+  arrives before any welcome.
 - `session:counterpartAway` is the inverse of the welcome: "your session's counterpart
   disconnected". It carries no payload, and it is a status change of a live session, never
   its end: the receiver keeps its connection and binding token, and the next welcome means
-  the counterpart is connected again. When a relay sends it is relay policy; the
-  vscode-bridge relay does not send it.
+  the counterpart is connected again. The engine follows it with `session:joinCode`
+  carrying the code minted for the vacant role.
 - Role-specific message unions (`AppClientMessage`, `AppServerMessage`,
   `ExtensionClientMessage`, `ExtensionServerMessage`) aggregate shared + role-specific
   messages. Add new messages to the correct union(s).

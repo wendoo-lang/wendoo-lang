@@ -68,7 +68,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.spec.json",
     "format": "biome format ./src --write",
     "pretest": "npm run build:prod",
-    "test": "tsx --tsconfig tsconfig.spec.json --test $(find src -name '*.spec.ts')",
+    "test": "tsx --disable-warning=ExperimentalWarning --tsconfig tsconfig.spec.json --test $(find src -name '*.spec.ts')",
     "release:patch": "node ../../scripts/release.js patch",
     "release:minor": "node ../../scripts/release.js minor",
     "release:major": "node ../../scripts/release.js major"

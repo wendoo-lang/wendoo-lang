@@ -229,7 +229,7 @@ describe("createAppBridge", () => {
     assert.equal(bridge.snapshot().status, "reconnecting");
     assert.equal(bridge.snapshot().joinCode, "JOIN-2");
     assert.ok(snapshots.some((snapshot) => snapshot.status === "connected"));
-    assert.ok(snapshots.some((snapshot) => snapshot.joinCode === "JOIN-1"));
+    assert.ok(snapshots.every((snapshot) => snapshot.joinCode !== "JOIN-1"));
     assert.ok(snapshots.some((snapshot) => snapshot.joinCode === "JOIN-2"));
 
     bridge.stop();
@@ -495,7 +495,7 @@ describe("createAppBridge", () => {
     socket.simulateMessage(inbound);
 
     assert.notEqual(socket, rejectedSocket);
-    assert.deepEqual(bridge.snapshot(), { status: "connected", joinCode: "JOIN-1", errorCode: undefined });
+    assert.deepEqual(bridge.snapshot(), { status: "connected", joinCode: undefined, errorCode: undefined });
     assert.deepEqual(received, [inbound]);
   });
 
@@ -535,7 +535,7 @@ describe("createAppBridge", () => {
       payload: { protocolVersion: 1, sessionId: "session-2", joinCode: "JOIN-2", bindingToken: "token-2" },
     });
 
-    assert.equal(bridge.snapshot().joinCode, "JOIN-2");
+    assert.equal(bridge.snapshot().status, "connected");
     assert.deepEqual(tokens, ["token-2"]);
     assert.deepEqual(parseSent(lastSocket())[0], { type: "session:hello", payload: { protocolVersion: 1 } });
   });
@@ -566,7 +566,7 @@ describe("createAppBridge", () => {
     lastSocket().simulateOpen();
     lastSocket().simulateMessage(welcome(1));
 
-    assert.deepEqual(bridge.snapshot(), { status: "connected", joinCode: "JOIN-1", errorCode: undefined });
+    assert.deepEqual(bridge.snapshot(), { status: "connected", joinCode: undefined, errorCode: undefined });
   });
 
   it("connects to the app endpoint unless a wsPath is given", () => {
@@ -636,7 +636,7 @@ describe("createAppBridge", () => {
     });
   });
 
-  it("reports a counterpart away until the next welcome, keeping the connection, join code, and token", () => {
+  it("reports a counterpart away until the next welcome, keeping the connection and token", () => {
     const tokens: string[] = [];
     const bridge = createAppBridge({
       bridgeUrl: "localhost:3000",
@@ -661,7 +661,7 @@ describe("createAppBridge", () => {
     socket.simulateMessage({ type: "session:counterpartAway" });
 
     assert.deepEqual(snapshots.slice(before), [
-      { status: "connected", joinCode: "JOIN-1", errorCode: undefined, counterpartAway: true },
+      { status: "connected", joinCode: undefined, errorCode: undefined, counterpartAway: true },
     ]);
     assert.equal(socket.closed, false);
     assert.deepEqual(tokens, ["token-1"]);
@@ -671,12 +671,117 @@ describe("createAppBridge", () => {
       payload: { protocolVersion: 1, sessionId: "session-1", joinCode: "JOIN-1", bindingToken: "token-1" },
     });
 
-    assert.deepEqual(bridge.snapshot(), { status: "connected", joinCode: "JOIN-1", errorCode: undefined });
+    assert.deepEqual(bridge.snapshot(), { status: "connected", joinCode: undefined, errorCode: undefined });
 
     socket.simulateMessage({ type: "session:counterpartAway" });
     bridge.stop();
 
     assert.deepEqual(bridge.snapshot(), { status: "disconnected", joinCode: undefined, errorCode: undefined });
+  });
+
+  it("takes the join code out of the snapshot at every welcome it accepts, showing only codes sent since", () => {
+    const bridge = createBridge(new MemoryProjectFileSystem());
+    const shown: (string | undefined)[] = [];
+    bridge.onStateChange(() => {
+      shown.push(bridge.snapshot().joinCode);
+    });
+    bridge.start();
+    const socket = lastSocket();
+    socket.simulateOpen();
+    socket.simulateMessage({ type: "session:joinCode", payload: { joinCode: "JOIN-1" } });
+    socket.simulateMessage(welcome(1));
+
+    assert.equal(bridge.snapshot().joinCode, undefined);
+
+    socket.simulateMessage({ type: "session:counterpartAway" });
+    socket.simulateMessage({ type: "session:joinCode", payload: { joinCode: "JOIN-2" } });
+    assert.equal(bridge.snapshot().joinCode, "JOIN-2");
+
+    socket.simulateMessage(welcome(1));
+
+    assert.equal(bridge.snapshot().joinCode, undefined);
+    assert.deepEqual(
+      shown.filter((code) => code !== undefined),
+      ["JOIN-1", "JOIN-2"]
+    );
+  });
+
+  it("reports each welcome it accepts, first and repeated, with its binding token, once the snapshot reflects it", () => {
+    const bridge = createBridge(new MemoryProjectFileSystem());
+    const welcomes: { bindingToken: string | undefined; snapshot: AppBridgeSnapshot }[] = [];
+    bridge.onWelcome((accepted) => {
+      welcomes.push({ bindingToken: accepted.bindingToken, snapshot: bridge.snapshot() });
+    });
+    bridge.start();
+    const socket = lastSocket();
+    socket.simulateOpen();
+    socket.simulateMessage({ type: "session:joinCode", payload: { joinCode: "JOIN-1" } });
+    socket.simulateMessage({
+      type: "session:welcome",
+      payload: { protocolVersion: 1, sessionId: "session-1", joinCode: "JOIN-1", bindingToken: "token-1" },
+    });
+    socket.simulateMessage({ type: "session:counterpartAway" });
+    socket.simulateMessage({
+      type: "session:welcome",
+      payload: { protocolVersion: 1, sessionId: "session-1", joinCode: "JOIN-2", bindingToken: "token-1" },
+    });
+
+    const settled: AppBridgeSnapshot = { status: "connected", joinCode: undefined, errorCode: undefined };
+    assert.deepEqual(welcomes, [
+      { bindingToken: "token-1", snapshot: settled },
+      { bindingToken: "token-1", snapshot: settled },
+    ]);
+
+    socket.simulateMessage(welcome(2));
+
+    assert.equal(welcomes.length, 2);
+    assert.equal(bridge.snapshot().errorCode, BridgeSessionErrorCode.PROTOCOL_VERSION_MISMATCH);
+  });
+
+  it("ends its session on purpose with a goodbye on the open connection, keeping its binding token for a later start", () => {
+    const bridge = createBridge(new MemoryProjectFileSystem());
+    bridge.start();
+    const socket = lastSocket();
+    socket.simulateOpen();
+    socket.simulateMessage({
+      type: "session:welcome",
+      payload: { protocolVersion: 1, sessionId: "session-1", joinCode: "JOIN-1", bindingToken: "token-1" },
+    });
+
+    bridge.end();
+
+    assert.deepEqual(parseSent(socket).at(-1), { type: "session:goodbye" });
+    assert.equal(socket.closed, true);
+    assert.deepEqual(bridge.snapshot(), { status: "disconnected", joinCode: undefined, errorCode: undefined });
+
+    bridge.start();
+    const restarted = lastSocket();
+    restarted.simulateOpen();
+
+    assert.deepEqual(parseSent(restarted)[0], {
+      type: "session:hello",
+      payload: { protocolVersion: 1, bindingToken: "token-1" },
+    });
+  });
+
+  it("ends with no goodbye while its connection is not open, closing it as a stop does", () => {
+    const bridge = createBridge(new MemoryProjectFileSystem());
+    bridge.start();
+    const socket = lastSocket();
+    socket.simulateOpen();
+    socket.simulateMessage(welcome(1));
+    socket.simulateClose();
+
+    bridge.end();
+
+    assert.equal(
+      parseSent(socket).some((message) => message.type === "session:goodbye"),
+      false
+    );
+    assert.equal(bridge.snapshot().status, "disconnected");
+    assert.equal(MockWebSocket.instances.length, 1);
+    mock.timers.tick(60_000);
+    assert.equal(MockWebSocket.instances.length, 1);
   });
 
   it("carries a peer session bound over its payload messages", async () => {

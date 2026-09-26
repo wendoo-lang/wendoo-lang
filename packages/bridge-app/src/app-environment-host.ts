@@ -33,7 +33,7 @@ import {
   syncManifestToWendooJson,
   WENDOO_JSON_PATH,
 } from "@wendoo/app-host";
-import type { FolderInstalledExtensionMetadata } from "@wendoo/bridge-protocol";
+import type { BridgeSessionErrorCode, FolderInstalledExtensionMetadata } from "@wendoo/bridge-protocol";
 import type { IBrainDef, WendooEnvironment, WendooModule } from "@wendoo/core/app";
 import {
   createWendooEnvironment,
@@ -286,9 +286,14 @@ export class AppEnvironmentHost {
   private _bridgeUrl: string | undefined;
   private _bridgeStatus: AppBridgeState = "disconnected";
   private _bridgeJoinCode: string | undefined;
+  private _bridgeErrorCode: BridgeSessionErrorCode | undefined;
+  private _bridgePaired = false;
   private readonly _bridgeStatusListeners = new Set<() => void>();
   private readonly _bridgeJoinCodeListeners = new Set<() => void>();
+  private readonly _bridgeErrorCodeListeners = new Set<() => void>();
+  private readonly _bridgePairedListeners = new Set<() => void>();
   private _bridgeStateUnsub: (() => void) | undefined;
+  private _bridgeWelcomeUnsub: (() => void) | undefined;
   private _remoteChangeUnsub: (() => void) | undefined;
 
   private readonly _loadBindingToken: () => string | undefined;
@@ -1798,9 +1803,21 @@ export class AppEnvironmentHost {
     this._bridge?.bridge.stop();
   }
 
+  /**
+   * Ends the bridge's session on purpose, as `AppBridge.end()` does, and
+   * discards the bridge, so the next `connectBridge()` opens a new one
+   * presenting the token `loadBindingToken` returns then.
+   */
+  endBridge(): void {
+    this._bridge?.bridge.end();
+    this.teardownBridge();
+  }
+
   private teardownBridge(): void {
     this._bridgeStateUnsub?.();
     this._bridgeStateUnsub = undefined;
+    this._bridgeWelcomeUnsub?.();
+    this._bridgeWelcomeUnsub = undefined;
     this._remoteChangeUnsub?.();
     this._remoteChangeUnsub = undefined;
     this._bridge?.bridge.stop();
@@ -1819,6 +1836,9 @@ export class AppEnvironmentHost {
         listener();
       }
     }
+
+    this.setBridgeErrorCode(undefined);
+    this.setBridgePaired(false);
   }
 
   updateBridgeUrl(bridgeUrl: string): void {
@@ -1852,6 +1872,35 @@ export class AppEnvironmentHost {
 
   getBridgeJoinCodeSnapshot = (): string | undefined => {
     return this._bridgeJoinCode;
+  };
+
+  /** Subscribes to changes of {@link getBridgeErrorCodeSnapshot}. Returns an unsubscribe function. */
+  subscribeToBridgeErrorCode = (listener: () => void): (() => void) => {
+    this._bridgeErrorCodeListeners.add(listener);
+    return () => this._bridgeErrorCodeListeners.delete(listener);
+  };
+
+  /**
+   * Stable code of the failure that ended the bridge's latest connection, or
+   * `undefined` when none did. Cleared when the bridge connects again.
+   */
+  getBridgeErrorCodeSnapshot = (): BridgeSessionErrorCode | undefined => {
+    return this._bridgeErrorCode;
+  };
+
+  /** Subscribes to changes of {@link getBridgePairedSnapshot}. Returns an unsubscribe function. */
+  subscribeToBridgePaired = (listener: () => void): (() => void) => {
+    this._bridgePairedListeners.add(listener);
+    return () => this._bridgePairedListeners.delete(listener);
+  };
+
+  /**
+   * `true` while the bridge's session is connected with its counterpart:
+   * from each welcome the bridge accepts until the counterpart is reported
+   * away or the bridge's connection is no longer open.
+   */
+  getBridgePairedSnapshot = (): boolean => {
+    return this._bridgePaired;
   };
 
   /**
@@ -1900,9 +1949,13 @@ export class AppEnvironmentHost {
 
   private wireBridgeState(bridge: AppBridge): void {
     this._bridgeStateUnsub?.();
+    this._bridgeWelcomeUnsub?.();
     this._remoteChangeUnsub?.();
     this._bridgeStateUnsub = bridge.onStateChange(() => {
       this.applyBridgeSnapshot(bridge);
+    });
+    this._bridgeWelcomeUnsub = bridge.onWelcome(() => {
+      this.setBridgePaired(true);
     });
     this._remoteChangeUnsub = bridge.onRemoteChange((change: ProjectFileChange) => {
       this.handleRemoteProjectFileChange(change);
@@ -1925,6 +1978,31 @@ export class AppEnvironmentHost {
       for (const listener of this._bridgeJoinCodeListeners) {
         listener();
       }
+    }
+
+    this.setBridgeErrorCode(snapshot.errorCode);
+    if (snapshot.status !== "connected" || snapshot.counterpartAway) {
+      this.setBridgePaired(false);
+    }
+  }
+
+  private setBridgeErrorCode(errorCode: BridgeSessionErrorCode | undefined): void {
+    if (errorCode === this._bridgeErrorCode) {
+      return;
+    }
+    this._bridgeErrorCode = errorCode;
+    for (const listener of this._bridgeErrorCodeListeners) {
+      listener();
+    }
+  }
+
+  private setBridgePaired(paired: boolean): void {
+    if (paired === this._bridgePaired) {
+      return;
+    }
+    this._bridgePaired = paired;
+    for (const listener of this._bridgePairedListeners) {
+      listener();
     }
   }
 }

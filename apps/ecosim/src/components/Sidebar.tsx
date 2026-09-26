@@ -3,18 +3,7 @@ import type { ExtensionTransactionToasts, LibraryUninstallImpact } from "@wendoo
 import { presentExtensionTransaction, runGuardedLibraryUninstall } from "@wendoo/bridge-app";
 import { useDocsSidebar } from "@wendoo/docs";
 import { Button, ExtensionBrowserDialog, Slider, Switch } from "@wendoo/ui";
-import {
-  Blocks,
-  BookOpen,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  CircleHelp,
-  Copy,
-  FileText,
-  Info,
-  Settings,
-} from "lucide-react";
+import { Blocks, BookOpen, ChevronDown, ChevronRight, CircleHelp, FileText, Info, Settings } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import type { Archetype } from "@/brain/actor";
@@ -22,6 +11,7 @@ import { ARCHETYPES } from "@/brain/archetypes";
 import type { BrainLoadFailure } from "@/brain/brain-load-failure";
 import type { ScoreSnapshot } from "@/brain/score";
 import { BrainDiagnosticsList, BrainErrorBadge, toggledBrainKey } from "@/components/BrainDiagnostics";
+import { BridgeConnectionStatus } from "@/components/BridgeConnectionStatus";
 import { CompileDiagnosticsConsole } from "@/components/CompileDiagnosticsConsole";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SettingsDialog } from "@/components/SettingsDialog";
@@ -306,11 +296,12 @@ export function Sidebar({
   const [bridgeEnabled, setBridgeEnabled] = useState(() => store.getUiPreferences().bridgeEnabled);
   const bridgeStatus = useSyncExternalStore(store.subscribeToBridgeStatus, store.getBridgeStatusSnapshot);
   const joinCode = useSyncExternalStore(store.subscribeToBridgeJoinCode, store.getBridgeJoinCodeSnapshot);
+  const bridgePaired = useSyncExternalStore(store.subscribeToBridgePaired, store.getBridgePairedSnapshot);
+  const bridgeErrorCode = useSyncExternalStore(store.subscribeToBridgeErrorCode, store.getBridgeErrorCodeSnapshot);
   const compileDiagnostics = useSyncExternalStore(
     store.subscribeToCompileDiagnostics,
     store.getCompileDiagnosticsSnapshot
   );
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     return store.onProjectLoaded(() => {
@@ -675,45 +666,22 @@ export function Sidebar({
                       setBridgeEnabled(checked);
                       store.updateUiPreferences({ bridgeEnabled: checked });
                       if (!checked) {
-                        store.disconnectBridge();
+                        store.endBridge();
                         clearBindingToken();
                       }
                     }}
                     aria-label="Toggle VS Code bridge connection"
                   />
                 </div>
-                <output
-                  className={`text-xs font-mono ${
-                    bridgeStatus === "connected"
-                      ? "text-success"
-                      : bridgeStatus === "connecting" || bridgeStatus === "reconnecting"
-                        ? "text-warning"
-                        : "text-muted-foreground"
-                  }`}
-                >
-                  {bridgeStatus}
-                </output>
-                {joinCode && (bridgeStatus === "connected" || bridgeStatus === "reconnecting") && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-mono text-foreground truncate">{joinCode}</span>
-                    <button
-                      type="button"
-                      className="shrink-0 p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                      aria-label={copied ? "Copied to clipboard" : "Copy join code"}
-                      onClick={() => {
-                        navigator.clipboard.writeText(joinCode);
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 1500);
-                      }}
-                    >
-                      {copied ? (
-                        <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                      ) : (
-                        <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-                      )}
-                    </button>
-                  </div>
-                )}
+                <BridgeConnectionStatus
+                  status={bridgeStatus}
+                  paired={bridgePaired}
+                  errorCode={bridgeErrorCode}
+                  joinCode={joinCode}
+                  onReconnect={() => {
+                    store.connectBridge();
+                  }}
+                />
                 <div className="text-center w-full">
                   <button
                     type="button"

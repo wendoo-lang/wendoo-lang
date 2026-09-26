@@ -51,12 +51,8 @@ export type {
   ControlPingMessage,
   ControlPongMessage,
   ErrorPayload,
-  ExtensionAppStatusMessage,
-  ExtensionAppStatusPayload,
   ExtensionClientMessage,
   ExtensionServerMessage,
-  ExtensionSessionWelcomeMessage,
-  ExtensionSessionWelcomePayload,
   FilesystemChangeMessage,
   FilesystemSyncMessage,
   GeneralErrorMessage,
@@ -83,6 +79,3 @@ export type { PeerSessionHelloMessage, PeerSessionHelloPayload } from "./peer-se
 export { PeerSessionErrorCode } from "./peer-session.js";
 export type { WsMessage } from "./schemas.js";
 export { BRIDGE_PROTOCOL_NAMESPACES, wsMessageSchema } from "./schemas.js";
-
-/** Identifies which side of the bridge a session belongs to. */
-export type SessionRole = "app" | "extension";

@@ -8,6 +8,10 @@
 !packages/join-codes/tsconfig.json
 !packages/join-codes/src
 
+!packages/bridge-session/package.json
+!packages/bridge-session/tsconfig.json
+!packages/bridge-session/src
+
 !packages/bridge-client/package.json
 !packages/bridge-client/tsconfig.json
 !packages/bridge-client/src
