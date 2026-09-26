@@ -4,7 +4,7 @@ status: Accepted
 # Active status:   Draft -> Review -> Accepted -> Committed -> In-Progress -> Shipped
 # Terminal status: Rejected | Withdrawn | Superseded (set superseded-by)
 created: 2026-09-25
-updated: 2026-09-25
+updated: 2026-09-26
 ---
 
 # Session Management
@@ -34,8 +34,9 @@ indicated.
 
 Session LIFECYCLE events are exactly three: formation, replacement,
 and end (explicit, or by sweep after a fully-disconnected linger).
-A member dropping and returning is a status transition of the same
-session. Wire-level handshake machinery -- sockets, hellos, welcomes
+Sweep ends the session; the binding persists in the tokens its
+members hold and can re-form a session. A member dropping and
+returning is a status transition of the same session. Wire-level handshake machinery -- sockets, hellos, welcomes
 -- is connection-scoped plumbing the session absorbs; no connectivity
 event creates or destroys a session.
 
