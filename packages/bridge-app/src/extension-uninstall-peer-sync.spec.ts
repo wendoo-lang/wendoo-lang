@@ -114,7 +114,7 @@ describe("extension uninstall peer sync", () => {
     socket.simulateOpen();
     socket.simulateMessage({
       type: "session:welcome",
-      payload: { protocolVersion: 1, sessionId: "s", joinCode: "J" },
+      payload: { protocolVersion: 1, sessionId: "s" },
     } as WsMessage);
 
     // While installed, the peer's sync view carries the extension tree.

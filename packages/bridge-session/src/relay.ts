@@ -1,7 +1,5 @@
 import { randomUUID } from "node:crypto";
 import {
-  type AppSessionJoinCodeMessage,
-  type AppSessionWelcomeMessage,
   BridgeSessionErrorCode,
   type ControlPongMessage,
   type GeneralErrorMessage,
@@ -9,6 +7,8 @@ import {
   type SessionCounterpartAwayMessage,
   type SessionErrorMessage,
   type SessionHelloPayload,
+  type SessionJoinCodeMessage,
+  type SessionWelcomeMessage,
   sessionHelloPayloadSchema,
 } from "@wendoo/bridge-protocol";
 import { generateTriplet } from "@wendoo/join-codes";
@@ -231,8 +231,6 @@ interface Pairing {
    * roles are bound.
    */
   previousJoinCode: string | undefined;
-  /** The pairing's most recently minted join code, which its answers and welcomes carry. */
-  latestJoinCode: string;
   /** Identity the binding tokens for this pairing name. */
   readonly bindingId: string;
   /** Members by role. */
@@ -272,8 +270,9 @@ interface Envelope {
  * token names, and when no pairing of the kind holds that binding id, opens a
  * new pairing under it, with a new session id and join code; a hello
  * presenting neither opens a new pairing under a new binding id. The relay
- * answers an accepted hello with `session:joinCode`, carrying the pairing's
- * most recent join code.
+ * answers an accepted hello that leaves a role of its pairing vacant with
+ * `session:joinCode`, carrying the pairing's join code; a hello that binds the
+ * pairing's second role is answered by the welcome alone.
  *
  * A join code is in service exactly while its pairing has a vacant role. A
  * pairing mints one when it opens and whenever a member's connection closes;
@@ -302,11 +301,10 @@ interface Envelope {
  * member for the linger time, which ends it. Each time the pairing comes to
  * have both members bound -- when the second member first arrives, and again
  * whenever a member binds back in -- BOTH members receive `session:welcome`,
- * carrying the session id, the pairing's most recent join code, and a binding
- * token for the pairing. A welcome means "the session is connected".
- * Endpoints must restart the handshake they scope to their counterpart's
- * connection on every welcome, including a further welcome on a connection
- * already welcomed.
+ * carrying the session id and a binding token for the pairing. A welcome
+ * means "the session is connected". Endpoints must restart the handshake they
+ * scope to their counterpart's connection on every welcome, including a
+ * further welcome on a connection already welcomed.
  *
  * A hello presenting a binding token for a pairing whose role it names is
  * still held supersedes the connection holding it, which receives
@@ -340,14 +338,13 @@ interface Envelope {
  * connected or lingering, with a newly minted one and sends each bound member
  * `session:joinCode` carrying it. For the entry grace after a rotation, or
  * until the next rotation if that comes first, a hello presenting a pairing's
- * previous join code still joins it; every answer and welcome carries the
- * current code. A join code leaves service when its pairing ends, when both
- * of its pairing's roles become bound, when a member's connection closes, or
- * when the grace after its replacement ends, and is not minted again for the
- * quarantine time after that. A minted join code is a generated triplet that
- * no pairing of the kind holds and that is not in quarantine; when 100
- * triplets in a row fail that test, the relay mints a triplet with a random
- * suffix instead.
+ * previous join code still joins it; every answer carries the current code. A
+ * join code leaves service when its pairing ends, when both of its pairing's
+ * roles become bound, when a member's connection closes, or when the grace
+ * after its replacement ends, and is not minted again for the quarantine time
+ * after that. A minted join code is a generated triplet that no pairing of the
+ * kind holds and that is not in quarantine; when 100 triplets in a row fail
+ * that test, the relay mints a triplet with a random suffix instead.
  *
  * The linger time, rotation interval, entry grace, quarantine time, activity
  * timeout, and reply deadline are five minutes, ten minutes, two minutes,
@@ -676,26 +673,27 @@ export class Relay {
     clearTimeout(pairing.expiry);
     pairing.expiry = undefined;
     member.accepted = { id: envelope.id, protocolVersion: hello.protocolVersion };
-    this._logger.info({ kind, role, pairingId: pairing.id, joinCode: pairing.latestJoinCode }, "member joined");
-    this.sendJoinCode(member, pairing.latestJoinCode);
-    if (pairing.members.size === 2) {
-      this.retireJoinCodes(pairing);
-      for (const paired of pairing.members.values()) {
-        this.welcome(paired, pairing);
-      }
+    this._logger.info({ kind, role, pairingId: pairing.id, joinCode: pairing.joinCode }, "member joined");
+    if (pairing.members.size < 2) {
+      // A pairing with a vacant role holds a join code in service.
+      this.sendJoinCode(member, pairing.joinCode!);
+      return;
+    }
+    this.retireJoinCodes(pairing);
+    for (const paired of pairing.members.values()) {
+      this.welcome(paired, pairing);
     }
   }
 
   /** Sends `member` the pairing's `session:welcome`. `member` is a bound member of `pairing`. */
   private welcome(member: Member, pairing: Pairing): void {
     const accepted = member.accepted!;
-    const welcome: AppSessionWelcomeMessage = {
+    const welcome: SessionWelcomeMessage = {
       type: "session:welcome",
       id: accepted.id,
       payload: {
         protocolVersion: accepted.protocolVersion,
         sessionId: pairing.id,
-        joinCode: pairing.latestJoinCode,
         bindingToken: this._tokens.create(pairing.bindingId),
       },
     };
@@ -704,7 +702,7 @@ export class Relay {
 
   /** Sends `member` a `session:joinCode` carrying `joinCode`. */
   private sendJoinCode(member: Member, joinCode: string): void {
-    const push: AppSessionJoinCodeMessage = { type: "session:joinCode", payload: { joinCode } };
+    const push: SessionJoinCodeMessage = { type: "session:joinCode", payload: { joinCode } };
     member.socket.send(JSON.stringify(push));
   }
 
@@ -789,7 +787,6 @@ export class Relay {
     this.retireJoinCodes(pairing);
     const joinCode = this.mintJoinCode(kind);
     pairing.joinCode = joinCode;
-    pairing.latestJoinCode = joinCode;
     if (pairing.members.size > 0) {
       const away: SessionCounterpartAwayMessage = { type: "session:counterpartAway" };
       const data = JSON.stringify(away);
@@ -839,7 +836,6 @@ export class Relay {
       rotated++;
       pairing.previousJoinCode = pairing.joinCode;
       pairing.joinCode = this.mintJoinCode(pairing.kind);
-      pairing.latestJoinCode = pairing.joinCode;
       for (const member of pairing.members.values()) {
         this.sendJoinCode(member, pairing.joinCode);
       }
@@ -927,7 +923,6 @@ export class Relay {
       kind,
       joinCode,
       previousJoinCode: undefined,
-      latestJoinCode: joinCode,
       bindingId,
       members: new Map(),
       lingeringRoles: new Map(),

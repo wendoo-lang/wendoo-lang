@@ -1,4 +1,3 @@
-import type { AppSessionJoinCodeMessage, AppSessionWelcomeMessage } from "./app.js";
 import type { CompileDiagnosticsMessage, CompileStatusMessage } from "./compile.js";
 import type {
   ControlPingMessage,
@@ -10,6 +9,8 @@ import type {
   SessionErrorMessage,
   SessionGoodbyeMessage,
   SessionHelloMessage,
+  SessionJoinCodeMessage,
+  SessionWelcomeMessage,
 } from "./shared.js";
 
 /** Any message an extension client may send to the bridge. */
@@ -22,8 +23,8 @@ export type ExtensionClientMessage =
 
 /** Any message the bridge may send to an extension client. */
 export type ExtensionServerMessage =
-  | AppSessionWelcomeMessage
-  | AppSessionJoinCodeMessage
+  | SessionWelcomeMessage
+  | SessionJoinCodeMessage
   | SessionCounterpartAwayMessage
   | SessionErrorMessage
   | ControlPongMessage

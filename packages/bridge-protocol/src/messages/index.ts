@@ -1,11 +1,4 @@
-export type {
-  AppClientMessage,
-  AppServerMessage,
-  AppSessionJoinCodeMessage,
-  AppSessionJoinCodePayload,
-  AppSessionWelcomeMessage,
-  AppSessionWelcomePayload,
-} from "./app.js";
+export type { AppClientMessage, AppServerMessage } from "./app.js";
 export type {
   CompileDiagnosticEntry,
   CompileDiagnosticRange,
@@ -28,5 +21,9 @@ export type {
   SessionGoodbyeMessage,
   SessionHelloMessage,
   SessionHelloPayload,
+  SessionJoinCodeMessage,
+  SessionJoinCodePayload,
+  SessionWelcomeMessage,
+  SessionWelcomePayload,
 } from "./shared.js";
 export { BridgeSessionErrorCode, sessionHelloPayloadSchema } from "./shared.js";

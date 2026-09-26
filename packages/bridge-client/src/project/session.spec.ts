@@ -83,7 +83,7 @@ function recordEvents(session: ProjectSession<WsMessage, WsMessage>): string[] {
 
 /** One message of every bridge protocol namespace. */
 const PROTOCOL_MESSAGES: readonly WsMessage[] = [
-  { type: "session:welcome", payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", joinCode: "J-1" } },
+  { type: "session:welcome", payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1" } },
   { type: "session:joinCode", payload: { joinCode: "J-2" } },
   { type: "control:pong" },
   { type: "error", payload: { message: "invalid message envelope" } },
@@ -197,7 +197,7 @@ describe("ProjectSession", () => {
 
       ws.simulateMessage({
         type: "session:welcome",
-        payload: { protocolVersion: PROTOCOL_VERSION + 1, sessionId: "s-1", joinCode: "J-1" },
+        payload: { protocolVersion: PROTOCOL_VERSION + 1, sessionId: "s-1" },
       });
 
       assert.deepEqual(events, [`error:${BridgeSessionErrorCode.PROTOCOL_VERSION_MISMATCH}`, "status:disconnected"]);
@@ -211,7 +211,7 @@ describe("ProjectSession", () => {
       const ws = startSession(session);
       const events = recordEvents(session);
 
-      ws.simulateMessage({ type: "session:welcome", payload: { sessionId: "s-1", joinCode: "J-1" } });
+      ws.simulateMessage({ type: "session:welcome", payload: { sessionId: "s-1" } });
 
       assert.deepEqual(events, [`error:${BridgeSessionErrorCode.PROTOCOL_VERSION_MISMATCH}`, "status:disconnected"]);
     });
@@ -223,7 +223,7 @@ describe("ProjectSession", () => {
 
       ws.simulateMessage({
         type: "session:welcome",
-        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", joinCode: "J-1" },
+        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1" },
       });
 
       assert.deepEqual(events, []);
@@ -298,7 +298,7 @@ describe("ProjectSession", () => {
       const ws = startSession(session);
       ws.simulateMessage({
         type: "session:welcome",
-        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", joinCode: "J-1", bindingToken: "T-1" },
+        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", bindingToken: "T-1" },
       });
       ws.simulateClose();
       for (const msg of queued) {
@@ -338,7 +338,7 @@ describe("ProjectSession", () => {
 
       welcomed.simulateMessage({
         type: "session:welcome",
-        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", joinCode: "J-0", bindingToken: "T-1" },
+        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", bindingToken: "T-1" },
       });
 
       assert.deepEqual(reconnectHello(welcomed)?.payload, {
@@ -356,7 +356,7 @@ describe("ProjectSession", () => {
       const welcomed = lastSocket();
       welcomed.simulateMessage({
         type: "session:welcome",
-        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", joinCode: "J-1", bindingToken: "T-1" },
+        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", bindingToken: "T-1" },
       });
 
       welcomed.simulateMessage({ type: "session:joinCode", payload: { joinCode: "J-2" } });
@@ -373,7 +373,7 @@ describe("ProjectSession", () => {
       const ws = startSession(session);
       ws.simulateMessage({
         type: "session:welcome",
-        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", joinCode: "J-0", bindingToken: "T-1" },
+        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", bindingToken: "T-1" },
       });
       session.stop();
 
@@ -386,14 +386,14 @@ describe("ProjectSession", () => {
       session.stop();
     });
 
-    it("keeps presenting the constructor's join code after a welcome carrying another is rejected", () => {
+    it("keeps presenting the constructor's join code after a rejected welcome", () => {
       const session = new ProjectSession<WsMessage, WsMessage>("app", "localhost:3000", {}, "J-0");
       const rejectedSocket = startSession(session);
       assert.equal((parseSent(rejectedSocket)[0]?.payload as { joinCode?: string } | undefined)?.joinCode, "J-0");
 
       rejectedSocket.simulateMessage({
         type: "session:welcome",
-        payload: { protocolVersion: PROTOCOL_VERSION + 1, joinCode: "J-9" },
+        payload: { protocolVersion: PROTOCOL_VERSION + 1, sessionId: "s-9" },
       });
       const ws = startSession(session);
 
@@ -431,7 +431,7 @@ describe("ProjectSession", () => {
       const ws = startSession(session);
       ws.simulateMessage({
         type: "session:welcome",
-        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", joinCode: "J-1", bindingToken: "T-1" },
+        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", bindingToken: "T-1" },
       });
       const events = recordEvents(session);
       const errors: WsMessage[] = [];
@@ -497,7 +497,7 @@ describe("ProjectSession", () => {
       const ws = startSession(session);
       ws.simulateMessage({
         type: "session:welcome",
-        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", joinCode: "J-1", bindingToken: "T-1" },
+        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", bindingToken: "T-1" },
       });
       ws.simulateClose();
       return ws;
@@ -564,7 +564,7 @@ describe("ProjectSession", () => {
       const ws = startSession(session);
       ws.simulateMessage({
         type: "session:welcome",
-        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", joinCode: "J-1", bindingToken: "T-1" },
+        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", bindingToken: "T-1" },
       });
       const events = recordEvents(session);
       let awayCount = 0;
@@ -603,7 +603,7 @@ describe("ProjectSession", () => {
       const ws = startSession(session);
       ws.simulateMessage({
         type: "session:welcome",
-        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", joinCode: "J-1", bindingToken: "T-1" },
+        payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", bindingToken: "T-1" },
       });
 
       session.stop();

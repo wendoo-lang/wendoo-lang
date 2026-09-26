@@ -75,16 +75,17 @@ Two fixed routes, each mapped onto the engine's `vscode` session kind
 - `/extension` -- VS Code extension clients, role `extension`
 
 Each connection is handed to `relay.connect(SESSION_KIND, role, socket)`, and its frames
-and close are reported back through the returned handler. The engine answers
-`session:hello` with `session:joinCode`, welcomes both members once the extension's hello
-pairs with the app's session, sends `session:counterpartAway` and a fresh
-`session:joinCode` when a member drops, reclaims the session for a member returning with
-its binding token, supersedes a member's older connection when the member binds back in
-by its token (`SESSION_REPLACED` to the older connection), refuses a join code that opens
-no vacant role (`JOIN_CODE_UNKNOWN`), ends the session on a member's `session:goodbye`
-(`SESSION_ENDED` to the other member), rotates every join code in service every ten
-minutes (the previous code still joins for two minutes), closes a connection that sends
-nothing for a minute, and answers `control:ping`. The service sends none of these itself.
+and close are reported back through the returned handler. The engine answers a
+`session:hello` that leaves a role vacant with `session:joinCode`, welcomes both members once
+the extension's hello pairs with the app's session (the welcome alone answers that hello),
+sends `session:counterpartAway` and a fresh `session:joinCode` when a member drops,
+reclaims the session for a member returning with its binding token, supersedes a member's
+older connection when the member binds back in by its token (`SESSION_REPLACED` to the
+older connection), refuses a join code that opens no vacant role (`JOIN_CODE_UNKNOWN`),
+ends the session on a member's `session:goodbye` (`SESSION_ENDED` to the other member),
+rotates every join code in service every ten minutes (the previous code still joins for
+two minutes), closes a connection that sends nothing for a minute, and answers
+`control:ping`. The service sends none of these itself.
 
 ### Message Protocol
 

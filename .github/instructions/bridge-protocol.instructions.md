@@ -83,7 +83,7 @@ client) and a `ServerMessage` union (sent by the bridge server to that client).
 | `session:hello` | client -> server | Initiate/authenticate session |
 | `session:goodbye` | client -> server | End the session on purpose |
 | `session:joinCode` | server -> client | The session's join code, for display |
-| `session:welcome` | server -> client | The session is connected (sessionId, joinCode, bindingToken) |
+| `session:welcome` | server -> client | The session is connected (sessionId, bindingToken) |
 | `session:counterpartAway` | server -> client | The session's counterpart disconnected; the session stays open |
 | `session:error` | either | Session-scoped error; one carrying a `code` ends the session |
 | `error` | either | General error |
@@ -128,18 +128,18 @@ client) and a `ServerMessage` union (sent by the bridge server to that client).
   error without one keeps its existing meaning. A new failure adds a member whose JSDoc
   says who raises it.
 - `session:welcome` means "the session is connected". Every relay runs on the
-  `bridge-session` engine, which answers a hello with `session:joinCode` at once and
-  welcomes both members each time both roles of the pairing become bound: first when the
+  `bridge-session` engine, which answers a hello that leaves a role vacant with
+  `session:joinCode` at once, answers one that binds the second role with the welcome alone,
+  and welcomes both members each time both roles of the pairing become bound: first when the
   pairing forms, and again whenever a member binds back in, so a still-connected member
   receives a further welcome on its open connection. A member returning with a binding
   token for the session is a status change of the same session (same session id and
   binding token). A join code is in service only while a role of its session is vacant:
   minted when the session forms and each time a member drops, pushed to each connected
-  member as `session:joinCode`, and taken out of service when both roles bind, so the
-  code a welcome carries is for display and no longer joins. A hello presenting a code
-  that opens no vacant role is refused with `JOIN_CODE_UNKNOWN`; a hello presenting the
-  token of the member holding its role supersedes that member's older connection, which
-  receives `SESSION_REPLACED`. `session:goodbye` ends the session: the other member
+  member as `session:joinCode`, and taken out of service when both roles bind, so a welcome
+  carries no code. A hello presenting a code that opens no vacant role is refused with
+  `JOIN_CODE_UNKNOWN`; a hello presenting the token of the member holding its role
+  supersedes that member's older connection, which receives `SESSION_REPLACED`. `session:goodbye` ends the session: the other member
   receives `SESSION_ENDED`, and both connections close. A session with no member also ends
   after a linger timeout. A hello presenting a verified binding token whose binding no live
   session holds -- after a linger timeout, an explicit end, or a relay restart under an

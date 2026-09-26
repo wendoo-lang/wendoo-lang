@@ -614,7 +614,7 @@ describe("extension install pipeline -- hand-edited wendoo.json", () => {
       socket.simulateOpen();
       socket.simulateMessage({
         type: "session:welcome",
-        payload: { protocolVersion: 1, sessionId: "s", joinCode: "J" },
+        payload: { protocolVersion: 1, sessionId: "s" },
       });
 
       // The peer edits wendoo.json by hand, adding a gh reference.

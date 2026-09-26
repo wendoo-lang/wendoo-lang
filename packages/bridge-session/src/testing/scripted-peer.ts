@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import {
-  type AppSessionWelcomePayload,
   BridgeSessionErrorCode,
   PROTOCOL_VERSION,
   type SessionHelloPayload,
+  type SessionWelcomePayload,
   type WsMessage,
 } from "@wendoo/bridge-protocol";
 import { WAIT_MS } from "./wait.js";
@@ -91,9 +91,11 @@ export class ScriptedPeer {
 
   /**
    * Sends `session:hello` with `fields` merged over the current protocol
-   * version and returns the relay's first answer. Pass any combination of
-   * credentials -- `joinCode`, `bindingToken` -- or none, and
-   * `protocolVersion` to declare a version other than the current one.
+   * version and returns the relay's first answer: `session:joinCode`, or
+   * `session:welcome` when the hello binds its session's second role, or the
+   * `session:error` refusing it. Pass any combination of credentials --
+   * `joinCode`, `bindingToken` -- or none, and `protocolVersion` to declare a
+   * version other than the current one.
    */
   async hello(fields: Partial<SessionHelloPayload> = {}): Promise<WsMessage> {
     this.send({ type: "session:hello", id: HELLO_ID, payload: { protocolVersion: PROTOCOL_VERSION, ...fields } });
@@ -124,7 +126,7 @@ export class ScriptedPeer {
 }
 
 /** The payload of a `session:welcome` answering a {@link ScriptedPeer.hello}. */
-export type Welcome = Required<AppSessionWelcomePayload>;
+export type Welcome = Required<SessionWelcomePayload>;
 
 /** Asserts that `message` is a `session:joinCode` carrying a join code of the generated shape, and returns the code. */
 export function assertJoinCode(message: WsMessage): string {
@@ -145,7 +147,6 @@ export function assertWelcome(message: WsMessage): Welcome {
   const payload = message.payload as Welcome;
   assert.equal(payload.protocolVersion, PROTOCOL_VERSION);
   assert.equal(typeof payload.sessionId, "string");
-  assert.match(payload.joinCode, JOIN_CODE_SHAPE);
   assert.equal(typeof payload.bindingToken, "string");
   return payload;
 }

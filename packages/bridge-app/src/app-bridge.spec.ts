@@ -158,7 +158,7 @@ function createBridge(filesystem: MemoryProjectFileSystem, features: readonly Ap
 
 /** A welcome from the bridge declaring `protocolVersion`. */
 function welcome(protocolVersion: number): WsMessage {
-  return { type: "session:welcome", payload: { protocolVersion, sessionId: "session-1", joinCode: "JOIN-1" } };
+  return { type: "session:welcome", payload: { protocolVersion, sessionId: "session-1" } };
 }
 
 /** A session kind speaking protocol version 1. */
@@ -218,7 +218,7 @@ describe("createAppBridge", () => {
     socket.simulateOpen();
     socket.simulateMessage({
       type: "session:welcome",
-      payload: { protocolVersion: 1, sessionId: "session-1", joinCode: "JOIN-1" },
+      payload: { protocolVersion: 1, sessionId: "session-1" },
     });
     socket.simulateMessage({
       type: "session:joinCode",
@@ -518,7 +518,7 @@ describe("createAppBridge", () => {
     socket.simulateOpen();
     socket.simulateMessage({
       type: "session:welcome",
-      payload: { protocolVersion: 2, sessionId: "session-1", joinCode: "JOIN-1", bindingToken: "token-1" },
+      payload: { protocolVersion: 2, sessionId: "session-1", bindingToken: "token-1" },
     });
 
     assert.deepEqual(
@@ -532,7 +532,7 @@ describe("createAppBridge", () => {
     lastSocket().simulateOpen();
     lastSocket().simulateMessage({
       type: "session:welcome",
-      payload: { protocolVersion: 1, sessionId: "session-2", joinCode: "JOIN-2", bindingToken: "token-2" },
+      payload: { protocolVersion: 1, sessionId: "session-2", bindingToken: "token-2" },
     });
 
     assert.equal(bridge.snapshot().status, "connected");
@@ -617,7 +617,7 @@ describe("createAppBridge", () => {
     unwelcomed.simulateOpen();
     unwelcomed.simulateMessage({
       type: "session:welcome",
-      payload: { protocolVersion: 1, sessionId: "session-1", joinCode: "JOIN-9", bindingToken: "token-1" },
+      payload: { protocolVersion: 1, sessionId: "session-1", bindingToken: "token-1" },
     });
     unwelcomed.simulateMessage({ type: "session:joinCode", payload: { joinCode: "JOIN-10" } });
     unwelcomed.simulateMessage(replaced);
@@ -654,7 +654,7 @@ describe("createAppBridge", () => {
     socket.simulateOpen();
     socket.simulateMessage({
       type: "session:welcome",
-      payload: { protocolVersion: 1, sessionId: "session-1", joinCode: "JOIN-1", bindingToken: "token-1" },
+      payload: { protocolVersion: 1, sessionId: "session-1", bindingToken: "token-1" },
     });
     const before = snapshots.length;
 
@@ -668,7 +668,7 @@ describe("createAppBridge", () => {
 
     socket.simulateMessage({
       type: "session:welcome",
-      payload: { protocolVersion: 1, sessionId: "session-1", joinCode: "JOIN-1", bindingToken: "token-1" },
+      payload: { protocolVersion: 1, sessionId: "session-1", bindingToken: "token-1" },
     });
 
     assert.deepEqual(bridge.snapshot(), { status: "connected", joinCode: undefined, errorCode: undefined });
@@ -718,12 +718,12 @@ describe("createAppBridge", () => {
     socket.simulateMessage({ type: "session:joinCode", payload: { joinCode: "JOIN-1" } });
     socket.simulateMessage({
       type: "session:welcome",
-      payload: { protocolVersion: 1, sessionId: "session-1", joinCode: "JOIN-1", bindingToken: "token-1" },
+      payload: { protocolVersion: 1, sessionId: "session-1", bindingToken: "token-1" },
     });
     socket.simulateMessage({ type: "session:counterpartAway" });
     socket.simulateMessage({
       type: "session:welcome",
-      payload: { protocolVersion: 1, sessionId: "session-1", joinCode: "JOIN-2", bindingToken: "token-1" },
+      payload: { protocolVersion: 1, sessionId: "session-1", bindingToken: "token-1" },
     });
 
     const settled: AppBridgeSnapshot = { status: "connected", joinCode: undefined, errorCode: undefined };
@@ -745,7 +745,7 @@ describe("createAppBridge", () => {
     socket.simulateOpen();
     socket.simulateMessage({
       type: "session:welcome",
-      payload: { protocolVersion: 1, sessionId: "session-1", joinCode: "JOIN-1", bindingToken: "token-1" },
+      payload: { protocolVersion: 1, sessionId: "session-1", bindingToken: "token-1" },
     });
 
     bridge.end();

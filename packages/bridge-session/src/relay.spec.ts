@@ -40,7 +40,7 @@ function assertJoinCodeUnknown(message: WsMessage): void {
 }
 
 describe("session engine", () => {
-  it("forms a session: a hello is answered with a join code, and both members are welcomed once the code pairs", async () => {
+  it("forms a session: a hello is answered with a join code, and both members are welcomed once a hello presenting it pairs", async () => {
     await withRelay({ bindingSecret: "spec-secret" }, async (relay) => {
       const host = await relay.connect("demo/host");
       const joinCode = assertJoinCode(await host.hello());
@@ -48,12 +48,10 @@ describe("session engine", () => {
       host.assertNothingReceived();
 
       const guest = await relay.connect("demo/guest");
-      assert.equal(assertJoinCode(await guest.hello({ joinCode })), joinCode);
-      const guestWelcome = assertWelcome(await guest.nextMessage());
+      const guestWelcome = assertWelcome(await guest.hello({ joinCode }));
       const hostWelcome = assertWelcome(await host.nextMessage());
 
       assert.equal(hostWelcome.sessionId, guestWelcome.sessionId);
-      assert.equal(hostWelcome.joinCode, joinCode);
       host.send({ type: "demo:note", payload: { text: "to the guest" } });
       assert.deepEqual(await guest.nextMessage(), { type: "demo:note", payload: { text: "to the guest" } });
     });
@@ -64,19 +62,17 @@ describe("session engine", () => {
       const { first, second, firstWelcome, secondWelcome } = await relay.pair("demo/host", "demo/guest");
       await first.close();
       assertCounterpartAway(await second.nextMessage());
-      const vacancyCode = assertJoinCode(await second.nextMessage());
+      assertJoinCode(await second.nextMessage());
 
       const returned = await relay.connect("demo/host");
-      assert.equal(assertJoinCode(await returned.hello({ bindingToken: firstWelcome.bindingToken })), vacancyCode);
-
-      assert.deepEqual(assertWelcome(await returned.nextMessage()), { ...firstWelcome, joinCode: vacancyCode });
-      assert.deepEqual(assertWelcome(await second.nextMessage()), { ...secondWelcome, joinCode: vacancyCode });
+      assert.deepEqual(assertWelcome(await returned.hello({ bindingToken: firstWelcome.bindingToken })), firstWelcome);
+      assert.deepEqual(assertWelcome(await second.nextMessage()), secondWelcome);
     });
   });
 
   it("sweeps a session with no member after the linger time; a token then re-forms it under a new session id and join code", async () => {
     await withRelay({ bindingSecret: "spec-secret", lingerMs: 20 }, async (relay) => {
-      const { first, second, firstWelcome, secondWelcome } = await relay.pair("demo/host", "demo/guest");
+      const { first, second, joinCode, firstWelcome, secondWelcome } = await relay.pair("demo/host", "demo/guest");
       await first.close();
       await second.close();
       await relay.expireLinger();
@@ -84,11 +80,10 @@ describe("session engine", () => {
       const host = await relay.connect("demo/host");
       const reformedCode = assertJoinCode(await host.hello({ bindingToken: firstWelcome.bindingToken }));
       const guest = await relay.connect("demo/guest");
-      assert.equal(assertJoinCode(await guest.hello({ bindingToken: secondWelcome.bindingToken })), reformedCode);
-      const guestWelcome = assertWelcome(await guest.nextMessage());
+      const guestWelcome = assertWelcome(await guest.hello({ bindingToken: secondWelcome.bindingToken }));
       const hostWelcome = assertWelcome(await host.nextMessage());
 
-      assert.notEqual(reformedCode, firstWelcome.joinCode);
+      assert.notEqual(reformedCode, joinCode);
       assert.notEqual(hostWelcome.sessionId, firstWelcome.sessionId);
       assert.equal(hostWelcome.sessionId, guestWelcome.sessionId);
       assert.equal(hostWelcome.bindingToken, firstWelcome.bindingToken);
@@ -98,10 +93,10 @@ describe("session engine", () => {
 
   it("refuses a hello presenting the code of a session whose roles are both bound, leaving the pair connected", async () => {
     await withRelay({ bindingSecret: "spec-secret" }, async (relay) => {
-      const { first, second, firstWelcome } = await relay.pair("demo/host", "demo/guest");
+      const { first, second, joinCode } = await relay.pair("demo/host", "demo/guest");
       const claimant = await relay.connect("demo/guest");
 
-      assertJoinCodeUnknown(await claimant.hello({ joinCode: firstWelcome.joinCode }));
+      assertJoinCodeUnknown(await claimant.hello({ joinCode }));
       await within(claimant.closed, "the refused connection to close");
 
       first.send({ type: "demo:note", payload: { text: "still paired" } });
@@ -121,27 +116,24 @@ describe("session engine", () => {
       await within(stranger.closed, "the refused connection to close");
 
       const guest = await relay.connect("demo/guest");
-      assertJoinCode(await guest.hello({ joinCode }));
-      assertWelcome(await guest.nextMessage());
+      assertWelcome(await guest.hello({ joinCode }));
     });
   });
 
   it("mints a fresh code when a member drops, pushing it after counterpartAway; the code the pair formed with is refused", async () => {
     await withRelay({ bindingSecret: "spec-secret" }, async (relay) => {
-      const { first, second, firstWelcome } = await relay.pair("demo/host", "demo/guest");
+      const { first, second, joinCode, firstWelcome } = await relay.pair("demo/host", "demo/guest");
       await second.close();
       assertCounterpartAway(await first.nextMessage());
       const vacancyCode = assertJoinCode(await first.nextMessage());
-      assert.notEqual(vacancyCode, firstWelcome.joinCode);
+      assert.notEqual(vacancyCode, joinCode);
 
       const stale = await relay.connect("demo/guest");
-      assertJoinCodeUnknown(await stale.hello({ joinCode: firstWelcome.joinCode }));
+      assertJoinCodeUnknown(await stale.hello({ joinCode }));
       const entered = await relay.connect("demo/guest");
-      assert.equal(assertJoinCode(await entered.hello({ joinCode: vacancyCode })), vacancyCode);
-
-      const enteredWelcome = assertWelcome(await entered.nextMessage());
+      const enteredWelcome = assertWelcome(await entered.hello({ joinCode: vacancyCode }));
       assert.equal(enteredWelcome.sessionId, firstWelcome.sessionId);
-      assert.deepEqual(assertWelcome(await first.nextMessage()), { ...firstWelcome, joinCode: vacancyCode });
+      assert.deepEqual(assertWelcome(await first.nextMessage()), firstWelcome);
     });
   });
 
@@ -150,18 +142,17 @@ describe("session engine", () => {
       const { first, second, firstWelcome, secondWelcome } = await relay.pair("demo/host", "demo/guest");
       const newer = await relay.connect("demo/guest");
 
-      assertJoinCode(await newer.hello({ bindingToken: secondWelcome.bindingToken }));
+      assert.deepEqual(assertWelcome(await newer.hello({ bindingToken: secondWelcome.bindingToken })), secondWelcome);
 
       assertSessionError(await second.nextMessage(), BridgeSessionErrorCode.SESSION_REPLACED);
       await within(second.closed, "the superseded connection to close");
-      assert.deepEqual(assertWelcome(await newer.nextMessage()), secondWelcome);
       assert.deepEqual(assertWelcome(await first.nextMessage()), firstWelcome);
     });
   });
 
   it("ends the session on a member's goodbye: the other member is told SESSION_ENDED, both close, and its token later re-forms it", async () => {
     await withRelay({ bindingSecret: "spec-secret" }, async (relay) => {
-      const { first, second, firstWelcome, secondWelcome } = await relay.pair("demo/host", "demo/guest");
+      const { first, second, joinCode, firstWelcome, secondWelcome } = await relay.pair("demo/host", "demo/guest");
 
       first.send({ type: "session:goodbye" });
 
@@ -170,15 +161,13 @@ describe("session engine", () => {
       await within(first.closed, "the leaving member's connection to close");
       first.assertNothingReceived();
       const late = await relay.connect("demo/guest");
-      assertJoinCodeUnknown(await late.hello({ joinCode: firstWelcome.joinCode }));
+      assertJoinCodeUnknown(await late.hello({ joinCode }));
 
       const host = await relay.connect("demo/host");
-      const reformedCode = assertJoinCode(await host.hello({ bindingToken: firstWelcome.bindingToken }));
+      assertJoinCode(await host.hello({ bindingToken: firstWelcome.bindingToken }));
       const guest = await relay.connect("demo/guest");
-      assertJoinCode(await guest.hello({ bindingToken: secondWelcome.bindingToken }));
-      const guestWelcome = assertWelcome(await guest.nextMessage());
+      const guestWelcome = assertWelcome(await guest.hello({ bindingToken: secondWelcome.bindingToken }));
       assert.notEqual(guestWelcome.sessionId, secondWelcome.sessionId);
-      assert.equal(guestWelcome.joinCode, reformedCode);
       assert.equal(guestWelcome.bindingToken, secondWelcome.bindingToken);
     });
   });
@@ -202,8 +191,10 @@ describe("session engine", () => {
         );
 
         const returned = await relay.connect("demo/guest");
-        assertJoinCode(await returned.hello({ bindingToken: firstWelcome.bindingToken }));
-        assert.equal(assertWelcome(await returned.nextMessage()).sessionId, firstWelcome.sessionId);
+        assert.equal(
+          assertWelcome(await returned.hello({ bindingToken: firstWelcome.bindingToken })).sessionId,
+          firstWelcome.sessionId
+        );
       } finally {
         clearInterval(beat);
       }
@@ -278,7 +269,7 @@ function pairEndpoints(relay: Relay): {
   const joinCode = joinCodeOf(host.messages()[0]);
   const guest = connectEndpoint(relay, "guest");
   guest.hello({ joinCode });
-  const guestWelcome = assertWelcome(guest.messages()[1]);
+  const guestWelcome = assertWelcome(guest.messages()[0]);
   const hostWelcome = assertWelcome(host.messages()[1]);
   host.frames.length = 0;
   guest.frames.length = 0;
@@ -306,7 +297,42 @@ describe("session joining", () => {
     assert.equal(host.messages().length, 1);
     const guest = connectEndpoint(relay, "guest");
     guest.hello({ joinCode });
-    assertWelcome(guest.messages()[1]);
+    assertWelcome(guest.messages()[0]);
+  });
+
+  it("answers a hello that completes its pairing with the welcome alone, by code, by token, and by supersession", () => {
+    const relay = createRelay();
+    const host = connectEndpoint(relay, "host");
+    host.hello();
+    const joinCode = joinCodeOf(host.messages()[0]);
+
+    const guest = connectEndpoint(relay, "guest");
+    guest.hello({ joinCode });
+    assert.deepEqual(
+      guest.messages().map((message) => message.type),
+      ["session:welcome"]
+    );
+    const guestWelcome = assertWelcome(guest.messages()[0]);
+
+    guest.connection.closed();
+    const returned = connectEndpoint(relay, "guest");
+    returned.hello({ bindingToken: guestWelcome.bindingToken });
+    assert.deepEqual(returned.messages(), [guest.messages()[0]]);
+
+    const newer = connectEndpoint(relay, "guest");
+    newer.hello({ bindingToken: guestWelcome.bindingToken });
+    assert.deepEqual(newer.messages(), [guest.messages()[0]]);
+    assert.deepEqual(
+      host.messages().map((message) => message.type),
+      [
+        "session:joinCode",
+        "session:welcome",
+        "session:counterpartAway",
+        "session:joinCode",
+        "session:welcome",
+        "session:welcome",
+      ]
+    );
   });
 
   it("refuses a third role presenting a token for a session whose roles are both bound, keeping its connection open", () => {
@@ -605,7 +631,7 @@ describe("join code lifecycle", () => {
     assert.equal(relay.sessions()[0].joinCode, vacancyCode);
   });
 
-  it("rotates a lingering session too: its members returning by token are answered and welcomed with the rotated code", () => {
+  it("rotates a lingering session too: its first member returning by token is answered with the rotated code", () => {
     const relay = rotatingRelay();
     const { host, guest, joinCode, hostWelcome, guestWelcome } = pairEndpoints(relay);
     host.connection.closed();
@@ -617,27 +643,25 @@ describe("join code lifecycle", () => {
     const rotated = joinCodeOf(returnedHost.messages()[0]);
     const returnedGuest = connectEndpoint(relay, "guest");
     returnedGuest.hello({ bindingToken: guestWelcome.bindingToken });
-    const welcome = assertWelcome(returnedGuest.messages()[1]);
+    const welcome = assertWelcome(returnedGuest.messages()[0]);
 
     assert.notEqual(rotated, joinCode);
     assert.equal(welcome.sessionId, hostWelcome.sessionId);
-    assert.equal(welcome.joinCode, rotated);
   });
 
-  it("joins a hello presenting the previous code within the entry grace, answering and welcoming with the current code", () => {
+  it("joins a hello presenting the previous code within the entry grace, welcoming both members", () => {
     const relay = rotatingRelay();
     const { host, joinCode } = openSession(relay);
     mock.timers.tick(ROTATION_MS);
-    const rotated = joinCodeOf(host.messages()[1]);
+    assert.notEqual(joinCodeOf(host.messages()[1]), joinCode);
 
     mock.timers.tick(GRACE_MS - 1);
     const guest = connectEndpoint(relay, "guest");
     guest.hello({ joinCode });
 
-    assert.equal(joinCodeOf(guest.messages()[0]), rotated);
-    const guestWelcome = assertWelcome(guest.messages()[1]);
+    assert.equal(guest.messages().length, 1);
+    const guestWelcome = assertWelcome(guest.messages()[0]);
     const hostWelcome = assertWelcome(host.messages()[2]);
-    assert.equal(guestWelcome.joinCode, rotated);
     assert.equal(hostWelcome.sessionId, guestWelcome.sessionId);
   });
 
@@ -664,7 +688,7 @@ describe("join code lifecycle", () => {
     mock.timers.tick(ROTATION_MS);
     const rotated = joinCodeOf(host.messages()[1]);
     mock.timers.tick(ROTATION_MS);
-    const current = joinCodeOf(host.messages()[2]);
+    joinCodeOf(host.messages()[2]);
     host.frames.length = 0;
 
     const late = connectEndpoint(relay, "guest");
@@ -674,9 +698,8 @@ describe("join code lifecycle", () => {
 
     const onTime = connectEndpoint(relay, "guest");
     onTime.hello({ joinCode: rotated });
-    const welcome = assertWelcome(onTime.messages()[1]);
+    const welcome = assertWelcome(onTime.messages()[0]);
     assert.equal(welcome.sessionId, assertWelcome(host.messages()[0]).sessionId);
-    assert.equal(welcome.joinCode, current);
   });
 
   it("takes both the current code and the previous code in its grace out of service when the last vacant role binds", () => {
@@ -686,7 +709,7 @@ describe("join code lifecycle", () => {
     const rotated = joinCodeOf(host.messages()[1]);
     const guest = connectEndpoint(relay, "guest");
     guest.hello({ joinCode: rotated });
-    assertWelcome(guest.messages()[1]);
+    assertWelcome(guest.messages()[0]);
 
     for (const presented of [joinCode, rotated]) {
       const late = connectEndpoint(relay, "guest");
@@ -847,13 +870,13 @@ describe("session inspection and administration", () => {
     assert.equal(host.closeRequested, false);
     guest.connection.closed();
     assertCounterpartAway(host.messages()[0]);
-    const vacancyCode = joinCodeOf(host.messages()[1]);
+    joinCodeOf(host.messages()[1]);
     assert.equal(relay.disconnectMember(guestId), false);
     assert.equal(relay.disconnectMember("no-such-member"), false);
 
     const returned = connectEndpoint(relay, "guest");
     returned.hello({ bindingToken: guestWelcome.bindingToken });
-    assert.deepEqual(assertWelcome(returned.messages()[1]), { ...guestWelcome, joinCode: vacancyCode });
-    assert.deepEqual(assertWelcome(host.messages()[2]), { ...hostWelcome, joinCode: vacancyCode });
+    assert.deepEqual(assertWelcome(returned.messages()[0]), guestWelcome);
+    assert.deepEqual(assertWelcome(host.messages()[2]), hostWelcome);
   });
 });

@@ -30,6 +30,8 @@ export interface TestRelayOptions extends RelayTimings {
 export interface ScriptedPair {
   first: ScriptedPeer;
   second: ScriptedPeer;
+  /** The join code the first peer was answered with and the second presented; it left service when the pair formed. */
+  joinCode: string;
   firstWelcome: Welcome;
   secondWelcome: Welcome;
 }
@@ -119,10 +121,9 @@ export async function startTestRelay(options: TestRelayOptions = {}): Promise<Te
       const first = await connect(firstPath);
       const joinCode = assertJoinCode(await first.hello());
       const second = await connect(secondPath);
-      assertJoinCode(await second.hello({ joinCode }));
-      const secondWelcome = assertWelcome(await second.nextMessage());
+      const secondWelcome = assertWelcome(await second.hello({ joinCode }));
       const firstWelcome = assertWelcome(await first.nextMessage());
-      return { first, second, firstWelcome, secondWelcome };
+      return { first, second, joinCode, firstWelcome, secondWelcome };
     },
     settle,
     async expireLinger() {

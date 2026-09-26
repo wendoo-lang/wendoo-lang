@@ -55,7 +55,7 @@ function receive(ws: MockWebSocket, message: object): void {
 function welcome(bindingToken: string): object {
   return {
     type: "session:welcome",
-    payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", joinCode: "fuzzy-diamond-moor", bindingToken },
+    payload: { protocolVersion: PROTOCOL_VERSION, sessionId: "s-1", bindingToken },
   };
 }
 

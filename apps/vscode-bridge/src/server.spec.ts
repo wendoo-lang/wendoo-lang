@@ -78,7 +78,7 @@ function writeOf(path: string): Record<string, unknown> {
 }
 
 describe("vscode bridge sessions", () => {
-  it("answers each route's hello with the join code and welcomes the app and the extension once the extension presents the app's code", async () => {
+  it("answers the app's hello with the join code and welcomes the app and the extension once the extension presents it", async () => {
     await withBridge({}, async (bridge) => {
       const app = await bridge.connect("app");
       const joinCode = assertJoinCode(await app.hello());
@@ -86,12 +86,10 @@ describe("vscode bridge sessions", () => {
       app.assertNothingReceived();
 
       const extension = await bridge.connect("extension");
-      assert.equal(assertJoinCode(await extension.hello({ joinCode })), joinCode);
-      const extensionWelcome = assertWelcome(await extension.nextMessage());
+      const extensionWelcome = assertWelcome(await extension.hello({ joinCode }));
       const appWelcome = assertWelcome(await app.nextMessage());
 
       assert.equal(appWelcome.sessionId, extensionWelcome.sessionId);
-      assert.equal(appWelcome.joinCode, joinCode);
     });
   });
 
@@ -117,13 +115,11 @@ describe("vscode bridge sessions", () => {
       const { first: app, second: extension, firstWelcome, secondWelcome } = await bridge.pair("app", "extension");
       await app.close();
       assertCounterpartAway(await extension.nextMessage());
-      const vacancyCode = assertJoinCode(await extension.nextMessage());
+      assertJoinCode(await extension.nextMessage());
 
       const returned = await bridge.connect("app");
-      assert.equal(assertJoinCode(await returned.hello({ bindingToken: firstWelcome.bindingToken })), vacancyCode);
-
-      assert.deepEqual(assertWelcome(await returned.nextMessage()), { ...firstWelcome, joinCode: vacancyCode });
-      assert.deepEqual(assertWelcome(await extension.nextMessage()), { ...secondWelcome, joinCode: vacancyCode });
+      assert.deepEqual(assertWelcome(await returned.hello({ bindingToken: firstWelcome.bindingToken })), firstWelcome);
+      assert.deepEqual(assertWelcome(await extension.nextMessage()), secondWelcome);
     });
   });
 
@@ -132,13 +128,14 @@ describe("vscode bridge sessions", () => {
       const { first: app, second: extension, firstWelcome, secondWelcome } = await bridge.pair("app", "extension");
       await extension.close();
       assertCounterpartAway(await app.nextMessage());
-      const vacancyCode = assertJoinCode(await app.nextMessage());
+      assertJoinCode(await app.nextMessage());
 
       const returned = await bridge.connect("extension");
-      assert.equal(assertJoinCode(await returned.hello({ bindingToken: secondWelcome.bindingToken })), vacancyCode);
-
-      assert.deepEqual(assertWelcome(await returned.nextMessage()), { ...secondWelcome, joinCode: vacancyCode });
-      assert.deepEqual(assertWelcome(await app.nextMessage()), { ...firstWelcome, joinCode: vacancyCode });
+      assert.deepEqual(
+        assertWelcome(await returned.hello({ bindingToken: secondWelcome.bindingToken })),
+        secondWelcome
+      );
+      assert.deepEqual(assertWelcome(await app.nextMessage()), firstWelcome);
     });
   });
 
@@ -150,10 +147,9 @@ describe("vscode bridge sessions", () => {
       await bridge.expireLinger();
 
       const returnedExtension = await bridge.connect("extension");
-      const reformedCode = assertJoinCode(await returnedExtension.hello({ bindingToken: secondWelcome.bindingToken }));
+      assertJoinCode(await returnedExtension.hello({ bindingToken: secondWelcome.bindingToken }));
       const returnedApp = await bridge.connect("app");
-      assert.equal(assertJoinCode(await returnedApp.hello({ bindingToken: firstWelcome.bindingToken })), reformedCode);
-      const appWelcome = assertWelcome(await returnedApp.nextMessage());
+      const appWelcome = assertWelcome(await returnedApp.hello({ bindingToken: firstWelcome.bindingToken }));
       const extensionWelcome = assertWelcome(await returnedExtension.nextMessage());
 
       assert.notEqual(appWelcome.sessionId, firstWelcome.sessionId);
@@ -165,21 +161,19 @@ describe("vscode bridge sessions", () => {
 
   it("refuses the code a session formed with once both members are away, and binds an extension entering the code the returning app is answered with", async () => {
     await withBridge({}, async (bridge) => {
-      const { first: app, second: extension, firstWelcome } = await bridge.pair("app", "extension");
+      const { first: app, second: extension, joinCode, firstWelcome } = await bridge.pair("app", "extension");
       await extension.close();
       await app.close();
 
       const stale = await bridge.connect("extension");
-      assertJoinCodeUnknown(await stale.hello({ joinCode: firstWelcome.joinCode }));
+      assertJoinCodeUnknown(await stale.hello({ joinCode }));
       await within(stale.closed, "the refused connection to close");
       const returned = await bridge.connect("app");
       const vacancyCode = assertJoinCode(await returned.hello({ bindingToken: firstWelcome.bindingToken }));
       const newExtension = await bridge.connect("extension");
-      assert.equal(assertJoinCode(await newExtension.hello({ joinCode: vacancyCode })), vacancyCode);
-
-      const extensionWelcome = assertWelcome(await newExtension.nextMessage());
+      const extensionWelcome = assertWelcome(await newExtension.hello({ joinCode: vacancyCode }));
       assert.equal(extensionWelcome.sessionId, firstWelcome.sessionId);
-      assert.deepEqual(assertWelcome(await returned.nextMessage()), { ...firstWelcome, joinCode: vacancyCode });
+      assert.deepEqual(assertWelcome(await returned.nextMessage()), firstWelcome);
     });
   });
 
@@ -199,14 +193,16 @@ describe("vscode bridge sessions", () => {
       app.assertNothingReceived();
 
       const returned = await bridge.connect("extension");
-      assertJoinCode(await returned.hello({ bindingToken: secondWelcome.bindingToken }));
-      assert.equal(assertWelcome(await returned.nextMessage()).sessionId, secondWelcome.sessionId);
+      assert.equal(
+        assertWelcome(await returned.hello({ bindingToken: secondWelcome.bindingToken })).sessionId,
+        secondWelcome.sessionId
+      );
     });
   });
 
   it("opens a separate session for a token that fails verification", async () => {
     await withBridge({}, async (bridge) => {
-      const { first: app, firstWelcome } = await bridge.pair("app", "extension");
+      const { first: app, joinCode, firstWelcome } = await bridge.pair("app", "extension");
       const [bindingId] = firstWelcome.bindingToken.split(".");
 
       const stranger = await bridge.connect("extension");
@@ -214,7 +210,7 @@ describe("vscode bridge sessions", () => {
       await stranger.ping();
       await app.ping();
 
-      assert.notEqual(strangerCode, firstWelcome.joinCode);
+      assert.notEqual(strangerCode, joinCode);
       stranger.assertNothingReceived();
       app.assertNothingReceived();
     });
@@ -222,10 +218,10 @@ describe("vscode bridge sessions", () => {
 
   it("refuses another extension presenting the join code of a session whose app and extension are connected, leaving both connected", async () => {
     await withBridge({}, async (bridge) => {
-      const { first: app, second: extension, firstWelcome } = await bridge.pair("app", "extension");
+      const { first: app, second: extension, joinCode } = await bridge.pair("app", "extension");
       const claimant = await bridge.connect("extension");
 
-      assertJoinCodeUnknown(await claimant.hello({ joinCode: firstWelcome.joinCode }));
+      assertJoinCodeUnknown(await claimant.hello({ joinCode }));
       await within(claimant.closed, "the refused connection to close");
 
       await app.ping();
@@ -239,11 +235,10 @@ describe("vscode bridge sessions", () => {
     await withBridge({}, async (bridge) => {
       const { first: app, second: extension, firstWelcome, secondWelcome } = await bridge.pair("app", "extension");
       const second = await bridge.connect("extension");
-      assertJoinCode(await second.hello({ bindingToken: secondWelcome.bindingToken }));
+      assert.deepEqual(assertWelcome(await second.hello({ bindingToken: secondWelcome.bindingToken })), secondWelcome);
 
       assertSessionError(await extension.nextMessage(), BridgeSessionErrorCode.SESSION_REPLACED);
       await within(extension.closed, "the superseded connection to close");
-      assert.deepEqual(assertWelcome(await second.nextMessage()), secondWelcome);
       assert.deepEqual(assertWelcome(await app.nextMessage()), firstWelcome);
     });
   });
@@ -284,8 +279,10 @@ describe("vscode bridge sessions", () => {
         while (message.type === "control:pong") message = await extension.nextMessage();
         assertCounterpartAway(message);
         const returned = await bridge.connect("app");
-        assertJoinCode(await returned.hello({ bindingToken: firstWelcome.bindingToken }));
-        assert.equal(assertWelcome(await returned.nextMessage()).sessionId, firstWelcome.sessionId);
+        assert.equal(
+          assertWelcome(await returned.hello({ bindingToken: firstWelcome.bindingToken })).sessionId,
+          firstWelcome.sessionId
+        );
       } finally {
         clearInterval(beat);
       }
@@ -303,7 +300,7 @@ describe("vscode bridge console commands", () => {
       assert.ok(runReplCommand(`disconnect ${memberId}`, admin)?.includes(memberId));
       await within(extension.closed, "the disconnected extension's connection to close");
       assertCounterpartAway(await app.nextMessage());
-      const vacancyCode = assertJoinCode(await app.nextMessage());
+      assertJoinCode(await app.nextMessage());
       assert.deepEqual(
         admin.sessions()[0]?.roles.map((role) => [role.role, role.state]),
         [
@@ -312,10 +309,11 @@ describe("vscode bridge console commands", () => {
         ]
       );
       const returned = await bridge.connect("extension");
-      assertJoinCode(await returned.hello({ bindingToken: secondWelcome.bindingToken }));
-
-      assert.deepEqual(assertWelcome(await returned.nextMessage()), { ...secondWelcome, joinCode: vacancyCode });
-      assert.deepEqual(assertWelcome(await app.nextMessage()), { ...firstWelcome, joinCode: vacancyCode });
+      assert.deepEqual(
+        assertWelcome(await returned.hello({ bindingToken: secondWelcome.bindingToken })),
+        secondWelcome
+      );
+      assert.deepEqual(assertWelcome(await app.nextMessage()), firstWelcome);
     });
   });
 
@@ -323,7 +321,13 @@ describe("vscode bridge console commands", () => {
     mock.method(Math, "random", () => 0);
     try {
       await withBridge({}, async (bridge, admin) => {
-        const { first: app, second: extension, firstWelcome, secondWelcome } = await bridge.pair("app", "extension");
+        const {
+          first: app,
+          second: extension,
+          joinCode,
+          firstWelcome,
+          secondWelcome,
+        } = await bridge.pair("app", "extension");
 
         assert.ok(runReplCommand(`kill ${firstWelcome.sessionId}`, admin)?.includes(firstWelcome.sessionId));
         assert.deepEqual(admin.sessions(), []);
@@ -337,13 +341,11 @@ describe("vscode bridge console commands", () => {
         const returnedApp = await bridge.connect("app");
         const reformedCode = joinCodeOf(await returnedApp.hello({ bindingToken: firstWelcome.bindingToken }));
         const returnedExtension = await bridge.connect("extension");
-        await returnedExtension.hello({ bindingToken: secondWelcome.bindingToken });
-        const welcome = (await returnedExtension.nextMessage()).payload as { sessionId: string; joinCode: string };
+        const welcome = assertWelcome(await returnedExtension.hello({ bindingToken: secondWelcome.bindingToken }));
 
-        assert.ok(freshCode.startsWith(`${firstWelcome.joinCode}-`));
-        assert.equal(welcome.joinCode, reformedCode);
+        assert.ok(freshCode.startsWith(`${joinCode}-`));
+        assert.notEqual(reformedCode, joinCode);
         assert.notEqual(welcome.sessionId, firstWelcome.sessionId);
-        assert.notEqual(welcome.joinCode, firstWelcome.joinCode);
       });
     } finally {
       mock.restoreAll();

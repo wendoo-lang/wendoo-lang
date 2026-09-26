@@ -117,6 +117,39 @@ export interface SessionHelloMessage {
   payload?: SessionHelloPayload;
 }
 
+/** Payload of {@link SessionWelcomeMessage}. */
+export interface SessionWelcomePayload {
+  protocolVersion: number;
+  sessionId: string;
+  /** Token the member stores and presents to bind back into the same session on reconnect. */
+  bindingToken?: string;
+}
+
+/** Payload of {@link SessionJoinCodeMessage}. */
+export interface SessionJoinCodePayload {
+  joinCode: string;
+}
+
+/**
+ * Tells a member of either role that its session is connected: the bridge
+ * sends it to both members each time both roles of the session are bound.
+ */
+export interface SessionWelcomeMessage {
+  type: "session:welcome";
+  id?: string;
+  payload: SessionWelcomePayload;
+}
+
+/**
+ * Tells a member of either role its session's join code, for display: in
+ * answer to its hello when a role of the session stays vacant, and whenever
+ * the session mints a new code while one of its roles is vacant.
+ */
+export interface SessionJoinCodeMessage {
+  type: "session:joinCode";
+  payload: SessionJoinCodePayload;
+}
+
 /**
  * Sent by a bridge to tell a member that its session's counterpart has
  * disconnected. The session stays open and keeps its binding token; the next

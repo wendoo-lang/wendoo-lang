@@ -97,12 +97,11 @@ Three layers of message handling:
 Session handshake: every connection's first frame is a `session:hello` declaring
 `PROTOCOL_VERSION`, sent via `sendImmediate`; messages sent while connecting or reconnecting
 follow it in the order they were sent. The server responds with `session:welcome`
-(protocolVersion, sessionId, joinCode, bindingToken). Each hello presents the binding token
+(protocolVersion, sessionId, bindingToken). Each hello presents the binding token
 the session holds. The join code passed to the constructor is an entry credential: hellos
 present it only until the session accepts a `session:welcome`, which discards it, so every
 later hello -- reconnects and `start()` included -- presents the token alone. A join code the
-bridge sends is never presented: a `session:joinCode` feeds a display, and a welcome's code has
-already left service and feeds none.
+bridge sends is never presented: a `session:joinCode` feeds a display.
 The session id a welcome carries is kept as `sessionId` and never presented. The `WsClient`
 sends `control:ping` every 15 seconds while connected, which keeps the connection inside the
 bridge's activity timeout.

@@ -81,8 +81,8 @@ event creates or destroys a session.
   `session:joinCode`. For two minutes after a rotation (or until the
   next rotation, if that comes first) a hello presenting a session's
   previous code still joins it, so a person partway through typing a
-  code is never stranded by a rotation; answers and welcomes always
-  carry the current code.
+  code is never stranded by a rotation; answers always carry the
+  current code.
 - A code that leaves service -- replaced by rotation once its grace
   ends, taken out of service when both roles bind or a member drops,
   or held by a session that ends -- is QUARANTINED: it is not minted
@@ -96,9 +96,8 @@ event creates or destroys a session.
   the code; every later hello, reconnects included, presents the
   token alone. A code the relay sends answering a hello, or pushed
   when a role falls vacant or at rotation, feeds the endpoint's
-  display; the code a welcome carries has already left service and is
-  displayed nowhere, and a welcome takes any displayed code down. No
-  code the relay sends is ever presented.
+  display; a welcome carries no code, and takes any displayed code
+  down. No code the relay sends is ever presented.
 - A presented code therefore always expresses current human intent,
   and a hello presenting one is matched by the code alone. A code in
   service joins its session's vacant role. A code that opens no vacant
@@ -121,12 +120,13 @@ event creates or destroys a session.
 
 FORMATION. Each party connects to its role endpoint and sends
 `session:hello` declaring the protocol version it speaks. A valid
-hello is answered immediately with `session:joinCode`, carrying the
-session's most recent code. The `session:welcome` is deferred until
-BOTH roles of the pairing are bound; it means "your session is
-connected", never "the relay heard you". Its join code is the one
-that just left service as the second role bound; it joins nothing,
-and no endpoint displays it.
+hello that leaves a role of the pairing vacant is answered
+immediately with `session:joinCode`, carrying the session's current
+code. The `session:welcome` is deferred until BOTH roles of the
+pairing are bound; it means "your session is connected", never "the
+relay heard you". A hello that binds the second role is answered by
+that welcome alone: the session's code leaves service as the role
+binds, so none is sent.
 Version rejection is immediate: `session:error` with a stable code,
 then the socket closes.
 
@@ -194,8 +194,9 @@ declared version in its framing.
 Two handshakes stack, and each answers one question.
 
 The RELAY layer answers "is the session connected?": `session:hello`,
-answered by `session:joinCode`, then `session:welcome` once both roles
-are bound, repeated whenever a member binds back in. It is spoken
+answered by `session:joinCode` while a role stays vacant, and
+`session:welcome` once both roles are bound, repeated whenever a
+member binds back in. It is spoken
 between each endpoint and the relay, and the engine owns it.
 
 The KIND layer answers "do the two endpoints speak a common version

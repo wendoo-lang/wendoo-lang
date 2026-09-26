@@ -38,10 +38,6 @@ export {
 export type {
   AppClientMessage,
   AppServerMessage,
-  AppSessionJoinCodeMessage,
-  AppSessionJoinCodePayload,
-  AppSessionWelcomeMessage,
-  AppSessionWelcomePayload,
   CompileDiagnosticEntry,
   CompileDiagnosticRange,
   CompileDiagnosticsMessage,
@@ -61,6 +57,10 @@ export type {
   SessionGoodbyeMessage,
   SessionHelloMessage,
   SessionHelloPayload,
+  SessionJoinCodeMessage,
+  SessionJoinCodePayload,
+  SessionWelcomeMessage,
+  SessionWelcomePayload,
 } from "./messages/index.js";
 export {
   BridgeSessionErrorCode,

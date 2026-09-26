@@ -1885,7 +1885,7 @@ describe("AppEnvironmentHost bridge", () => {
   function welcome(bindingToken: string): object {
     return {
       type: "session:welcome",
-      payload: { protocolVersion: 1, sessionId: "s-1", joinCode: "spent-code", bindingToken },
+      payload: { protocolVersion: 1, sessionId: "s-1", bindingToken },
     };
   }
 
