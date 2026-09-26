@@ -113,6 +113,60 @@ wraps one for the apps built on it.
   `endBridge()`, which ends the session and discards the bridge so the next connect loads
   the binding token afresh.
 
+## The Folder-Host Session
+
+The app end of the folder-host session: an app embedded in a host that owns the project
+as a workspace folder (the VS Code extension's desktop folder mode, whose host end is
+documented in `vscode-extension.instructions.md`). The root barrel re-exports the
+protocol's folder types and constants, so an app needs only `@wendoo/bridge-app`.
+
+- The app detects folder host mode itself, from the `FOLDER_HOST_MODE_URL_PARAM` URL
+  parameter or the `FOLDER_HOST_MODE_GLOBAL` global carrying `FOLDER_HOST_MODE_FOLDER`.
+  Nothing in this package reads the flag.
+- `connectFolderHostSession({ port, appName, appDataCodec? })` in
+  `folder-host-session.ts` sends `folder:hello`, requires an exact-version
+  `folder:welcome`, and builds a `WorkspaceFolderProjectStore` from the welcome's
+  manifest. It rejects with `FolderSessionError` carrying the host's error code, or
+  `INVALID_PAYLOAD` / `PROTOCOL_VERSION_MISMATCH` for a bad welcome; a `wendoo.json`
+  that fails manifest validation rejects with `WorkspaceFolderStoreError`
+  (`INVALID_MANIFEST`) thrown by the store's constructor.
+- The resolved `FolderHostSession` carries the `store`, the host's `projectId`, and:
+  - `publishDiagnostics` and `publishCompilerControlledFiles`, posted with no reply;
+    `createFolderCompileDiagnosticsPublisher` wraps the first with a per-file version
+    counter and publishes an empty list for a file whose diagnostics cleared;
+  - `writeRemovableVolumeFile` and `openExternalDocument`, which resolve on the host's
+    `folder:ack` and reject with `FolderSessionError`;
+  - `onExternalChange`, delivering each `folder:externalChange` after the store has
+    absorbed it; changes arriving before the first listener are replayed to it;
+  - `dispose`, which detaches from the port.
+- Requests are matched to replies by an `id` the session mints (`folder-request-<n>`).
+  A message matching no pending request is dropped unless it is a
+  `folder:externalChange` -- including a `folder:error` without an `id`. Requests carry
+  no timeout, and `dispose()` drops pending requests without settling them.
+- `WorkspaceFolderProjectStore` (`workspace-folder-project-store.ts`) is a
+  `ProjectStore` holding one collection (`WORKSPACE_FOLDER_PROJECT_COLLECTION_ID`) with
+  one project whose id is the host's `projectId`; multi-project and
+  collection-management operations throw `UNSUPPORTED_OPERATION`, and the tab session and
+  last opened project are fixed to that project.
+  - App data lives in `wendoo.json`: the `brains` key as `extras.brains`, and the keys the
+    `FolderAppDataCodec` claims as the app's own chunk at `extras.app[appName]`. Other
+    keys are held in memory only; the installed-extensions key is seeded from the
+    welcome's `extensionsCache` (rebuilt from `.libraries/installed.json` and the tree
+    files), so the project loads its fetched dependencies offline.
+  - The manifest is rewritten through `folder:manifestWrite` only when its composed text
+    changes, preserving fields the store does not model. File changes naming
+    `wendoo.json` are skipped; other changes go out one `folder:change` each, and a
+    snapshot save or `import` goes out as the diff against the store's mirror of the
+    folder.
+  - `absorbExternalChange` re-parses an external `wendoo.json` write into the manifest
+    and app data (an unparseable one keeps the previous manifest and app data) and
+    applies any other change to the mirror. Interleaved app and external writes resolve
+    last writer wins.
+- `AppEnvironmentHost` supplies the pieces an app wires to the session:
+  `getCompilerControlledFiles()`, `onCompilerControlledFilesChanged()`,
+  `getInstalledExtensionMetadata()`, and `applyExternalProjectFileChange()`. A host
+  created without `bridgeUrl` has no app bridge.
+
 ## Session Kinds
 
 A session kind is one wire surface between two parties, with one version.
