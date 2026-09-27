@@ -4,7 +4,14 @@ import type { FileContentPayload, FileSystemNotification, FilesystemSyncPayload 
 /**
  * Wire-format version of the folder-session protocol spoken between a host
  * (for example a VS Code extension owning a workspace folder) and an embedded
- * app. Bumped on incompatible changes.
+ * app: the newest version this build speaks. Bumped on incompatible changes.
+ *
+ * The app declares its version in `folder:hello`. The host accepts any
+ * declared version up to its own, welcomes with the declared version, and
+ * speaks that version for the session; it refuses a newer declaration with
+ * `FolderSessionErrorCode.PROTOCOL_VERSION_NEWER`, whose remedy is updating
+ * the host. A host that bumps this constant must keep speaking every older
+ * version.
  */
 export const FOLDER_SESSION_PROTOCOL_VERSION = 3;
 
@@ -35,8 +42,17 @@ export const FOLDER_HOST_MODE_GLOBAL = "__wendooHostMode";
 
 /** Stable identifiers for folder-session errors reported by the host. */
 export const FolderSessionErrorCode = {
-  /** The app's `folder:hello` declared a protocol version the host does not speak. */
+  /**
+   * The host's `folder:welcome` carried a protocol version other than the one
+   * the app declared. Raised by the app.
+   */
   PROTOCOL_VERSION_MISMATCH: "FOLDER_SESSION_PROTOCOL_VERSION_MISMATCH",
+  /**
+   * The app's `folder:hello` declared a protocol version newer than the
+   * host's {@link FOLDER_SESSION_PROTOCOL_VERSION}. Raised by the host; the
+   * remedy is updating the host.
+   */
+  PROTOCOL_VERSION_NEWER: "FOLDER_SESSION_PROTOCOL_VERSION_NEWER",
   /** The project folder carries no readable `wendoo.json`. */
   PROJECT_MANIFEST_NOT_FOUND: "FOLDER_SESSION_PROJECT_MANIFEST_NOT_FOUND",
   /** A message payload failed validation. */
@@ -56,7 +72,11 @@ export type FolderSessionErrorCode = (typeof FolderSessionErrorCode)[keyof typeo
 
 /** Payload of a {@link FolderHelloMessage}. */
 export interface FolderHelloPayload {
-  /** Protocol version the app speaks; must equal {@link FOLDER_SESSION_PROTOCOL_VERSION}. */
+  /**
+   * Protocol version the app speaks: its build's
+   * {@link FOLDER_SESSION_PROTOCOL_VERSION}. The host accepts any whole
+   * version from 1 up to its own.
+   */
   protocolVersion: number;
 }
 
@@ -72,7 +92,10 @@ export interface FolderHelloMessage {
 
 /** Payload of a {@link FolderWelcomeMessage}. */
 export interface FolderWelcomePayload {
-  /** Protocol version the host speaks. */
+  /**
+   * Protocol version the host accepted for the session: always the version
+   * the app's hello declared.
+   */
   protocolVersion: number;
   /** Stable opaque id of the host-provided project. */
   projectId: string;

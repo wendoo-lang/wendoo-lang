@@ -400,6 +400,17 @@ export class Engine {
     }
   }
 
+  /**
+   * Reload the archetype's brain from the active project -- falling back to
+   * the default asset or a generated brain, saved to the project, when the
+   * project holds none -- and push it onto every live actor of that
+   * archetype. Does nothing until {@link loadBrains} has resolved.
+   */
+  async reloadBrain(archetype: Archetype): Promise<void> {
+    if (!this.brains) return;
+    this.updateBrainDef(archetype, await this.loadBrainDef(archetype));
+  }
+
   getActorById(actorId: number): Actor | undefined {
     return this.world.entity(actorId) || undefined;
   }

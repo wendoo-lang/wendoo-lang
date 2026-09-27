@@ -36,11 +36,13 @@ const POSITION_REFERENCE = `gh:${POSITION_ORIGIN}@v0.1.0`;
 
 /**
  * A host-side fake answering the handshake and capturing every app message,
- * optionally offering an on-disk installed-extensions tree with the welcome
- * and optionally declaring a protocol version other than the app's.
+ * optionally offering an on-disk installed-extensions tree with the welcome,
+ * optionally declaring a protocol version other than the app's, and
+ * optionally refusing the hello with an error code.
  */
 function fakeHostPort(options?: {
   welcomeProtocolVersion?: number;
+  helloErrorCode?: FolderSessionErrorCodeType;
   extensionsCache?: ReadonlyArray<[string, FileContentPayload]>;
   volumeWriteErrorCode?: FolderSessionErrorCodeType;
   openExternalDocumentErrorCode?: FolderSessionErrorCodeType;
@@ -54,7 +56,13 @@ function fakeHostPort(options?: {
     postMessage(message: FolderAppMessage): void {
       sent.push(message);
       queueMicrotask(() => {
-        if (message.type === "folder:hello") {
+        if (message.type === "folder:hello" && options?.helloErrorCode) {
+          listener?.({
+            type: "folder:error",
+            id: message.id,
+            payload: { code: options.helloErrorCode, message: "hello refused" },
+          });
+        } else if (message.type === "folder:hello") {
           listener?.({
             type: "folder:welcome",
             id: message.id,
@@ -102,8 +110,28 @@ function fakeHostPort(options?: {
 }
 
 describe("folder session protocol version", () => {
+  it("declares this build's protocol version in its hello", async () => {
+    const port = fakeHostPort();
+    const session = await connectFolderHostSession({ port, appName: "test-app" });
+
+    const hello = port.sent.find((candidate) => candidate.type === "folder:hello");
+    assert.deepStrictEqual(hello?.payload, { protocolVersion: FOLDER_SESSION_PROTOCOL_VERSION });
+    session.dispose();
+  });
+
+  it("rejects with the host's PROTOCOL_VERSION_NEWER code and message when the host refuses its version", async () => {
+    const port = fakeHostPort({ helloErrorCode: FolderSessionErrorCode.PROTOCOL_VERSION_NEWER });
+
+    await assert.rejects(connectFolderHostSession({ port, appName: "test-app" }), (error: unknown) => {
+      assert.ok(error instanceof FolderSessionError);
+      assert.equal(error.code, FolderSessionErrorCode.PROTOCOL_VERSION_NEWER);
+      assert.equal(error.message, "hello refused");
+      return true;
+    });
+  });
+
   for (const hostVersion of [FOLDER_SESSION_PROTOCOL_VERSION - 1, FOLDER_SESSION_PROTOCOL_VERSION + 1]) {
-    it(`rejects a host speaking version ${hostVersion} with the mismatch code`, async () => {
+    it(`rejects a welcome carrying version ${hostVersion}, not the declared one, with the mismatch code`, async () => {
       const port = fakeHostPort({ welcomeProtocolVersion: hostVersion });
 
       await assert.rejects(connectFolderHostSession({ port, appName: "test-app" }), (error: unknown) => {

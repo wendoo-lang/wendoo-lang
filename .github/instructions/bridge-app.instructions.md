@@ -124,12 +124,14 @@ protocol's folder types and constants, so an app needs only `@wendoo/bridge-app`
   parameter or the `FOLDER_HOST_MODE_GLOBAL` global carrying `FOLDER_HOST_MODE_FOLDER`.
   Nothing in this package reads the flag.
 - `connectFolderHostSession({ port, appName, appDataCodec? })` in
-  `folder-host-session.ts` sends `folder:hello`, requires an exact-version
-  `folder:welcome`, and builds a `WorkspaceFolderProjectStore` from the welcome's
-  manifest. It rejects with `FolderSessionError` carrying the host's error code, or
-  `INVALID_PAYLOAD` / `PROTOCOL_VERSION_MISMATCH` for a bad welcome; a `wendoo.json`
-  that fails manifest validation rejects with `WorkspaceFolderStoreError`
-  (`INVALID_MANIFEST`) thrown by the store's constructor.
+  `folder-host-session.ts` sends `folder:hello` declaring this build's
+  `FOLDER_SESSION_PROTOCOL_VERSION`, requires a `folder:welcome` carrying that same
+  version, and builds a `WorkspaceFolderProjectStore` from the welcome's manifest. It
+  rejects with `FolderSessionError` carrying the host's error code (among them
+  `PROTOCOL_VERSION_NEWER`, see Version Rules), or `INVALID_PAYLOAD` /
+  `PROTOCOL_VERSION_MISMATCH` for a bad welcome; a `wendoo.json` that fails manifest
+  validation rejects with `WorkspaceFolderStoreError` (`INVALID_MANIFEST`) thrown by
+  the store's constructor.
 - The resolved `FolderHostSession` carries the `store`, the host's `projectId`, and:
   - `publishDiagnostics` and `publishCompilerControlledFiles`, posted with no reply;
     `createFolderCompileDiagnosticsPublisher` wraps the first with a per-file version
@@ -207,13 +209,17 @@ port and never assumes how the port reaches the peer.
 
 ## Version Rules
 
-The folder-host session and the peer-session mechanism follow different
-version rules. Do not carry one into the other.
+Both surfaces adapt down, and the older party's declaration governs. They
+differ in who declares and who adapts.
 
 | Surface | Rule | Rejection |
 |---|---|---|
-| Folder-host session | Exact match: the host's welcome must declare `FOLDER_SESSION_PROTOCOL_VERSION`; any other version, older or newer, is refused. | `FolderSessionErrorCode.PROTOCOL_VERSION_MISMATCH` |
+| Folder-host session | One-sided adapt down: the app (the pinned party, a target build with its version compiled in) declares its `FOLDER_SESSION_PROTOCOL_VERSION` in `folder:hello`; the host (the evergreen party) accepts any version up to its own, records it, speaks it for the session, and welcomes with it -- so the welcome always carries the app's declared version, and the app refuses any other welcome (`PROTOCOL_VERSION_MISMATCH`). The host refuses only a newer declaration; the refusal's message tells the user to update the host. | `FolderSessionErrorCode.PROTOCOL_VERSION_NEWER` |
 | Peer-session mechanism (every kind built on it) | Adapt down: both parties send `<kind>:hello` declaring the version they speak; a receiver accepts any version up to its kind's `protocolVersion`, records it as `peerProtocolVersion`, and refuses only a newer one. The refusal's message tells the user to refresh or update the older side. | `PeerSessionErrorCode.PROTOCOL_VERSION_NEWER` |
+
+Bumping `FOLDER_SESSION_PROTOCOL_VERSION` strands no pinned target app: every
+older declaration stays accepted, so the host keeps speaking each older version.
+An app built against the bumped version needs a host at least as new.
 
 For a peer session:
 

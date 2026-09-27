@@ -11,6 +11,7 @@ import {
   type ProjectFileSystem,
   ProjectManager,
   type ProjectManifest,
+  WENDOO_JSON_PATH,
 } from "@wendoo/app-host";
 import {
   type AppBridgeState,
@@ -19,7 +20,9 @@ import {
   type BridgeSessionErrorCode,
   collectBrainErrorDiagnostics,
   collectBrainTileCompileDiagnostics,
+  createFolderCompileDiagnosticsPublisher,
   createVfsAssetUrlProvider,
+  type FolderHostSession,
   type UserTileMetadata,
   type VfsAssetUrlProvider,
   type WorkspaceCompileDiagnostic,
@@ -35,6 +38,7 @@ import {
 import { createDefaultLocalizer } from "@wendoo/core/localization";
 import type { DocsTileEntry } from "@wendoo/docs";
 import { isCompilerControlledPath, type Mount } from "@wendoo/ts-compiler";
+import type { PrintTransport } from "@wendoo/ui";
 import { createEcosimModule } from "@/brain";
 import type { Archetype } from "@/brain/actor";
 import { ARCHETYPES } from "@/brain/archetypes";
@@ -45,7 +49,15 @@ import { type AppSettings, loadAppSettings, normalizeAppSettings, persistAppSett
 import { loadBindingToken, saveBindingToken } from "./binding-token-persistence";
 import { ecosimDefaultExtensions, ecosimEmbeddedExtensions } from "./ecosim-embedded-extensions";
 import { ecosimApprovedCatalogEntry, ecosimLibraryCatalogMoves } from "./ecosim-extension-browser";
-import { buildEcosimExportDocument } from "./project-io";
+import { type AppChrome, appChromeForMode, connectEcosimFolderSession, isFolderHostMode } from "./folder-host-mode";
+import {
+  buildEcosimExportDocument,
+  DESIRED_COUNTS_KEY,
+  OBSTACLES_KEY,
+  parseDesiredCounts,
+  parseObstacles,
+  translateEcosimAppChunk,
+} from "./project-io";
 
 /**
  * Platform content mounts for the sim, applied at the workspace root. Empty:
@@ -141,75 +153,19 @@ function persistUiPreferences(projectId: string, prefs: UiPreferences): void {
   }
 }
 
-function parseObstacles(value: unknown): Obstacle[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  const result: Obstacle[] = [];
-  for (const entry of value) {
-    if (!entry || typeof entry !== "object") continue;
-    const o = entry as Partial<Obstacle>;
-    if (
-      typeof o.x === "number" &&
-      typeof o.y === "number" &&
-      typeof o.width === "number" &&
-      typeof o.height === "number" &&
-      Number.isFinite(o.x) &&
-      Number.isFinite(o.y) &&
-      Number.isFinite(o.width) &&
-      Number.isFinite(o.height) &&
-      o.width > 0 &&
-      o.height > 0
-    ) {
-      const rotation = typeof o.rotation === "number" && Number.isFinite(o.rotation) ? o.rotation : undefined;
-      result.push({ x: o.x, y: o.y, width: o.width, height: o.height, rotation });
-    }
-  }
-  return result;
-}
-
-function translateEcosimAppChunk(app: unknown): ImportAppChunkResult {
-  const diagnostics: { severity: "error" | "warning"; message: string }[] = [];
-  const appData = app as { actors?: unknown[]; obstacles?: unknown } | null;
-  if (!appData?.actors || !Array.isArray(appData.actors) || appData.actors.length === 0) {
-    return {
-      diagnostics: [{ severity: "error", message: "No actor data found in the sim's app chunk." }],
-    };
-  }
-
-  const counts: Record<string, number> = {};
-  for (const entry of appData.actors) {
-    const actorEntry = entry as { archetype?: string; desiredCount?: number } | null;
-    if (!actorEntry?.archetype || !(actorEntry.archetype in ARCHETYPES)) {
-      diagnostics.push({
-        severity: "warning",
-        message: `Skipped unknown archetype: "${actorEntry?.archetype ?? "(none)"}".`,
-      });
-      continue;
-    }
-    if (typeof actorEntry.desiredCount === "number") {
-      counts[actorEntry.archetype] = Math.max(0, Math.min(100, Math.round(actorEntry.desiredCount)));
-    }
-  }
-
-  const importedAppData: Record<string, string> = { actors: JSON.stringify(counts) };
-  if (appData.obstacles !== undefined) {
-    const obstacles = parseObstacles(appData.obstacles);
-    if (obstacles) {
-      importedAppData.obstacles = JSON.stringify(obstacles);
-    } else {
-      diagnostics.push({
-        severity: "warning",
-        message: "Ignored malformed obstacle data in the sim's app chunk.",
-      });
-    }
-  }
-
-  return {
-    diagnostics,
-    appData: importedAppData,
-  };
-}
-
 const DESIRED_COUNTS_DEBOUNCE_MS = 200;
+
+/** Project data an external `wendoo.json` edit changed, for the running scene to apply. */
+export interface ExternalProjectDataChange {
+  /** Archetypes whose stored brain the edit changed or removed. */
+  readonly brains: readonly Archetype[];
+  /** Whether the edit changed the stored obstacles. */
+  readonly obstaclesChanged: boolean;
+}
+
+function sameObstacles(a: readonly Obstacle[] | undefined, b: readonly Obstacle[] | undefined): boolean {
+  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+}
 
 export class EcosimEnvironmentStore {
   readonly host: AppEnvironmentHost;
@@ -233,9 +189,20 @@ export class EcosimEnvironmentStore {
   private _isSwitchingProject = false;
   private _vfsRevisionWiringInitialized = false;
   private readonly _vfsAssetUrlProvider: VfsAssetUrlProvider;
+  private readonly _folderSession: FolderHostSession | undefined;
+  private readonly _chrome: AppChrome;
+  private readonly _printTransport: PrintTransport | undefined;
+  private readonly _externalProjectDataListeners = new Set<(change: ExternalProjectDataChange) => void>();
 
-  private constructor(host: AppEnvironmentHost) {
+  private constructor(host: AppEnvironmentHost, folderSession: FolderHostSession | undefined) {
     this.host = host;
+    this._folderSession = folderSession;
+    this._chrome = appChromeForMode(folderSession !== undefined);
+    this._printTransport = folderSession
+      ? (html) => {
+          void folderSession.openExternalDocument(html);
+        }
+      : undefined;
     this._vfsAssetUrlProvider = createVfsAssetUrlProvider({
       getProjectFileSystem: () => this.host.servedProjectFileSystem,
       getVfsRevision: () => this.host.getVfsRevisionSnapshot(),
@@ -247,6 +214,11 @@ export class EcosimEnvironmentStore {
       this.userTileDocEntries = [];
       this._projectDataReloadPromise = this.reloadProjectData();
     });
+    if (folderSession) {
+      this.host.onCompilerControlledFilesChanged(() => {
+        this.publishCompilerControlledFiles();
+      });
+    }
   }
 
   private async reloadProjectData(): Promise<void> {
@@ -266,7 +238,7 @@ export class EcosimEnvironmentStore {
   private async reloadObstaclesFromProject(): Promise<void> {
     let next: Obstacle[] | undefined;
     try {
-      const raw = await this.host.projectManager.loadAppData("obstacles");
+      const raw = await this.host.projectManager.loadAppData(OBSTACLES_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as unknown;
         next = parseObstacles(parsed);
@@ -282,37 +254,36 @@ export class EcosimEnvironmentStore {
       clearTimeout(this._desiredCountsSaveTimer);
       this._desiredCountsSaveTimer = undefined;
     }
-    const next = defaultDesiredCounts();
+    let raw: string | undefined;
     try {
-      const raw = await this.host.projectManager.loadAppData("actors");
-      if (raw) {
-        const parsed = JSON.parse(raw) as Partial<Record<Archetype, number>>;
-        for (const key of Object.keys(next) as Archetype[]) {
-          const value = parsed[key];
-          if (typeof value === "number" && Number.isFinite(value)) {
-            next[key] = Math.max(0, Math.min(100, Math.round(value)));
-          }
-        }
-      }
+      raw = await this.host.projectManager.loadAppData(DESIRED_COUNTS_KEY);
     } catch {
-      // corrupted or missing data -- fall back to defaults
+      // unreadable data -- fall back to defaults
     }
-    this._desiredCounts = next;
+    this._desiredCounts = parseDesiredCounts(raw);
     for (const fn of this._desiredCountsListeners) {
       fn();
     }
   }
 
+  /**
+   * Creates the store. In folder host mode it first opens the folder session
+   * and backs the project with the host's workspace folder; otherwise the
+   * project lives in IndexedDB. Rejects with `FolderSessionError` when the
+   * folder host refuses the session.
+   */
   static async create(): Promise<EcosimEnvironmentStore> {
     const appSettings = loadAppSettings();
-    const projectStore = await createIdbProjectStore(simName);
+    const folderSession = isFolderHostMode() ? await connectEcosimFolderSession() : undefined;
+    const publishFolderDiagnostics = folderSession ? createFolderCompileDiagnosticsPublisher(folderSession) : undefined;
+    const projectStore = folderSession ? folderSession.store : await createIdbProjectStore(simName);
     let instanceRef: EcosimEnvironmentStore | undefined;
     const host = new AppEnvironmentHost({
       projectManager: new ProjectManager(projectStore, {
         filesystemOptions: {
           shouldExclude: (path) => isCompilerControlledPath(path, ecosimMounts),
         },
-        lock: createWebLocksProjectLock(simName),
+        ...(folderSession ? {} : { lock: createWebLocksProjectLock(simName) }),
         defaultExtensions: ecosimDefaultExtensions,
       }),
       modules: [coreModule(), createEcosimModule()],
@@ -322,17 +293,18 @@ export class EcosimEnvironmentStore {
       extensionFetchTransport: createJsDelivrExtensionTransport(),
       catalogMoves: ecosimLibraryCatalogMoves,
       approvedCatalogEntry: ecosimApprovedCatalogEntry,
-      bridgeUrl: appSettings.vscodeBridgeUrl,
+      ...(folderSession ? {} : { bridgeUrl: appSettings.vscodeBridgeUrl }),
       loadBindingToken,
       saveBindingToken,
       rng: createEntropySeededRng(),
-      onDidCompile: (_result, tileResult) => {
+      onDidCompile: (result, tileResult) => {
         if (tileResult && instanceRef) {
           instanceRef.userTileDocEntries = buildDocEntries(tileResult.metadata);
         }
+        publishFolderDiagnostics?.(result.files);
       },
     });
-    const instance = new EcosimEnvironmentStore(host);
+    const instance = new EcosimEnvironmentStore(host, folderSession);
     instanceRef = instance;
     instance._appSettings = appSettings;
     return instance;
@@ -358,9 +330,24 @@ export class EcosimEnvironmentStore {
     return this.host.activeProjectManifest;
   }
 
+  /**
+   * Opens or creates the active project and loads its runtime state. In
+   * folder host mode it then applies each change the host observes in the
+   * workspace folder and publishes the generated project files to the host.
+   */
   async initialize(): Promise<void> {
     await this.host.initialize(DEFAULT_PROJECT_NAME);
     await this.loadActiveProjectRuntime();
+    if (this._folderSession) {
+      this._folderSession.onExternalChange((change) => {
+        this.host.applyExternalProjectFileChange(change);
+        if (change.action === "write" && change.path === WENDOO_JSON_PATH) {
+          void this.refreshFromExternalManifest();
+        }
+      });
+      this.publishCompilerControlledFiles();
+      return;
+    }
     this.onAppSettingsChange((settings, prev) => {
       if (settings.vscodeBridgeUrl !== prev.vscodeBridgeUrl) {
         this.host.updateBridgeUrl(settings.vscodeBridgeUrl);
@@ -400,13 +387,78 @@ export class EcosimEnvironmentStore {
     });
   }
 
+  /** Visibility of the app's top-level chrome sections for the current mode. */
+  get chrome(): AppChrome {
+    return this._chrome;
+  }
+
+  /**
+   * Print sink for the current mode: a transport routing the printable
+   * document to the host in folder mode, or undefined in browser mode (where
+   * printing uses `window.print()`).
+   */
+  get printTransport(): PrintTransport | undefined {
+    return this._printTransport;
+  }
+
+  /**
+   * Registers a listener fired after an external `wendoo.json` edit has been
+   * applied to the store: the brain cache and the desired counts and
+   * obstacles are current when it runs. Fires only when the edit changed a
+   * brain or the obstacles. Returns an unsubscribe function.
+   */
+  onExternalProjectDataChange(listener: (change: ExternalProjectDataChange) => void): () => void {
+    this._externalProjectDataListeners.add(listener);
+    return () => {
+      this._externalProjectDataListeners.delete(listener);
+    };
+  }
+
   /** Release host resources owned by this store. */
   dispose(): void {
     if (this._desiredCountsSaveTimer !== undefined) {
       clearTimeout(this._desiredCountsSaveTimer);
       this._desiredCountsSaveTimer = undefined;
     }
+    this._folderSession?.dispose();
     this.host.dispose();
+  }
+
+  /**
+   * Publishes the compiler-controlled file set and the installed
+   * fetched-extension provenance to the folder-session host. A no-op outside
+   * a folder session or before the compiler is wired.
+   */
+  private publishCompilerControlledFiles(): void {
+    if (!this._folderSession) {
+      return;
+    }
+    const files = this.host.getCompilerControlledFiles();
+    if (!files) {
+      return;
+    }
+    this._folderSession.publishCompilerControlledFiles(files, this.host.getInstalledExtensionMetadata());
+  }
+
+  /**
+   * Applies an external `wendoo.json` edit to the live app state: the brain
+   * cache reconciles against the stored brains, the desired counts and
+   * obstacles reload (desired-count listeners fire), and the external
+   * project-data listeners hear which brains and whether the obstacles
+   * changed.
+   */
+  private async refreshFromExternalManifest(): Promise<void> {
+    const { changed, removed } = await this.host.reconcileBrainsFromStore();
+    const obstaclesBefore = this._obstacles;
+    await this.reloadProjectData();
+    const brains = [...changed, ...removed].filter((key): key is Archetype => key in ARCHETYPES);
+    const obstaclesChanged = !sameObstacles(obstaclesBefore, this._obstacles);
+    if (brains.length === 0 && !obstaclesChanged) {
+      return;
+    }
+    for (const listener of this._externalProjectDataListeners) {
+      listener({ brains, obstaclesChanged });
+    }
   }
 
   // -- Brain Persistence (archetype-typed wrappers) --
@@ -667,7 +719,7 @@ export class EcosimEnvironmentStore {
     }
     this._desiredCountsSaveTimer = setTimeout(() => {
       this._desiredCountsSaveTimer = undefined;
-      void this.host.projectManager.saveAppData("actors", JSON.stringify(this._desiredCounts));
+      void this.host.projectManager.saveAppData(DESIRED_COUNTS_KEY, JSON.stringify(this._desiredCounts));
     }, DESIRED_COUNTS_DEBOUNCE_MS);
   }
 
@@ -698,7 +750,7 @@ export class EcosimEnvironmentStore {
       ...(o.rotation !== undefined ? { rotation: o.rotation } : {}),
     }));
     this._obstacles = next;
-    void this.host.projectManager.saveAppData("obstacles", JSON.stringify(next));
+    void this.host.projectManager.saveAppData(OBSTACLES_KEY, JSON.stringify(next));
   }
 
   // -- Bridge (delegate) --

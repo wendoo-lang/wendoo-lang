@@ -66,6 +66,7 @@ export class Playground extends Scene {
   private gameplayPaused: boolean = false;
   private unsubProjectUnloading?: () => void;
   private unsubProjectLoaded?: () => void;
+  private unsubExternalProjectData?: () => void;
   private obstacleBodies: ObstacleBody[] = [];
 
   constructor() {
@@ -228,6 +229,19 @@ export class Playground extends Scene {
         this.scene.restart();
       });
     });
+    this.unsubExternalProjectData = store.onExternalProjectDataChange((change) => {
+      if (change.obstaclesChanged) {
+        this.engine.shutdown();
+        this.reportBrainState();
+        this.scene.restart();
+        return;
+      }
+      for (const archetype of change.brains) {
+        this.engine.reloadBrain(archetype).catch((err: unknown) => {
+          console.error(`Failed to reload the ${archetype} brain:`, err);
+        });
+      }
+    });
 
     // Set up Matter collision events -- handle both initial contact and
     // ongoing contact so bump sensors fire every frame while actors overlap
@@ -320,6 +334,8 @@ export class Playground extends Scene {
     this.unsubProjectUnloading = undefined;
     this.unsubProjectLoaded?.();
     this.unsubProjectLoaded = undefined;
+    this.unsubExternalProjectData?.();
+    this.unsubExternalProjectData = undefined;
     this.engine.shutdown();
   }
 

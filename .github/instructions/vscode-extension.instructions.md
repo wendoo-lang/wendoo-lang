@@ -78,6 +78,7 @@ src/
     project-presence.ts                # folder mode: wendoo.enabled follows root wendoo.json presence
     folder-session.ts                  # folder mode: session lifecycle, app tab, serializer restore
     folder-store-host.ts               # folder mode: host end of the folder-session protocol
+    folder-hello.ts                    # folder mode: the host's verdict on a folder:hello's version
     folder-target-resolver.ts          # folder mode: project folder discovery, target and app root
     folder-restore.ts                  # folder mode: restore resolution, RestoreFailureReason
     app-host-html.ts                   # folder mode: webview document hosting the target app
@@ -104,8 +105,8 @@ src/
 
 Specs sit beside their modules as `*.spec.ts`. The vscode-bound folder-mode modules
 (`folder-session.ts`, `folder-store-host.ts`, `commands/folder-commands.ts`) have no
-specs; their `vscode`-free cores (`folder-restore.ts`, `target-app-cache.ts`,
-`target-update.ts`, `project-affordances.ts`, and the like) do.
+specs; their `vscode`-free cores (`folder-hello.ts`, `folder-restore.ts`,
+`target-app-cache.ts`, `target-update.ts`, `project-affordances.ts`, and the like) do.
 
 ## Operating Modes
 
@@ -259,7 +260,8 @@ Tabs the extension creates carry `localResourceRoots: [appRoot]` and
 The app opens the session with `connectFolderHostSession` from `@wendoo/bridge-app`
 when it finds the host-mode flag (the global, or the `wendooHostMode=folder` URL
 parameter). An app that never checks the flag runs its standalone mode inside the tab,
-and no session forms; `apps/ecosim` in this repository opens no folder session.
+and no session forms. `apps/ecosim` in this repository is a folder-session client
+(`src/services/folder-host-mode.ts`), so its registry target is served in folder mode.
 
 ### The Folder-Host Session
 
@@ -270,7 +272,7 @@ and no session forms; `apps/ecosim` in this repository opens no folder session.
 
 | App -> host | Host action | Reply |
 |---|---|---|
-| `folder:hello` | Exact version check; reads `wendoo.json`; collects every file under `.libraries` | `folder:welcome` (`projectId` = folder URI string, manifest text + etag, `extensionsCache`), or `folder:error` (`PROTOCOL_VERSION_MISMATCH`, `PROJECT_MANIFEST_NOT_FOUND`) |
+| `folder:hello` | Judges the declared version (`judgeFolderHello`, below); reads `wendoo.json`; collects every file under `.libraries` | `folder:welcome` (`protocolVersion` = the app's declared version, `projectId` = folder URI string, manifest text + etag, `extensionsCache`), or `folder:error` (`PROTOCOL_VERSION_NEWER`, `INVALID_PAYLOAD`, `PROJECT_MANIFEST_NOT_FOUND`) |
 | `folder:loadFiles` | Walks the folder, skipping excluded paths, `wendoo.json`, and generated files | `folder:files` |
 | `folder:change` | Validates against `filesystemNotificationSchema`; refuses `import` (`UNSUPPORTED_CHANGE`) and unsafe paths (`PATH_OUTSIDE_PROJECT`); applies the change unconditionally | `folder:ack`, or `folder:error` (`WRITE_FAILED`) |
 | `folder:manifestWrite` | Writes `wendoo.json` | `folder:ack` / `folder:error` |
@@ -278,6 +280,27 @@ and no session forms; `apps/ecosim` in this repository opens no folder session.
 | `folder:openExternalDocument` | Writes the HTML to `.wendoo/print.html` in the project folder (adding `.wendoo/` to `.gitignore`), then opens it with `vscode.env.openExternal` | `folder:ack` / `folder:error` (`WRITE_FAILED`) |
 | `folder:diagnostics` | Publishes through `DiagnosticsManager` | none |
 | `folder:compilerFiles` | Reconciles the generated files (below) | none; a failure posts `folder:error` with no `id` and shows a VS Code error message |
+
+### Protocol Versioning
+
+The target app is the pinned party: a registry target is a sha-pinned build with
+`FOLDER_SESSION_PROTOCOL_VERSION` compiled in. The extension is the evergreen party, so
+it adapts down to the app:
+
+- The app declares its version in `folder:hello`. `judgeFolderHello`
+  (`services/folder-hello.ts`) accepts any whole version from 1 up to the host's
+  `FOLDER_SESSION_PROTOCOL_VERSION`; the welcome carries the accepted version, which is
+  always the app's own, and the host speaks that version's semantics for the session.
+- `FolderStoreHost.appProtocolVersion` records the accepted version from the welcome
+  until the next hello; a handler whose behavior differs between versions branches on it.
+- An app declaring a NEWER version is refused with `folder:error`
+  (`PROTOCOL_VERSION_NEWER`), whose message says the extension needs updating, and the
+  extension shows its own error notification with that remedy and a Check for Updates
+  action. A missing or malformed version is refused with `INVALID_PAYLOAD` and no
+  notification.
+- Bumping `FOLDER_SESSION_PROTOCOL_VERSION` strands no pinned target app: older
+  declarations stay accepted, so the host must keep speaking every older version it
+  accepts.
 
 Host -> app, unsolicited: `folder:externalChange`, one per watcher event. A created or
 changed file is a `write` carrying its content and a `<mtime>-<size>` etag; a directory
@@ -377,12 +400,9 @@ All in `commands/folder-commands.ts`:
 
 ### Gotchas
 
-- **The version is exact-match on both ends.** The host refuses any hello other than
-  `FOLDER_SESSION_PROTOCOL_VERSION`, and the app refuses any other welcome. A published
-  target app is a pinned build with the version compiled in, so bumping the version
-  strands every registry-pinned target app until it is republished and re-pinned.
-- **The host never surfaces a handshake failure.** It posts `folder:error` to the app
-  and does nothing else; what the tab shows is up to the app.
+- **The version refusal is the only handshake failure the host surfaces.** For every
+  other one it posts `folder:error` to the app and does nothing else; what the tab
+  shows is up to the app.
 - **One session at a time.** Multi-root workspaces with several project folders open one
   at a time; New Project and Open Project Folder quick-pick the folder.
 - **Desktop-only test hooks.** `activate()` registers `wendoo.testHooks.*` commands (not
@@ -436,5 +456,6 @@ transport events.
 
 Folder mode: a new message is a member of `FolderAppMessage` or `FolderHostMessage` in
 `bridge-protocol`, a case in `FolderStoreHost.handleAppMessage`, and a method on the app
-end in `bridge-app`. An incompatible change bumps `FOLDER_SESSION_PROTOCOL_VERSION` (see
-Gotchas).
+end in `bridge-app`. An incompatible change bumps `FOLDER_SESSION_PROTOCOL_VERSION`, and
+the host keeps the older behavior for sessions whose `appProtocolVersion` is older (see
+Protocol Versioning).

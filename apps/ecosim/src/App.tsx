@@ -841,6 +841,8 @@ function App() {
         libraries={docsLibraries}
         dataTypeNames={dataTypeNameMap}
         dataTypeIcons={dataTypeIconMap}
+        showDocsPageLinks={store.chrome.showDocsPageLinks}
+        printTransport={store.printTransport}
         resolveTileVisual={docsResolveTileVisual}
       >
         <div className="h-screen flex bg-background overflow-hidden">

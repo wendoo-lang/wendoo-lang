@@ -189,6 +189,18 @@ Payload message kinds carry no versions of their own. A lane's
 host-side emission channel, where one exists, carries the emitter's
 declared version in its framing.
 
+The same order governs application-hosting wires: a direct channel,
+with no relay, between a hosting party and the application build it
+embeds (the folder-host session is one). The pinned party -- the
+application build, its version compiled in -- declares its version;
+the evergreen hosting party accepts any declaration up to its own
+maximum, records it, speaks that version for the connection, and
+answers with the declared version, which the application requires.
+Only a newer declaration is rejected, with a stable code and a human
+remedy: update the hosting party. Raising the host's maximum
+therefore strands no pinned application, and the host keeps speaking
+every older version it accepts.
+
 ## The two-layer handshake
 
 Two handshakes stack, and each answers one question.

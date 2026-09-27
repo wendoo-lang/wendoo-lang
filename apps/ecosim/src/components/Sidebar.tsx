@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import type { Archetype } from "@/brain/actor";
 import { ARCHETYPES } from "@/brain/archetypes";
 import type { BrainLoadFailure } from "@/brain/brain-load-failure";
+import { ICON_BASE } from "@/brain/icon-base";
 import type { ScoreSnapshot } from "@/brain/score";
 import { BrainDiagnosticsList, BrainErrorBadge, toggledBrainKey } from "@/components/BrainDiagnostics";
 import { BridgeConnectionStatus } from "@/components/BridgeConnectionStatus";
@@ -130,6 +131,7 @@ export function Sidebar({
   onClose,
 }: SidebarProps) {
   const store = useEcosimEnvironment();
+  const { chrome } = store;
   const [desiredCounts, setDesiredCounts] = useState<Record<Archetype, number>>(() => store.getDesiredCounts());
   const [collapsedArchetypes, setCollapsedArchetypes] = useState<Record<string, boolean>>(() =>
     store.getCollapsedArchetypes()
@@ -377,23 +379,27 @@ export function Sidebar({
         >
           <Blocks className="h-4 w-4" aria-hidden="true" />
         </Button>
-        <Button
-          onClick={() => setSettingsOpen(true)}
-          variant="ghost"
-          size="sm"
-          className="h-7 w-7 p-0"
-          title="Settings"
-          aria-label="Open settings"
-        >
-          <Settings className="h-4 w-4" aria-hidden="true" />
-        </Button>
+        {chrome.showSettings && (
+          <Button
+            onClick={() => setSettingsOpen(true)}
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0"
+            title="Settings"
+            aria-label="Open settings"
+          >
+            <Settings className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        )}
       </div>
 
-      <SettingsDialog
-        open={settingsOpen}
-        onOpenChange={setSettingsOpen}
-        onBridgeDisabled={() => setBridgeEnabled(false)}
-      />
+      {chrome.showSettings && (
+        <SettingsDialog
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          onBridgeDisabled={() => setBridgeEnabled(false)}
+        />
+      )}
 
       {pendingUninstall !== null && (
         <ConfirmDialog
@@ -522,11 +528,7 @@ export function Sidebar({
                     <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
                   )}
                 </button>
-                <img
-                  src={`/assets/brain/icons/${arch}.svg`}
-                  alt={`${ARCHETYPE_LABELS[arch]} icon`}
-                  className="w-5 h-5 mr-1"
-                />
+                <img src={`${ICON_BASE}/${arch}.svg`} alt={`${ARCHETYPE_LABELS[arch]} icon`} className="w-5 h-5 mr-1" />
                 <span className="text-sm font-medium" style={{ color: ARCHETYPE_COLORS[arch] }}>
                   {ARCHETYPE_LABELS[arch]}
                 </span>
@@ -623,7 +625,7 @@ export function Sidebar({
         )}
 
         {/* Dev Panel: the VS Code bridge section and the build-output console */}
-        {store.getAppSettings().showBridgePanel && (
+        {chrome.showBridgePanel && store.getAppSettings().showBridgePanel && (
           // biome-ignore lint/a11y/useSemanticElements: fieldset would break layout; role="group" provides accessible grouping
           <div className="space-y-2 rounded-lg bg-panel p-2.5" role="group" aria-label="Dev Panel">
             <div className="flex items-center gap-1.5">

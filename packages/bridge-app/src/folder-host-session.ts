@@ -105,16 +105,22 @@ export interface FolderHostSession {
 }
 
 /**
- * Open a folder session over `port`: performs the hello/welcome handshake,
- * verifies the protocol version, and builds the workspace-folder project
- * store from the delivered manifest. Rejects with {@link FolderSessionError}
- * when the host refuses or speaks a different protocol version.
+ * Open a folder session over `port`: performs the hello/welcome handshake and
+ * builds the workspace-folder project store from the delivered manifest.
+ *
+ * The hello declares this build's {@link FOLDER_SESSION_PROTOCOL_VERSION}, and
+ * the resulting session speaks that version. Rejects with
+ * {@link FolderSessionError}: `PROTOCOL_VERSION_MISMATCH` when the welcome
+ * carries any other version, or the host's code when the host refuses the
+ * hello -- `PROTOCOL_VERSION_NEWER` when this build's version is newer than
+ * the host's; the remedy is updating the host.
  */
 export async function connectFolderHostSession(options: FolderHostSessionOptions): Promise<FolderHostSession> {
   const rpc = new FolderPortRpc(options.port);
+  const declaredVersion = FOLDER_SESSION_PROTOCOL_VERSION;
   const welcome = await rpc.request({
     type: "folder:hello",
-    payload: { protocolVersion: FOLDER_SESSION_PROTOCOL_VERSION },
+    payload: { protocolVersion: declaredVersion },
   });
   if (welcome.type !== "folder:welcome") {
     rpc.dispose();
@@ -124,11 +130,11 @@ export async function connectFolderHostSession(options: FolderHostSessionOptions
     );
   }
   const payload: FolderWelcomePayload = welcome.payload;
-  if (payload.protocolVersion !== FOLDER_SESSION_PROTOCOL_VERSION) {
+  if (payload.protocolVersion !== declaredVersion) {
     rpc.dispose();
     throw new FolderSessionError(
       FolderSessionErrorCodes.PROTOCOL_VERSION_MISMATCH,
-      `Host speaks folder-session protocol version ${payload.protocolVersion}; this app speaks ${FOLDER_SESSION_PROTOCOL_VERSION}`
+      `Host welcomed folder-session protocol version ${payload.protocolVersion}; this app declared ${declaredVersion}`
     );
   }
 

@@ -124,6 +124,7 @@ export function buildBrainEditorConfig(options: BuildBrainEditorConfigOptions): 
     projectNamespace: store.activeProjectManifest?.id,
     tileCatalogs: environment.tileCatalogs(),
     libraries: store.host.installedLibraries,
+    printTransport: store.printTransport,
     onTileDocs,
     docsIntegration,
     sidePanel,

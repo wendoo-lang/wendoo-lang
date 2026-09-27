@@ -2,7 +2,7 @@
 applyTo: "apps/ecosim/**"
 ---
 
-<!-- Last reviewed: 2026-08-08 -->
+<!-- Last reviewed: 2026-09-26 -->
 
 # Sim App -- Rules & Patterns
 
@@ -102,8 +102,9 @@ const target = getTargetActor(ctx);
 - Brain editor config: `brain/editor/config.tsx` `buildBrainEditorConfig()` returns the
   `BrainEditorConfig`, wrapped in `BrainEditorProvider` in `App.tsx`
 - Brain persistence: brains live in the project document, managed by the `ProjectManager` from
-  `@wendoo/app-host` over an IndexedDB store; `localStorage` holds only app settings and
-  UI preferences
+  `@wendoo/app-host` over an IndexedDB store in the browser, or over the folder session's
+  workspace-folder store in folder host mode (below); `localStorage` holds only app settings
+  and UI preferences
 - Phaser bridge: `PhaserGame.tsx` calls `StartGame()` from `game/main.ts`, passing the store
   through the Phaser registry and reporting scene brain state through a callback
 - Physics: Matter.js, zero gravity, top-down 2D; actors use `Mover` from `brain/movement.ts`
@@ -111,3 +112,36 @@ const target = getTargetActor(ctx);
 - Tile icons: SVGs in `public/assets/brain/icons/`, addressed through `ICON_BASE` from
   `brain/icon-base.ts`
 - All brain edits go through the Command Pattern with undo/redo (`BrainCommandHistory` in core)
+
+## Folder Host Mode
+
+Hosted by the VS Code extension's desktop folder mode, the app runs in a webview tab and the
+project lives in a workspace folder. `services/folder-host-mode.ts` holds the app end; the
+session contract is in `bridge-app.instructions.md` and the host end in
+`vscode-extension.instructions.md`.
+
+- `EcosimEnvironmentStore.create()` checks `isFolderHostMode()` (the `wendooHostMode=folder`
+  URL parameter or the host-injected global) and, when set, opens the session with
+  `connectEcosimFolderSession()` before anything else. A refused handshake rejects `create()`
+  with `FolderSessionError` carrying the host's code (`PROTOCOL_VERSION_NEWER` when this build
+  is newer than the extension).
+- In folder mode the `ProjectManager` runs over the session's store with no Web Lock, and the
+  host is created without a bridge URL, so there is no VS Code bridge. The browser path keeps
+  IndexedDB, the lock, and the bridge.
+- App data reaches `wendoo.json` through `ecosimFolderAppDataCodec`: brains as the manifest's
+  `brains` key, and the desired counts (`DESIRED_COUNTS_KEY`) and obstacles (`OBSTACLES_KEY`)
+  as the sim's chunk under `app["@wendoo/ecosim"]`, in the same shape a `.wendoo` export
+  carries (`buildEcosimAppChunk` / `translateEcosimAppChunk` in `services/project-io.ts`).
+- `initialize()` applies each host-observed change with `applyExternalProjectFileChange`. An
+  external `wendoo.json` write also reconciles the brain cache, reloads the desired counts
+  and obstacles, and notifies `onExternalProjectDataChange` listeners when a brain or the
+  obstacles changed; the Playground scene swaps changed brains onto live actors
+  (`Engine.reloadBrain`) and restarts when the obstacles changed.
+- Each compile's diagnostics go to the host (`createFolderCompileDiagnosticsPublisher`), and the
+  compiler-controlled files are published at startup and on every change.
+- Printing routes to the host (`store.printTransport`), which opens the document in the system
+  browser; the webview sandbox blocks `window.print()`.
+- `store.chrome` (`appChromeForMode`) gates the chrome: folder mode hides the project and
+  workspace menus, the Settings button and dialog, the Dev Panel (VS Code bridge and
+  build-issues console), and the docs panel's links to standalone docs pages. The Libraries
+  button, the project rename, and the simulation panels stay.

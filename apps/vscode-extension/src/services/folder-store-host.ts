@@ -10,7 +10,6 @@ import type {
 } from "@wendoo/bridge-protocol";
 import {
   EXTENSIONS_TREE_PATH,
-  FOLDER_SESSION_PROTOCOL_VERSION,
   FolderSessionErrorCode,
   filesystemNotificationSchema,
   MAX_FILE_CONTENT_BYTES,
@@ -20,6 +19,7 @@ import { WENDOO_JSON } from "../wendoo-json";
 import type { DiagnosticsManager } from "./diagnostics-manager";
 import type { ExternalDocumentAccess } from "./external-document";
 import { openExternalHtmlDocument } from "./external-document";
+import { judgeFolderHello } from "./folder-hello";
 import { containedRelativePath, isSafeRelativePath } from "./path-confinement";
 import type { AffordanceFileAccess } from "./project-affordances";
 import { GITIGNORE_PATH, ProjectAffordanceWriter, updatedGitignoreContent } from "./project-affordances";
@@ -54,6 +54,8 @@ export class FolderStoreHost {
   private readonly affordanceWriter: ProjectAffordanceWriter;
   /** Reused scratch file printable documents are written to before opening externally. */
   private readonly externalDocumentAccess: ExternalDocumentAccess;
+  /** Backing field of {@link appProtocolVersion}. */
+  private acceptedAppProtocolVersion: number | undefined;
 
   constructor(
     folder: vscode.Uri,
@@ -67,6 +69,15 @@ export class FolderStoreHost {
     this.onHandshakeComplete = onHandshakeComplete;
     this.affordanceWriter = new ProjectAffordanceWriter(this.createAffordanceFileAccess());
     this.externalDocumentAccess = createExternalDocumentAccess(this.folder);
+  }
+
+  /**
+   * Protocol version the connected app declared and this host accepted at
+   * its latest `folder:hello`; the host speaks that version's semantics for
+   * the session. Undefined before the first welcome and after a refused hello.
+   */
+  get appProtocolVersion(): number | undefined {
+    return this.acceptedAppProtocolVersion;
   }
 
   /** Handle one message posted by the embedded app. */
@@ -152,13 +163,14 @@ export class FolderStoreHost {
     });
   }
 
-  private async handleHello(id: string | undefined, protocolVersion: number | undefined): Promise<void> {
-    if (protocolVersion !== FOLDER_SESSION_PROTOCOL_VERSION) {
-      this.postError(
-        id,
-        FolderSessionErrorCode.PROTOCOL_VERSION_MISMATCH,
-        `This host speaks folder-session protocol version ${FOLDER_SESSION_PROTOCOL_VERSION}`
-      );
+  private async handleHello(id: string | undefined, protocolVersion: unknown): Promise<void> {
+    this.acceptedAppProtocolVersion = undefined;
+    const verdict = judgeFolderHello(protocolVersion);
+    if (!verdict.accepted) {
+      this.postError(id, verdict.error.code, verdict.error.message);
+      if (verdict.extensionUpdateNotice !== undefined) {
+        void showExtensionUpdateNotice(verdict.extensionUpdateNotice);
+      }
       return;
     }
     const manifestUri = vscode.Uri.joinPath(this.folder, WENDOO_JSON);
@@ -176,11 +188,12 @@ export class FolderStoreHost {
       return;
     }
     const extensionsCache = await this.collectExtensionsCacheEntries();
+    this.acceptedAppProtocolVersion = verdict.protocolVersion;
     this.postToApp({
       type: "folder:welcome",
       id,
       payload: {
-        protocolVersion: FOLDER_SESSION_PROTOCOL_VERSION,
+        protocolVersion: verdict.protocolVersion,
         projectId: this.folder.toString(),
         manifest: { content, etag: etagFromStat(stat) },
         ...(extensionsCache.length > 0 ? { extensionsCache } : {}),
@@ -657,6 +670,17 @@ async function ensureScratchGitignored(gitignoreUri: vscode.Uri): Promise<void> 
   const updated = updatedGitignoreContent(existing, [SCRATCH_GITIGNORE_ENTRY]);
   if (updated !== undefined) {
     await vscode.workspace.fs.writeFile(gitignoreUri, new TextEncoder().encode(updated));
+  }
+}
+
+/** Label of the notification action that checks for a newer release of this extension. */
+const CHECK_FOR_UPDATES_LABEL = "Check for Updates";
+
+/** Show `message` as an error notification offering to check for extension updates, and run the check when chosen. */
+async function showExtensionUpdateNotice(message: string): Promise<void> {
+  const choice = await vscode.window.showErrorMessage(message, CHECK_FOR_UPDATES_LABEL);
+  if (choice === CHECK_FOR_UPDATES_LABEL) {
+    await vscode.commands.executeCommand("workbench.extensions.action.checkForUpdates");
   }
 }
 

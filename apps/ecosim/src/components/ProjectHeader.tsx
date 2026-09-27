@@ -139,6 +139,7 @@ export function ProjectHeader({
   onImportProject,
 }: ProjectHeaderProps) {
   const store = useEcosimEnvironment();
+  const { showProjectMenu } = store.chrome;
   const [isEditingProject, setIsEditingProject] = useState(false);
   const [projectNameValue, setProjectNameValue] = useState("");
   const [workspaceSummaries, setWorkspaceSummaries] = useState<ProjectCollectionSummary[] | undefined>();
@@ -159,6 +160,9 @@ export function ProjectHeader({
   const pendingWorkspaceFocusIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
+    if (!showProjectMenu) {
+      return;
+    }
     let active = true;
     let unsubscribe = () => {};
     store.projectManager
@@ -185,7 +189,7 @@ export function ProjectHeader({
       active = false;
       unsubscribe();
     };
-  }, [store]);
+  }, [showProjectMenu, store]);
 
   useEffect(() => {
     if (!pinDialog || workspaceSummaries === undefined) {
@@ -498,281 +502,287 @@ export function ProjectHeader({
 
   return (
     <div className="absolute top-3 left-3 right-16 z-40 flex min-w-0 items-center gap-1 md:right-auto md:max-w-[calc(100%-24rem)]">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className="flex items-center justify-center w-8 h-8 rounded-lg bg-background/80 backdrop-blur border border-border shadow-md hover:bg-background/90"
-            aria-label="Project menu"
-          >
-            <Menu className="w-4 h-4" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" sideOffset={4}>
-          <DropdownMenuItem disabled={activeWorkspaceIsLocked} onSelect={onNewProject}>
-            <Plus className="w-4 h-4 mr-2" />
-            New Project
-          </DropdownMenuItem>
-          {activeWorkspace && (
-            <DropdownMenuItem
-              disabled={activeWorkspaceIsLocked}
-              onSelect={() =>
-                onBrowseProjects(
-                  activeWorkspace,
-                  activeWorkspaceSummary && duplicateWorkspaceNames.has(activeWorkspaceSummary.collection.name)
-                    ? activeWorkspaceContext
-                    : undefined
-                )
-              }
-            >
-              <FolderOpen className="w-4 h-4 mr-2" />
-              Browse Projects
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem disabled={activeWorkspaceIsLocked} onSelect={onExportProject}>
-            <Download className="w-4 h-4 mr-2" />
-            Export Project
-          </DropdownMenuItem>
-          <DropdownMenuItem disabled={activeWorkspaceIsLocked} onSelect={onImportProject}>
-            <Upload className="w-4 h-4 mr-2" />
-            Import Project
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {showProjectMenu && (
+        <>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex items-center justify-center w-8 h-8 rounded-lg bg-background/80 backdrop-blur border border-border shadow-md hover:bg-background/90"
+                aria-label="Project menu"
+              >
+                <Menu className="w-4 h-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" sideOffset={4}>
+              <DropdownMenuItem disabled={activeWorkspaceIsLocked} onSelect={onNewProject}>
+                <Plus className="w-4 h-4 mr-2" />
+                New Project
+              </DropdownMenuItem>
+              {activeWorkspace && (
+                <DropdownMenuItem
+                  disabled={activeWorkspaceIsLocked}
+                  onSelect={() =>
+                    onBrowseProjects(
+                      activeWorkspace,
+                      activeWorkspaceSummary && duplicateWorkspaceNames.has(activeWorkspaceSummary.collection.name)
+                        ? activeWorkspaceContext
+                        : undefined
+                    )
+                  }
+                >
+                  <FolderOpen className="w-4 h-4 mr-2" />
+                  Browse Projects
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem disabled={activeWorkspaceIsLocked} onSelect={onExportProject}>
+                <Download className="w-4 h-4 mr-2" />
+                Export Project
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={activeWorkspaceIsLocked} onSelect={onImportProject}>
+                <Upload className="w-4 h-4 mr-2" />
+                Import Project
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className="flex h-8 min-w-0 max-w-56 items-center gap-1.5 rounded-lg border border-border bg-background/80 px-3 text-sm font-medium shadow-md backdrop-blur hover:bg-background/90"
-            aria-label={`Workspace: ${activeWorkspaceName}`}
-            title={activeWorkspaceName}
-          >
-            <span className="truncate">{activeWorkspaceName}</span>
-            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent ref={workspaceDropdownContentRef} align="start" sideOffset={4} className="w-72">
-          {workspaceSummaries === undefined ? (
-            <div className="px-2 py-3 text-sm text-muted-foreground">Loading workspaces...</div>
-          ) : workspaceSummaries.length === 0 ? (
-            <div className="px-2 py-3 text-sm text-muted-foreground">No workspaces found</div>
-          ) : (
-            workspaceSummaries.map((summary) => {
-              const collection = summary.collection;
-              const isActive = collection.projectCollectionId === activeWorkspace?.projectCollectionId;
-              const isDefault = collection.projectCollectionId === DEFAULT_PROJECT_COLLECTION_ID;
-              const isProtected = collection.pinVerifier !== undefined;
-              const isLocked = summary.access === "locked";
-              const deleteDisabledReason = isActive
-                ? "Cannot delete the active workspace"
-                : isDefault
-                  ? "Cannot delete the default workspace"
-                  : isProtected && isLocked
-                    ? "Unlock the workspace before deleting it"
-                    : undefined;
-              const renameDisabledReason =
-                isProtected && isLocked ? "Unlock the workspace before renaming it" : undefined;
-              const isRenaming = renamingWorkspaceId === collection.projectCollectionId;
-              const context = getWorkspaceContext(summary, duplicateWorkspaceNames);
-              const browseWorkspace = () => {
-                if (isProtected && isLocked) {
-                  openPinDialog(summary, "unlock", {
-                    context: duplicateWorkspaceNames.has(collection.name) ? context : undefined,
-                    browseAfterUnlock: !isActive,
-                  });
-                  return;
-                }
-                onBrowseProjects(collection, duplicateWorkspaceNames.has(collection.name) ? context : undefined);
-              };
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex h-8 min-w-0 max-w-56 items-center gap-1.5 rounded-lg border border-border bg-background/80 px-3 text-sm font-medium shadow-md backdrop-blur hover:bg-background/90"
+                aria-label={`Workspace: ${activeWorkspaceName}`}
+                title={activeWorkspaceName}
+              >
+                <span className="truncate">{activeWorkspaceName}</span>
+                <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent ref={workspaceDropdownContentRef} align="start" sideOffset={4} className="w-72">
+              {workspaceSummaries === undefined ? (
+                <div className="px-2 py-3 text-sm text-muted-foreground">Loading workspaces...</div>
+              ) : workspaceSummaries.length === 0 ? (
+                <div className="px-2 py-3 text-sm text-muted-foreground">No workspaces found</div>
+              ) : (
+                workspaceSummaries.map((summary) => {
+                  const collection = summary.collection;
+                  const isActive = collection.projectCollectionId === activeWorkspace?.projectCollectionId;
+                  const isDefault = collection.projectCollectionId === DEFAULT_PROJECT_COLLECTION_ID;
+                  const isProtected = collection.pinVerifier !== undefined;
+                  const isLocked = summary.access === "locked";
+                  const deleteDisabledReason = isActive
+                    ? "Cannot delete the active workspace"
+                    : isDefault
+                      ? "Cannot delete the default workspace"
+                      : isProtected && isLocked
+                        ? "Unlock the workspace before deleting it"
+                        : undefined;
+                  const renameDisabledReason =
+                    isProtected && isLocked ? "Unlock the workspace before renaming it" : undefined;
+                  const isRenaming = renamingWorkspaceId === collection.projectCollectionId;
+                  const context = getWorkspaceContext(summary, duplicateWorkspaceNames);
+                  const browseWorkspace = () => {
+                    if (isProtected && isLocked) {
+                      openPinDialog(summary, "unlock", {
+                        context: duplicateWorkspaceNames.has(collection.name) ? context : undefined,
+                        browseAfterUnlock: !isActive,
+                      });
+                      return;
+                    }
+                    onBrowseProjects(collection, duplicateWorkspaceNames.has(collection.name) ? context : undefined);
+                  };
 
-              if (isRenaming) {
-                return (
-                  <div key={collection.projectCollectionId} className="p-2">
-                    <div className="flex items-center gap-1" onKeyDownCapture={handleWorkspaceEditTabKeyDown}>
-                      <Input
-                        ref={workspaceInputRef}
-                        value={workspaceNameValue}
-                        className="h-8 bg-background text-sm"
-                        onChange={(e) => setWorkspaceNameValue(e.target.value)}
-                        onKeyDown={(e) => handleWorkspaceKeyDown(e, collection.projectCollectionId)}
-                      />
-                      <Button
-                        ref={workspaceAcceptButtonRef}
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        aria-label={`Save workspace name for ${collection.name}`}
-                        onClick={() => commitWorkspaceRename(collection.projectCollectionId)}
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        ref={workspaceCancelButtonRef}
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        aria-label={`Cancel renaming ${collection.name}`}
-                        onClick={cancelWorkspaceRename}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              }
+                  if (isRenaming) {
+                    return (
+                      <div key={collection.projectCollectionId} className="p-2">
+                        <div className="flex items-center gap-1" onKeyDownCapture={handleWorkspaceEditTabKeyDown}>
+                          <Input
+                            ref={workspaceInputRef}
+                            value={workspaceNameValue}
+                            className="h-8 bg-background text-sm"
+                            onChange={(e) => setWorkspaceNameValue(e.target.value)}
+                            onKeyDown={(e) => handleWorkspaceKeyDown(e, collection.projectCollectionId)}
+                          />
+                          <Button
+                            ref={workspaceAcceptButtonRef}
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8"
+                            aria-label={`Save workspace name for ${collection.name}`}
+                            onClick={() => commitWorkspaceRename(collection.projectCollectionId)}
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            ref={workspaceCancelButtonRef}
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8"
+                            aria-label={`Cancel renaming ${collection.name}`}
+                            onClick={cancelWorkspaceRename}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  }
 
-              return (
-                <div key={collection.projectCollectionId} className="flex items-stretch rounded-sm">
-                  <DropdownMenuItem asChild className="min-w-0 flex-1 py-2">
-                    <button
-                      data-workspace-row-id={collection.projectCollectionId}
-                      type="button"
-                      onClick={browseWorkspace}
-                      aria-label={`${collection.name}${isLocked ? ", locked" : isProtected ? ", protected" : ""}`}
-                    >
-                      <span className="min-w-0 flex-1 text-left">
-                        <span className="flex min-w-0 items-center gap-1.5">
-                          <span className="truncate">{collection.name}</span>
-                          {isActive && (
-                            <span className="shrink-0 rounded border border-emerald-200 bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-100">
-                              Current
-                            </span>
-                          )}
-                          {isDefault && (
-                            <span className="shrink-0 rounded border border-slate-300 bg-slate-200 px-1.5 py-0.5 text-[10px] text-slate-800 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100">
-                              Default
-                            </span>
-                          )}
-                          {isProtected && (
-                            <span
-                              title={isLocked ? "Locked workspace" : "Unlocked protected workspace"}
-                              className={
-                                isLocked
-                                  ? "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-700 dark:bg-amber-900/50 dark:text-amber-100"
-                                  : "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-sky-200 bg-sky-100 text-sky-800 dark:border-sky-800 dark:bg-sky-900/60 dark:text-sky-100"
-                              }
-                            >
-                              {isLocked ? (
-                                <Lock className="h-3 w-3" aria-hidden="true" />
-                              ) : (
-                                <LockOpen className="h-3 w-3" aria-hidden="true" />
+                  return (
+                    <div key={collection.projectCollectionId} className="flex items-stretch rounded-sm">
+                      <DropdownMenuItem asChild className="min-w-0 flex-1 py-2">
+                        <button
+                          data-workspace-row-id={collection.projectCollectionId}
+                          type="button"
+                          onClick={browseWorkspace}
+                          aria-label={`${collection.name}${isLocked ? ", locked" : isProtected ? ", protected" : ""}`}
+                        >
+                          <span className="min-w-0 flex-1 text-left">
+                            <span className="flex min-w-0 items-center gap-1.5">
+                              <span className="truncate">{collection.name}</span>
+                              {isActive && (
+                                <span className="shrink-0 rounded border border-emerald-200 bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-100">
+                                  Current
+                                </span>
                               )}
-                              <span className="sr-only">
-                                {isLocked ? "Locked workspace" : "Unlocked protected workspace"}
-                              </span>
+                              {isDefault && (
+                                <span className="shrink-0 rounded border border-slate-300 bg-slate-200 px-1.5 py-0.5 text-[10px] text-slate-800 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100">
+                                  Default
+                                </span>
+                              )}
+                              {isProtected && (
+                                <span
+                                  title={isLocked ? "Locked workspace" : "Unlocked protected workspace"}
+                                  className={
+                                    isLocked
+                                      ? "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-700 dark:bg-amber-900/50 dark:text-amber-100"
+                                      : "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-sky-200 bg-sky-100 text-sky-800 dark:border-sky-800 dark:bg-sky-900/60 dark:text-sky-100"
+                                  }
+                                >
+                                  {isLocked ? (
+                                    <Lock className="h-3 w-3" aria-hidden="true" />
+                                  ) : (
+                                    <LockOpen className="h-3 w-3" aria-hidden="true" />
+                                  )}
+                                  <span className="sr-only">
+                                    {isLocked ? "Locked workspace" : "Unlocked protected workspace"}
+                                  </span>
+                                </span>
+                              )}
                             </span>
-                          )}
-                        </span>
-                        <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-                          <span className="truncate">{context}</span>
-                        </span>
-                      </span>
-                    </button>
-                  </DropdownMenuItem>
-                  <DropdownMenuSub
-                    open={openWorkspaceActionId === collection.projectCollectionId}
-                    onOpenChange={(open) => setOpenWorkspaceActionId(open ? collection.projectCollectionId : undefined)}
-                  >
-                    <DropdownMenuSubTrigger
-                      className="w-9 justify-center px-2"
-                      aria-label={`Workspace actions for ${collection.name}`}
-                    ></DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent>
-                      {!isDefault && !isProtected && (
-                        <DropdownMenuItem
-                          onSelect={(event) => {
-                            event.preventDefault();
-                            openPinDialog(summary, "set");
-                          }}
-                        >
-                          <Shield className="h-4 w-4 mr-2" />
-                          Set PIN
-                        </DropdownMenuItem>
-                      )}
-                      {isProtected && isLocked && (
-                        <DropdownMenuItem
-                          onSelect={(event) => {
-                            event.preventDefault();
-                            openPinDialog(summary, "unlock");
-                          }}
-                        >
-                          <Unlock className="h-4 w-4 mr-2" />
-                          Unlock
-                        </DropdownMenuItem>
-                      )}
-                      {isProtected && !isLocked && (
-                        <>
-                          {!isDefault && (
+                            <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                              <span className="truncate">{context}</span>
+                            </span>
+                          </span>
+                        </button>
+                      </DropdownMenuItem>
+                      <DropdownMenuSub
+                        open={openWorkspaceActionId === collection.projectCollectionId}
+                        onOpenChange={(open) =>
+                          setOpenWorkspaceActionId(open ? collection.projectCollectionId : undefined)
+                        }
+                      >
+                        <DropdownMenuSubTrigger
+                          className="w-9 justify-center px-2"
+                          aria-label={`Workspace actions for ${collection.name}`}
+                        ></DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent>
+                          {!isDefault && !isProtected && (
                             <DropdownMenuItem
                               onSelect={(event) => {
                                 event.preventDefault();
-                                openPinDialog(summary, "change");
+                                openPinDialog(summary, "set");
                               }}
                             >
                               <Shield className="h-4 w-4 mr-2" />
-                              Change PIN
+                              Set PIN
                             </DropdownMenuItem>
                           )}
+                          {isProtected && isLocked && (
+                            <DropdownMenuItem
+                              onSelect={(event) => {
+                                event.preventDefault();
+                                openPinDialog(summary, "unlock");
+                              }}
+                            >
+                              <Unlock className="h-4 w-4 mr-2" />
+                              Unlock
+                            </DropdownMenuItem>
+                          )}
+                          {isProtected && !isLocked && (
+                            <>
+                              {!isDefault && (
+                                <DropdownMenuItem
+                                  onSelect={(event) => {
+                                    event.preventDefault();
+                                    openPinDialog(summary, "change");
+                                  }}
+                                >
+                                  <Shield className="h-4 w-4 mr-2" />
+                                  Change PIN
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem
+                                onSelect={() => {
+                                  setOpenWorkspaceActionId(undefined);
+                                  setRemovePinCandidate(summary);
+                                }}
+                              >
+                                <X className="h-4 w-4 mr-2" />
+                                Remove PIN
+                              </DropdownMenuItem>
+                              {!isDefault && (
+                                <DropdownMenuItem onSelect={() => handleLockWorkspace(summary)}>
+                                  <Lock className="h-4 w-4 mr-2" />
+                                  Lock
+                                </DropdownMenuItem>
+                              )}
+                            </>
+                          )}
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem
-                            onSelect={() => {
+                            disabled={renameDisabledReason !== undefined}
+                            title={renameDisabledReason}
+                            aria-label={renameDisabledReason ?? `Rename ${collection.name}`}
+                            onSelect={(event) => {
+                              event.preventDefault();
+                              if (renameDisabledReason !== undefined) {
+                                return;
+                              }
                               setOpenWorkspaceActionId(undefined);
-                              setRemovePinCandidate(summary);
+                              handleWorkspaceRename(summary);
                             }}
                           >
-                            <X className="h-4 w-4 mr-2" />
-                            Remove PIN
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Rename
                           </DropdownMenuItem>
-                          {!isDefault && (
-                            <DropdownMenuItem onSelect={() => handleLockWorkspace(summary)}>
-                              <Lock className="h-4 w-4 mr-2" />
-                              Lock
-                            </DropdownMenuItem>
-                          )}
-                        </>
-                      )}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        disabled={renameDisabledReason !== undefined}
-                        title={renameDisabledReason}
-                        aria-label={renameDisabledReason ?? `Rename ${collection.name}`}
-                        onSelect={(event) => {
-                          event.preventDefault();
-                          if (renameDisabledReason !== undefined) {
-                            return;
-                          }
-                          setOpenWorkspaceActionId(undefined);
-                          handleWorkspaceRename(summary);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4 mr-2" />
-                        Rename
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        disabled={deleteDisabledReason !== undefined}
-                        title={deleteDisabledReason}
-                        aria-label={deleteDisabledReason ?? `Delete ${collection.name}`}
-                        onSelect={() => setDeleteCandidate(summary)}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                </div>
-              );
-            })
-          )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={onNewWorkspace}>
-            <Plus className="w-4 h-4 mr-2" />
-            New Workspace
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+                          <DropdownMenuItem
+                            disabled={deleteDisabledReason !== undefined}
+                            title={deleteDisabledReason}
+                            aria-label={deleteDisabledReason ?? `Delete ${collection.name}`}
+                            onSelect={() => setDeleteCandidate(summary)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+                    </div>
+                  );
+                })
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={onNewWorkspace}>
+                <Plus className="w-4 h-4 mr-2" />
+                New Workspace
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-      <span className="text-sm font-medium text-background/80 drop-shadow-sm">/</span>
+          <span className="text-sm font-medium text-background/80 drop-shadow-sm">/</span>
+        </>
+      )}
 
       {activeWorkspaceIsLocked ? (
         <span className="flex h-8 min-w-24 max-w-64 items-center gap-1.5 rounded-lg border border-border bg-background/80 px-3 text-sm font-medium shadow-md backdrop-blur">
