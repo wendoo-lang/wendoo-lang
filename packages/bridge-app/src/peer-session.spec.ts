@@ -132,6 +132,140 @@ describe("peer session establishment", () => {
   });
 });
 
+/** What a party of {@link SAMPLE_KIND} declares about itself in its hello. */
+interface SampleDeclaration {
+  label: string;
+}
+
+/** Every message {@link SAMPLE_KIND} carries when its hello carries a {@link SampleDeclaration}. */
+type DeclaringSampleMessage = PeerSessionHelloMessage<"sample", SampleDeclaration> | SampleDocumentMessage;
+
+/**
+ * A port answering this side's hello with `reply`, recording every message
+ * this side posts.
+ */
+function recordingPeer(reply: DeclaringSampleMessage): PeerSessionPort<DeclaringSampleMessage> & {
+  sent: DeclaringSampleMessage[];
+} {
+  const listeners = new Set<(message: DeclaringSampleMessage) => void>();
+  const sent: DeclaringSampleMessage[] = [];
+  return {
+    sent,
+    postMessage(message) {
+      sent.push(message);
+      if (message.type === "sample:hello") {
+        for (const listener of listeners) {
+          listener(reply);
+        }
+      }
+    },
+    onMessage(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+}
+
+describe("peer session declarations", () => {
+  it("sends a hello carrying only its version when it declares nothing", async () => {
+    const port = recordingPeer({ type: "sample:hello", payload: { protocolVersion: 1 } });
+
+    const session = await connectPeerSession<"sample", SampleDocumentMessage, SampleDeclaration>({
+      kind: SAMPLE_KIND,
+      port,
+    });
+
+    assert.deepEqual(port.sent, [{ type: "sample:hello", payload: { protocolVersion: 1 } }]);
+    session.dispose();
+  });
+
+  it("sends the declaration it is given in its hello", async () => {
+    const port = recordingPeer({ type: "sample:hello", payload: { protocolVersion: 1 } });
+
+    const session = await connectPeerSession<"sample", SampleDocumentMessage, SampleDeclaration>({
+      kind: SAMPLE_KIND,
+      port,
+      declaration: { label: "first" },
+    });
+
+    assert.deepEqual(port.sent, [
+      { type: "sample:hello", payload: { protocolVersion: 1, declaration: { label: "first" } } },
+    ]);
+    session.dispose();
+  });
+
+  it("records the peer's declaration, and none when the peer's hello carries none", async () => {
+    const declaring = await connectPeerSession<"sample", SampleDocumentMessage, SampleDeclaration>({
+      kind: SAMPLE_KIND,
+      port: recordingPeer({ type: "sample:hello", payload: { protocolVersion: 1, declaration: { label: "peer" } } }),
+    });
+    const silent = await connectPeerSession<"sample", SampleDocumentMessage, SampleDeclaration>({
+      kind: SAMPLE_KIND,
+      port: recordingPeer({ type: "sample:hello", payload: { protocolVersion: 1 } }),
+    });
+
+    assert.deepEqual(declaring.peerDeclaration, { label: "peer" });
+    assert.equal(silent.peerDeclaration, undefined);
+    declaring.dispose();
+    silent.dispose();
+  });
+
+  it("carries one party's declaration to the other across a JSON wire, the other declaring nothing", async () => {
+    const [declaringPort, silentPort] = linkedPorts();
+
+    const [declaring, silent] = await Promise.all([
+      connectPeerSession<"sample", SampleDocumentMessage, SampleDeclaration>({
+        kind: SAMPLE_KIND,
+        port: declaringPort as PeerSessionPort<DeclaringSampleMessage>,
+        declaration: { label: "declared" },
+      }),
+      connectPeerSession<"sample", SampleDocumentMessage, SampleDeclaration>({
+        kind: SAMPLE_KIND,
+        port: silentPort as PeerSessionPort<DeclaringSampleMessage>,
+      }),
+    ]);
+
+    assert.deepEqual(silent.peerDeclaration, { label: "declared" });
+    assert.equal(declaring.peerDeclaration, undefined);
+    declaring.dispose();
+    silent.dispose();
+  });
+
+  it("accepts an older peer by its version alone, whatever it declares", async () => {
+    const session = await connectPeerSession<"sample", SampleDocumentMessage, SampleDeclaration>({
+      kind: { kind: "sample", protocolVersion: 2 },
+      port: recordingPeer({ type: "sample:hello", payload: { protocolVersion: 1, declaration: { label: "peer" } } }),
+      declaration: { label: "self" },
+    });
+
+    assert.equal(session.peerProtocolVersion, 1);
+    assert.deepEqual(session.peerDeclaration, { label: "peer" });
+    session.dispose();
+  });
+
+  it("rejects a peer declaring a newer version with the stable code whatever it declares", async () => {
+    const port = recordingPeer({
+      type: "sample:hello",
+      payload: { protocolVersion: 2, declaration: { label: "peer" } },
+    });
+
+    await assert.rejects(
+      connectPeerSession<"sample", SampleDocumentMessage, SampleDeclaration>({
+        kind: SAMPLE_KIND,
+        port,
+        declaration: { label: "self" },
+      }),
+      (error: unknown) => {
+        assert.ok(error instanceof PeerSessionError);
+        assert.equal(error.code, PeerSessionErrorCode.PROTOCOL_VERSION_NEWER);
+        return true;
+      }
+    );
+  });
+});
+
 describe("peer session messages", () => {
   it("delivers a posted message to the peer byte-verbatim across a JSON wire", async () => {
     const [senderPort, receiverPort] = linkedPorts();

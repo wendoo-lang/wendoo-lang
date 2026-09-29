@@ -2,7 +2,7 @@
 applyTo: "packages/bridge-app/**"
 ---
 
-<!-- Last reviewed: 2026-09-26 -->
+<!-- Last reviewed: 2026-09-29 -->
 
 # bridge-app -- Rules & Patterns
 
@@ -177,16 +177,19 @@ declared elsewhere.
 
 - The MECHANISM lives here and in `bridge-protocol`, platform-clean:
   - `bridge-protocol` holds the generic hello shapes
-    (`PeerSessionHelloPayload`, `PeerSessionHelloMessage<kind>`,
+    (`PeerSessionHelloPayload`, `PeerSessionHelloMessage<kind, declaration>`,
     whose message type is `<kind>:hello`) and the mechanism's error-code
     constant object with its union type (`PeerSessionErrorCode`).
   - `bridge-app` holds the session logic (`peer-session.ts`): the port
     interface (`PeerSessionPort`), the error class carrying the stable
     `code` (`PeerSessionError`), and `connectPeerSession`, which
     takes a kind spec -- the kind's name and the newest protocol version this
-    build speaks for it (`PeerSessionKind`) -- and a port.
+    build speaks for it (`PeerSessionKind`) -- a port, and optionally this
+    side's declaration.
 - A KIND declares its name, its message types, its protocol version
-  constant, and a connect call binding the mechanism to the kind. A platform
+  constant, and a connect call binding the mechanism to the kind; it may
+  also define a declaration shape, what a party states about itself in its
+  hello. A platform
   session kind lives with its platform integration, never in this package or
   in `bridge-protocol`.
 - A kind's name is never one of the bridge protocol's reserved namespaces
@@ -227,6 +230,11 @@ For a peer session:
   hello.
 - A kind's payload messages carry no version of their own; they ride the
   kind's version, and the mechanism carries them verbatim.
+- A hello carries a `declaration` only when its sender passes one. It is
+  optional at every version: a receiver accepts a hello with or without
+  one, never weighs it in version acceptance, and records it verbatim as
+  the session's `peerDeclaration` (`undefined` when absent). The mechanism
+  never interprets it.
 - A message received before the peer's hello belongs to the peer's previous
   session and is dropped. Payload messages received after the peer's hello
   while no listener is attached are replayed to the next listener that

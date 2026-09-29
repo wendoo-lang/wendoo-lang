@@ -10,10 +10,21 @@ export const PeerSessionErrorCode = {
 /** Union of all {@link PeerSessionErrorCode} values. */
 export type PeerSessionErrorCode = (typeof PeerSessionErrorCode)[keyof typeof PeerSessionErrorCode];
 
-/** Payload of a {@link PeerSessionHelloMessage}. */
-export interface PeerSessionHelloPayload {
+/**
+ * Payload of a {@link PeerSessionHelloMessage}.
+ *
+ * @typeParam TDeclaration - What a party of the kind declares about itself;
+ * `never` for a kind that defines no declaration.
+ */
+export interface PeerSessionHelloPayload<TDeclaration = never> {
   /** Protocol version the sender speaks. */
   protocolVersion: number;
+  /**
+   * What the sender declares about itself, in the shape its kind defines.
+   * Absent when the sender declares nothing; a receiver accepts a hello
+   * with or without it, at any version it accepts.
+   */
+  declaration?: TDeclaration;
 }
 
 /**
@@ -23,8 +34,10 @@ export interface PeerSessionHelloPayload {
  *
  * @typeParam TKind - The session kind's name; the message type is
  * `<kind>:hello`.
+ * @typeParam TDeclaration - What a party of the kind declares about itself
+ * in its hello; `never` for a kind that defines no declaration.
  */
-export interface PeerSessionHelloMessage<TKind extends string> {
+export interface PeerSessionHelloMessage<TKind extends string, TDeclaration = never> {
   type: `${TKind}:hello`;
-  payload: PeerSessionHelloPayload;
+  payload: PeerSessionHelloPayload<TDeclaration>;
 }

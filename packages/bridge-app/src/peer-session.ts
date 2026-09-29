@@ -43,25 +43,42 @@ export class PeerSessionError extends Error {
   }
 }
 
-/** Options for {@link connectPeerSession}. */
-export interface PeerSessionOptions<TKind extends string, TMessage extends { type: string }> {
+/**
+ * Options for {@link connectPeerSession}.
+ *
+ * @typeParam TDeclaration - What a party of the kind declares about itself
+ * in its hello; `never` for a kind that defines no declaration.
+ */
+export interface PeerSessionOptions<TKind extends string, TMessage extends { type: string }, TDeclaration = never> {
   /** The session's kind. */
   kind: PeerSessionKind<TKind>;
   /** Transport to the peer. */
-  port: PeerSessionPort<PeerSessionHelloMessage<TKind> | TMessage>;
+  port: PeerSessionPort<PeerSessionHelloMessage<TKind, TDeclaration> | TMessage>;
+  /**
+   * What this side declares about itself, sent in its hello. When omitted,
+   * the hello carries no declaration.
+   */
+  declaration?: TDeclaration;
 }
 
 /**
  * An established peer session.
  *
  * @typeParam TMessage - The kind's messages other than its hello.
+ * @typeParam TDeclaration - What a party of the kind declares about itself
+ * in its hello; `never` for a kind that defines no declaration.
  */
-export interface PeerSession<TMessage> {
+export interface PeerSession<TMessage, TDeclaration = never> {
   /**
    * Protocol version the peer declared in its hello. Never newer than the
    * kind's `protocolVersion`.
    */
   readonly peerProtocolVersion: number;
+  /**
+   * What the peer declared about itself in its hello, verbatim, or
+   * `undefined` when its hello carried no declaration.
+   */
+  readonly peerDeclaration: TDeclaration | undefined;
   /** Send one message to the peer. */
   postMessage(message: TMessage): void;
   /**
@@ -75,10 +92,11 @@ export interface PeerSession<TMessage> {
 }
 
 /**
- * Open a peer session of `kind` over `port`: sends this side's hello and
- * waits for the peer's, dropping any other message that arrives before it. A
- * peer declaring any version up to the kind's `protocolVersion` is accepted
- * and its version recorded on the session.
+ * Open a peer session of `kind` over `port`: sends this side's hello,
+ * carrying `declaration` when one is given, and waits for the peer's,
+ * dropping any other message that arrives before it. A peer declaring any
+ * version up to the kind's `protocolVersion` is accepted, and its version and
+ * declaration are recorded on the session.
  * Rejects with {@link PeerSessionError} carrying
  * `PROTOCOL_VERSION_NEWER` when the peer declares a newer version. A
  * session covers one connection of the peer; open a new session when the
@@ -86,17 +104,19 @@ export interface PeerSession<TMessage> {
  *
  * @typeParam TKind - The kind's name.
  * @typeParam TMessage - The kind's messages other than its hello.
+ * @typeParam TDeclaration - What a party of the kind declares about itself
+ * in its hello; `never` for a kind that defines no declaration.
  */
-export function connectPeerSession<TKind extends string, TMessage extends { type: string }>(
-  options: PeerSessionOptions<TKind, TMessage>
-): Promise<PeerSession<TMessage>> {
-  const { kind, port } = options;
+export function connectPeerSession<TKind extends string, TMessage extends { type: string }, TDeclaration = never>(
+  options: PeerSessionOptions<TKind, TMessage, TDeclaration>
+): Promise<PeerSession<TMessage, TDeclaration>> {
+  const { kind, port, declaration } = options;
   const helloType: `${TKind}:hello` = `${kind.kind}:hello`;
   const listeners = new Set<(message: TMessage) => void>();
   const buffered: TMessage[] = [];
   let established = false;
 
-  return new Promise<PeerSession<TMessage>>((resolve, reject) => {
+  return new Promise<PeerSession<TMessage, TDeclaration>>((resolve, reject) => {
     const unsubscribe = port.onMessage((message) => {
       if (message.type !== helloType) {
         if (!established) return;
@@ -110,7 +130,9 @@ export function connectPeerSession<TKind extends string, TMessage extends { type
         }
         return;
       }
-      const peerProtocolVersion = (message as PeerSessionHelloMessage<TKind>).payload.protocolVersion;
+      const { protocolVersion: peerProtocolVersion, declaration: peerDeclaration } = (
+        message as PeerSessionHelloMessage<TKind, TDeclaration>
+      ).payload;
       if (peerProtocolVersion > kind.protocolVersion) {
         unsubscribe();
         reject(
@@ -124,6 +146,7 @@ export function connectPeerSession<TKind extends string, TMessage extends { type
       established = true;
       resolve({
         peerProtocolVersion,
+        peerDeclaration,
         postMessage(sessionMessage: TMessage): void {
           port.postMessage(sessionMessage);
         },
@@ -141,6 +164,13 @@ export function connectPeerSession<TKind extends string, TMessage extends { type
         },
       });
     });
-    port.postMessage({ type: helloType, payload: { protocolVersion: kind.protocolVersion } });
+    const hello: PeerSessionHelloMessage<TKind, TDeclaration> = {
+      type: helloType,
+      payload:
+        declaration === undefined
+          ? { protocolVersion: kind.protocolVersion }
+          : { protocolVersion: kind.protocolVersion, declaration },
+    };
+    port.postMessage(hello);
   });
 }

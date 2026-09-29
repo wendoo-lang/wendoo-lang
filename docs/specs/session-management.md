@@ -4,7 +4,7 @@ status: Accepted
 # Active status:   Draft -> Review -> Accepted -> Committed -> In-Progress -> Shipped
 # Terminal status: Rejected | Withdrawn | Superseded (set superseded-by)
 created: 2026-09-25
-updated: 2026-09-26
+updated: 2026-09-29
 ---
 
 # Session Management
@@ -216,7 +216,11 @@ of their kind?". On every welcome, each endpoint opens a fresh peer
 session over the payload channel: each sends `<kind>:hello` declaring
 the version it speaks, and sends nothing else of the kind until it has
 received the peer's hello; each adapts down, refusing only a newer
-version. Because welcomes gate the kind layer, both kind hellos travel
+version. A hello may also carry a declaration: what its sender states
+about itself at bind, in a shape the kind defines. The declaration is
+optional at every version -- a receiver accepts a hello with or without
+one, and it never bears on version acceptance -- and the mechanism
+carries it verbatim, never interpreting it. Because welcomes gate the kind layer, both kind hellos travel
 over a connected session and neither is lost. A peer session covers
 one connection of the peer: a message arriving before the peer's hello
 belongs to the peer's previous session and is dropped, and a message
