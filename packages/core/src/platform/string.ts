@@ -33,6 +33,15 @@ export namespace StringUtils {
   export declare function length(str: string): number;
 
   /**
+   * Gets the number of bytes the UTF-8 encoding of a string occupies. An
+   * unpaired UTF-16 surrogate counts as the three bytes of the replacement
+   * character it encodes as.
+   * @param str The string to measure
+   * @returns The UTF-8 byte length of the string
+   */
+  export declare function utf8ByteLength(str: string): number;
+
+  /**
    * Gets the character code at the specified index in a string
    * @param str The source string
    * @param index The index of the character (0-based)

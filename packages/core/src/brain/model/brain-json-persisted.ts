@@ -9,7 +9,15 @@ import type { RuleJson } from "./ruledef";
 // Persisted brain JSON stores every identifier that can carry a project
 // namespace as a small kind-discriminated value whose namespace is a field:
 // absent for the owning project, present for a foreign one. Identifiers that
-// cannot carry a namespace stay plain strings.
+// cannot carry a namespace stay plain strings. A plain string never contains
+// the owning namespace followed by `:`, nor the markers `:user.` or `:/`.
+//
+// A content-addressed literal's tile id, `tile.literal-><typeId>-><label>`
+// with an optional `[<format>]` suffix, embeds the literal's label. It is
+// stored as that plain string when its type ref is a plain string and the id
+// contains none of the text above; otherwise it is stored as a `literal` ref
+// holding the label verbatim in its `label` field. Both forms decode to the
+// same tile id.
 
 /** Persisted reference to a registered type. Plain string for types that carry no namespace. */
 export type PersistedTypeRef =
@@ -21,7 +29,12 @@ export type PersistedTypeRef =
   | { k: "union"; members: readonly PersistedTypeRef[] }
   | { k: "function"; params: readonly PersistedTypeRef[]; ret: PersistedTypeRef };
 
-/** Persisted reference to a tile. Plain string for tile ids that carry no namespace. */
+/**
+ * Persisted reference to a tile. Plain string for tile ids that carry no
+ * namespace. A `literal` ref re-mints a content-addressed literal's tile id
+ * from its value type, its verbatim label, and its display format (absent for
+ * the default format).
+ */
 export type PersistedTileRef =
   | string
   | { k: "action"; area: "sensor" | "actuator"; id: string; ns?: string }

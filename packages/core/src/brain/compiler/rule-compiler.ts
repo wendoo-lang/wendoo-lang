@@ -2,6 +2,7 @@ import { Dict } from "../../platform/dict";
 import { Error } from "../../platform/error";
 import { List, type ReadonlyList } from "../../platform/list";
 import { logger } from "../../platform/logger";
+import { kMaxLongStringLength } from "../../platform/stream";
 import { StringUtils as SU } from "../../platform/string";
 import { TypeUtils } from "../../platform/types";
 import type { UniqueSet } from "../../platform/uniqueset";
@@ -351,9 +352,30 @@ export class ExprCompiler implements ExprVisitor<void> {
   // ==========================================
 
   visitLiteral(expr: LiteralExpr): void {
+    const value = expr.tileDef.value;
+    if (TypeUtils.isString(value) && SU.utf8ByteLength(value) > kMaxLongStringLength) {
+      this.reportStringTooLarge(expr.nodeId, "Text");
+      this.pushNilPlaceholder();
+      return;
+    }
     // Convert literal value to a VM Value object and route to the appropriate
     // typed sub-pool of the constant pool.
-    this.pushLiteralValue(expr.tileDef.value);
+    this.pushLiteralValue(value);
+  }
+
+  /**
+   * Record a {@link CompilationDiagCode.StringTooLarge} error for the string
+   * `what` names ("Text" or "A variable name") at node `nodeId`.
+   */
+  private reportStringTooLarge(nodeId: number, what: string): void {
+    const sideName = this.context.ruleSide === RuleSide.When ? "WHEN" : "DO";
+    this.context.diags.push({
+      code: CompilationDiagCode.StringTooLarge,
+      severity: diagnosticSeverity(CompilationDiagCode.StringTooLarge),
+      message: `${what} in rule '${this.context.rulePath}' ${sideName} is too long to compile.`,
+      nodeId,
+      params: { rulePath: this.context.rulePath, side: this.context.ruleSide },
+    });
   }
 
   /**
@@ -445,17 +467,23 @@ export class ExprCompiler implements ExprVisitor<void> {
    * records `varType` and resolves that type's starting value into the value
    * constant pool. A later occurrence of the same name at a different type
    * shares the slot and reports a
-   * {@link CompilationDiagCode.VariableTypeConflict}.
+   * {@link CompilationDiagCode.VariableTypeConflict}. Minting a slot for a
+   * name too long to compile reports a
+   * {@link CompilationDiagCode.StringTooLarge}.
    *
    * @param varName - Variable name carried by the variable tile.
    * @param varType - Data type the tile declares the variable at.
-   * @param nodeId - Node id the conflict diagnostic points at.
+   * @param nodeId - Node id the diagnostics point at.
    */
   private getOrCreateVariableIndex(varName: string, varType: TypeId, nodeId: number): number {
     const existingIdx = this.context.variableIndices.get(varName);
     if (existingIdx !== undefined) {
       this.reportVariableTypeConflictIfAny(varName, varType, nodeId);
       return existingIdx;
+    }
+
+    if (SU.utf8ByteLength(varName) > kMaxLongStringLength) {
+      this.reportStringTooLarge(nodeId, "A variable name");
     }
 
     // Variable not yet seen - add to variable names list

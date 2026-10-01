@@ -8,8 +8,15 @@
 import assert from "node:assert/strict";
 import { before, describe, test } from "node:test";
 
-import { List } from "@wendoo/core";
-import { type BrainServices, mkOutputTileId, mkVariableTileId, RuleTriggerMode } from "@wendoo/core/brain";
+import { coreModule, createWendooEnvironment, List } from "@wendoo/core";
+import {
+  type BrainServices,
+  mkLiteralTileId,
+  mkOperatorTileId,
+  mkOutputTileId,
+  mkVariableTileId,
+  RuleTriggerMode,
+} from "@wendoo/core/brain";
 import { __test__appendTile, __test__createBrainServices } from "@wendoo/core/brain/__test__";
 import {
   BrainDef,
@@ -31,7 +38,15 @@ import {
   BrainTileSensorDef,
   BrainTileVariableDef,
 } from "@wendoo/core/brain/tiles";
-import { CoreTypeIds, mkCallDef, mkPrivateArgId, mkUserActionKey, type TypeId } from "@wendoo/core/runtime";
+import {
+  CoreOpId,
+  CoreTypeIds,
+  linkedBrainProgramToBytes,
+  mkCallDef,
+  mkPrivateArgId,
+  mkUserActionKey,
+  type TypeId,
+} from "@wendoo/core/runtime";
 
 const NS = "p1";
 const FOREIGN_NS = "acme/widgets";
@@ -593,5 +608,175 @@ describe("persisted brain JSON codec", () => {
         ),
       new RegExp(BrainJsonCodecErrorCode.InvalidPersistedRef)
     );
+  });
+});
+
+describe("persisted brain JSON codec -- text literal content", () => {
+  /** Namespace the documents below are saved and read under. */
+  const SOURCE_NS = "project";
+
+  /** Texts whose plain literal tile id would read as namespace content under {@link SOURCE_NS}. */
+  const NAMESPACE_LIKE_TEXTS = [
+    "http://example.com",
+    "my project: robot",
+    ":user.",
+    ":/",
+    "project:",
+    "project:project:",
+    "trailing project:",
+    "x:/y:user.z",
+    ":/:/",
+    "project::user.:/",
+  ];
+
+  /** Texts carrying no namespace content: their literal tile id persists as a plain string. */
+  const PLAIN_TEXTS = [
+    "",
+    "hello",
+    ":",
+    "::",
+    ":leading",
+    "trailing:",
+    ":user",
+    "user.",
+    "projects",
+    "project :",
+    "a->b",
+    "tile.literal->x",
+    "[percent]",
+    "\\",
+    "%",
+    "%3A%2F",
+    'quote " and backslash \\',
+    "unicode \u00e9 \u{1F680}",
+  ];
+
+  const environment = createWendooEnvironment({ modules: [coreModule()] });
+  const envServices = (environment as unknown as { brainServices: BrainServices }).brainServices;
+
+  /**
+   * A brain whose one rule assigns a text literal of `text` to a text
+   * variable, with the literal and the variable held in the brain's catalog
+   * as an authored document holds them.
+   */
+  function textBrain(text: string): { brainDef: BrainDef; literal: BrainTileLiteralDef } {
+    const brainDef = BrainDef.emptyBrainDef(envServices, "Text Brain");
+    const variable = new BrainTileVariableDef(mkVariableTileId("textVar1"), "message", CoreTypeIds.String, "textVar1");
+    const literal = new BrainTileLiteralDef(CoreTypeIds.String, text, {}, envServices);
+    brainDef.catalog().registerTileDef(variable);
+    brainDef.catalog().registerTileDef(literal);
+    const assign = envServices.edit.tiles.get(mkOperatorTileId(CoreOpId.Assign))!;
+    const rule = brainDef.pages().get(0)!.children().get(0)!;
+    rule.do().appendTile(variable);
+    rule.do().appendTile(assign);
+    rule.do().appendTile(literal);
+    return { brainDef, literal };
+  }
+
+  /** The literal's reference on the DO side of the brain's first rule. */
+  function literalRef(persisted: PersistedBrainJson): PersistedTileRef {
+    return persisted.pages[0].rules[0].do[2];
+  }
+
+  /** Source text as an app persists it: the encoded document, indented by two spaces. */
+  function saved(brainDef: BrainDef): string {
+    return JSON.stringify(encodePersistedBrainJson(brainDef, SOURCE_NS), null, 2);
+  }
+
+  function reopened(source: string): BrainDef {
+    return environment.deserializeBrainJsonFromPlain(JSON.parse(source), SOURCE_NS) as BrainDef;
+  }
+
+  for (const text of NAMESPACE_LIKE_TEXTS) {
+    test(`a text literal of ${JSON.stringify(text)} serializes as a structured literal ref`, () => {
+      const { brainDef, literal } = textBrain(text);
+      const persisted = encodePersistedBrainJson(brainDef, SOURCE_NS);
+      assert.deepEqual(literalRef(persisted), {
+        k: "literal",
+        type: CoreTypeIds.String,
+        label: text,
+        format: undefined,
+      });
+      assert.equal(literal.tileId, mkLiteralTileId(CoreTypeIds.String, text));
+    });
+  }
+
+  for (const text of PLAIN_TEXTS) {
+    test(`a text literal of ${JSON.stringify(text)} keeps its plain literal tile id`, () => {
+      const { brainDef, literal } = textBrain(text);
+      const persisted = encodePersistedBrainJson(brainDef, SOURCE_NS);
+      assert.equal(literalRef(persisted), mkLiteralTileId(CoreTypeIds.String, text));
+      assert.equal(literalRef(persisted), literal.tileId);
+    });
+  }
+
+  for (const text of [...NAMESPACE_LIKE_TEXTS, ...PLAIN_TEXTS]) {
+    test(`a text literal of ${JSON.stringify(text)} round-trips, compiles, and re-serializes stably`, () => {
+      const { brainDef, literal } = textBrain(text);
+      const first = saved(brainDef);
+      const loaded = reopened(first);
+
+      const loadedTile = loaded.pages().get(0)!.children().get(0)!.do().tiles().get(2)!;
+      assert.equal(loadedTile.kind, "literal");
+      assert.equal(loadedTile.tileId, literal.tileId);
+      assert.equal((loadedTile as BrainTileLiteralDef).value, text);
+      assert.equal((loadedTile as BrainTileLiteralDef).valueLabel, text);
+
+      const result = environment.linkBrain(loaded);
+      assert.ok(result.program, "the reopened brain links");
+      assert.ok(result.program.program.constantPools.strings.toArray().includes(text));
+      linkedBrainProgramToBytes(result.program, {
+        profileId: 1,
+        precision: "f64",
+        typeRegistry: envServices.runtime.types,
+      });
+
+      assert.equal(saved(loaded), first);
+      assert.equal(saved(reopened(saved(loaded))), first);
+    });
+  }
+
+  test("a text literal saved under another namespace reads back as the same literal", () => {
+    const { brainDef, literal } = textBrain("my project: robot");
+    const persisted = JSON.parse(JSON.stringify(encodePersistedBrainJson(brainDef, SOURCE_NS)));
+    const loaded = environment.deserializeBrainJsonFromPlain(persisted, "owner/repo") as BrainDef;
+    const loadedTile = loaded.pages().get(0)!.children().get(0)!.do().tiles().get(2)!;
+    assert.equal(loadedTile.kind, "literal");
+    assert.equal(loadedTile.tileId, literal.tileId);
+  });
+
+  test("a document holding a plain literal tile id reads back byte-stable", () => {
+    const literalId = mkLiteralTileId(CoreTypeIds.String, "trailing:");
+    const source = JSON.stringify(
+      {
+        version: 1,
+        id: "brain00000000004",
+        name: "Text Brain",
+        catalog: [
+          {
+            version: 2,
+            kind: "literal",
+            valueType: CoreTypeIds.String,
+            value: "trailing:",
+            valueLabel: "trailing:",
+            displayFormat: "default",
+          },
+          { version: 2, kind: "page", pageId: "page000000000004", label: "Page 1" },
+        ],
+        pages: [
+          {
+            version: 2,
+            pageId: "page000000000004",
+            name: "Page 1",
+            rules: [{ version: 1, when: [literalId], do: [], children: [], ruleId: "rule000000000004" }],
+          },
+        ],
+      },
+      null,
+      2
+    );
+    const loaded = reopened(source);
+    assert.equal(loaded.pages().get(0)!.children().get(0)!.when().tiles().get(0)!.tileId, literalId);
+    assert.equal(saved(loaded), source);
   });
 });

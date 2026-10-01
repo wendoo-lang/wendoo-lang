@@ -2,6 +2,9 @@ import type { IByteArray, IReadStream, IWriteStream } from "./stream-types";
 
 export { DataType, type IByteArray, type IReadStream, type IWriteStream } from "./stream-types";
 
+/** Largest UTF-8 byte length a variable-length string written by {@link MemoryStream.writeVarString} may have. */
+export declare const kMaxLongStringLength: number;
+
 /** In-memory tagged binary stream implementing both {@link IReadStream} and {@link IWriteStream}. */
 export declare class MemoryStream implements IReadStream, IWriteStream {
   constructor(initial?: IByteArray, initialCapacity?: number);

@@ -39,6 +39,29 @@ export namespace StringUtils {
     return str.length;
   }
 
+  export function utf8ByteLength(str: string): number {
+    let bytes = 0;
+    for (let i = 0; i < str.length; i++) {
+      const unit = str.charCodeAt(i);
+      if (unit < 0x80) {
+        bytes += 1;
+      } else if (unit < 0x800) {
+        bytes += 2;
+      } else if (unit >= 0xd800 && unit <= 0xdbff && i + 1 < str.length) {
+        const next = str.charCodeAt(i + 1);
+        if (next >= 0xdc00 && next <= 0xdfff) {
+          bytes += 4;
+          i++;
+        } else {
+          bytes += 3;
+        }
+      } else {
+        bytes += 3;
+      }
+    }
+    return bytes;
+  }
+
   export function charCodeAt(str: string, index: number): number {
     return str.charCodeAt(index);
   }

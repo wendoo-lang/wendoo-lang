@@ -152,6 +152,15 @@ export enum CompilationDiagCode {
    * runs. `params` names the variable and both type ids.
    */
   VariableTypeConflict = 3003,
+
+  /**
+   * A text literal or a variable name is longer than a compiled program can
+   * carry: its UTF-8 encoding exceeds the bytecode string limit
+   * (`kMaxLongStringLength` bytes). Emitted at "error" severity, so the build
+   * produces no program. `params` names the rule path and the rule side; the
+   * message does not quote the string.
+   */
+  StringTooLarge = 3004,
 }
 
 /**

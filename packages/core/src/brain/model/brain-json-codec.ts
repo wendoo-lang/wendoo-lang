@@ -109,21 +109,30 @@ class BrainJsonEncoder {
     return namespace === this.owningNamespace ? undefined : namespace;
   }
 
-  /** Emit a plain-string id, enforcing that it carries no namespace content. */
-  private plainId(id: string, position: string): string {
+  /**
+   * The error code emitting `id` as a plain string would violate, or undefined
+   * when `id` carries no namespace content: neither the owning namespace nor a
+   * namespace marker.
+   */
+  private namespaceContentIn(id: string): BrainJsonCodecErrorCode | undefined {
     if (SU.indexOf(id, `${this.owningNamespace}:`) >= 0) {
-      throw codecError(
-        BrainJsonCodecErrorCode.SelfNamespaceInPlainId,
-        `${position} '${id}' carries the owning namespace '${this.owningNamespace}'`
-      );
+      return BrainJsonCodecErrorCode.SelfNamespaceInPlainId;
     }
     if (SU.indexOf(id, kUserKeyMarker) >= 0 || SU.indexOf(id, kTypeNameMarker) >= 0) {
-      throw codecError(
-        BrainJsonCodecErrorCode.NamespacedIdNotStructurable,
-        `${position} '${id}' carries a namespace but no components are available to structure it`
-      );
+      return BrainJsonCodecErrorCode.NamespacedIdNotStructurable;
     }
-    return id;
+    return undefined;
+  }
+
+  /** Emit a plain-string id, enforcing that it carries no namespace content. */
+  private plainId(id: string, position: string): string {
+    const violation = this.namespaceContentIn(id);
+    if (violation === undefined) return id;
+    const detail =
+      violation === BrainJsonCodecErrorCode.SelfNamespaceInPlainId
+        ? `carries the owning namespace '${this.owningNamespace}'`
+        : "carries a namespace but no components are available to structure it";
+    throw codecError(violation, `${position} '${id}' ${detail}`);
   }
 
   /** Emit an unresolved tile's preserved id when no structured ref is known for it. */
@@ -267,7 +276,9 @@ class BrainJsonEncoder {
         const literalDef = tileDef as BrainTileLiteralDef;
         if (literalDef.uniqueId !== undefined) return this.plainId(tileDef.tileId, "literal tile id");
         const typeRef = this.encodeTypeRefById(literalDef.valueType, "literal value type");
-        if (TypeUtils.isString(typeRef)) return this.plainId(tileDef.tileId, "literal tile id");
+        // A label that reads as namespace content is stored in the structured
+        // ref's label field.
+        if (TypeUtils.isString(typeRef) && this.namespaceContentIn(tileDef.tileId) === undefined) return tileDef.tileId;
         return {
           k: "literal",
           type: typeRef,

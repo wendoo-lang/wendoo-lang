@@ -53,6 +53,10 @@ export namespace StringUtils {
     return str.size();
   }
 
+  export function utf8ByteLength(str: string): number {
+    return str.size();
+  }
+
   export function charCodeAt(str: string, index: number): number {
     return str.byte(index + 1, index + 1)[0];
   }
