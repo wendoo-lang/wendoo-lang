@@ -53,7 +53,7 @@ export {
   useOptionalBrainEditorConfig,
   useTr,
 } from "./BrainEditorContext";
-export type { BrainEditorDialogProps } from "./BrainEditorDialog";
+export type { BrainEditorDialogProps, ContinuousBrainEditorDialogProps } from "./BrainEditorDialog";
 // Components
 export { BrainEditorDialog } from "./BrainEditorDialog";
 export type { RuleReveal } from "./BrainPageEditor";

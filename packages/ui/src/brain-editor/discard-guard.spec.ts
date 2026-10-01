@@ -12,7 +12,7 @@ import { type DiscardGuardReading, hasDiscardableEdits } from "./discard-guard";
 
 /** A reading with no user work, overridable field by field. */
 function reading(overrides: Partial<DiscardGuardReading> = {}): DiscardGuardReading {
-  return { undoDepth: 0, openingDepth: 0, brainReplaced: false, ...overrides };
+  return { undoDepth: 0, openingDepth: 0, ...overrides };
 }
 
 describe("hasDiscardableEdits", () => {
@@ -35,13 +35,5 @@ describe("hasDiscardableEdits", () => {
 
   test("undoing past the opening state still holds nothing", () => {
     assert.equal(hasDiscardableEdits(reading({ undoDepth: 0, openingDepth: 1 })), false);
-  });
-
-  test("a replaced brain holds work even with an empty history", () => {
-    assert.equal(hasDiscardableEdits(reading({ undoDepth: 0, openingDepth: 0, brainReplaced: true })), true);
-  });
-
-  test("a replaced brain still holds work once edits pile on top", () => {
-    assert.equal(hasDiscardableEdits(reading({ undoDepth: 3, openingDepth: 0, brainReplaced: true })), true);
   });
 });

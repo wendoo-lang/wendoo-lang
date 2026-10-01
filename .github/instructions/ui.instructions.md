@@ -40,6 +40,8 @@ src/
     ArmedTargetContext.tsx   Armed tile-picker target (arm/disarm state + matching predicates)
     BrainEditorContext.tsx   BrainEditorConfig interface, BrainEditorProvider, useBrainEditorConfig
     BrainEditorDialog.tsx    Full editor (page nav, toolbar, undo/redo, save/load)
+    editor-session.ts        What a host sees of a session: edit reporting, the brain it is handed, whole-brain loads, footer chrome
+    discard-guard.ts         Whether closing a modal session would lose user work
     BrainEditorSidePanel.tsx The side region beside the rules, holding what the host put in it
     side-panel.ts            The side region's id, its lazy content latch, and the classes it lays out with
     BrainPageEditor.tsx      Page rules list with depth flattening
@@ -375,6 +377,55 @@ Rules for this contract:
   rather than assuming a dialog is up.
 - Nothing in the type system checks this. A change on either side has to be
   matched by hand.
+
+## The Editor's Host Contract
+
+`BrainEditorDialog` takes one of two prop shapes, discriminated by `continuous`:
+
+- **Modal** -- `BrainEditorDialogProps`, `continuous` absent or false. The footer
+  stands Cancel and OK. OK hands `onSubmit` the edited brain; Cancel, and Escape
+  once nothing else in the editor claims it, close through the discard
+  confirmation while the session holds user work.
+- **Continuous** -- `ContinuousBrainEditorDialogProps`, `continuous: true`. The
+  footer stands a single close control, Escape closes without confirming, and
+  there is no `onSubmit`: the host already holds every edit through `onChange`.
+
+`brainEditorChrome` (`brain-editor/editor-session.ts`) is the one reading of
+that choice: the footer's controls in order, and whether a close confirms a
+discard. The dialog renders its footer from it.
+
+`onChange` is optional in a modal session and required in a continuous one.
+`watchBrainEdits` feeds it from the command history, never from `BrainDef`
+model events, which fire mid-drag:
+
+- **Person and Tool origins report; the Editor origin never does.** Standing the
+  working copy up and taking it down -- the history cleared, the starting rule
+  given to an empty brain -- reach no host.
+- **The unit is the history entry.** Each command, undo and redo reports once.
+  Names commit on blur or Enter and drags record at drop, so no keystroke or
+  pointer move reports on its own. A batch reports once as it closes, ended or
+  aborted, and the commands it gathers report nothing -- a rule held from the
+  keyboard steps through a batch, and an assistant proposal replays through
+  one it may abort.
+- **`snapshot()` is lazy.** It reads the working copy when called, not when the
+  edit was reported, so a host debouncing the stream reads the latest state.
+
+**A host is always handed a detached copy.** `detachedBrainSnapshot` takes a
+working copy carrying the brain's id and purges tiles no page places from THE
+COPY; OK and `snapshot()` both go through it. Never purge the working copy in
+place: tile commands never re-add a tile to the brain's own catalog, so undoing
+a tile's removal after an in-place purge leaves a placement whose tile the
+catalog no longer holds.
+
+**Every edit is a step on the history, a whole-brain load included.** Load
+Default Brain and Load Brain from File go through `replaceBrainContent`, which
+carries the loaded brain's persisted references over and runs a
+`ReplaceBrainCommand`, as Paste Brain does. The working copy keeps its id
+across a load, and a load undoes like any edit. The undo floor is the opening
+state: the history is cleared as the editor opens and standing the working
+copy up is not a command, so undo never reaches below it, and undoing back to
+it reads clean again -- `hasDiscardableEdits` compares the undo depth with the
+depth the editor opened at, and nothing else.
 
 ## Dialogs, Portals and Focus
 

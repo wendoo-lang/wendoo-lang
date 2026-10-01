@@ -10,25 +10,19 @@ export interface DiscardGuardReading {
    * when the editor appended a starting rule to a brain that held none, else 0.
    */
   openingDepth: number;
-  /**
-   * True once the working brain has been swapped for another wholesale -- loaded
-   * from a file, or reset to the host's default brain. Those replacements clear
-   * the command history, so the undo depth no longer measures the work at risk.
-   */
-  brainReplaced: boolean;
 }
 
 /**
  * Whether closing the brain editor now would throw away work the user did.
  *
  * A brain the user only opened is not dirty, including one the editor gave a
- * starting rule to on open. Undoing back to the opening state clears the
- * reading again, since the working copy then matches what the editor opened.
+ * starting rule to on open. Every change the user makes, a whole brain loaded
+ * over the working copy included, is a step on the command history, so
+ * undoing back to the opening state clears the reading again.
  *
- * @param reading - The editor's session counters and replacement flag.
+ * @param reading - The editor's session counters.
  * @returns True when the session holds user work that a discard would lose.
  */
 export function hasDiscardableEdits(reading: DiscardGuardReading): boolean {
-  if (reading.brainReplaced) return true;
   return reading.undoDepth > reading.openingDepth;
 }

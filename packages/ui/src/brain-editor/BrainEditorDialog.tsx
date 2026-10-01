@@ -35,7 +35,7 @@ import {
   Undo,
   Upload,
 } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { staticAssetUrl } from "../asset-url";
 import { Button } from "../ui/button";
@@ -73,6 +73,13 @@ import {
   returnFocusTarget,
   takeReturnFocus,
 } from "./editor-return-focus";
+import {
+  type BrainEditorFooterControl,
+  brainEditorChrome,
+  detachedBrainSnapshot,
+  replaceBrainContent,
+  watchBrainEdits,
+} from "./editor-session";
 import { decideHistoryShortcut } from "./history-shortcut";
 import { takePageGridKeyboard } from "./page-grid-selection";
 import { RulePickupProvider, useRulePickupState } from "./RulePickupContext";
@@ -93,21 +100,61 @@ function brainHoldsNoRule(brainDef: BrainDef): boolean {
   return true;
 }
 
-/** Props for {@link BrainEditorDialog}. */
-export interface BrainEditorDialogProps {
+/** What every host of {@link BrainEditorDialog} passes, whichever kind of session it stands. */
+interface BrainEditorDialogCommonProps {
+  /** True while the editor stands open. Opening it stands a fresh working copy of `srcBrainDef`. */
   isOpen: boolean;
+  /** Called with false when the editor closes itself: from its footer, on Escape, or once a discard is confirmed. */
   onOpenChange: (open: boolean) => void;
+  /** The brain to edit. The editor edits a working copy carrying its id, never this brain itself. */
   srcBrainDef?: BrainDef;
+  /**
+   * Called after each edit the person or a tool call makes -- each command,
+   * undo and redo, with a batch counting once as it closes -- and never for the
+   * editor's own changes as it opens and closes. `snapshot` returns a detached
+   * copy of the working copy as it stands when called, its unused tiles purged.
+   */
+  onChange?: (snapshot: () => BrainDef) => void;
+}
+
+/**
+ * Props for a modal {@link BrainEditorDialog}: edits reach the host when the
+ * user confirms them, and closing any other way discards them.
+ */
+export interface BrainEditorDialogProps extends BrainEditorDialogCommonProps {
+  /** Absent or false for a modal session. */
+  continuous?: false;
+  /** Called with a detached copy of the edited brain, its unused tiles purged, when the user confirms. */
   onSubmit: (newBrainDef: BrainDef) => void;
 }
 
 /**
- * Modal brain editor with page navigation, toolbar (undo/redo, copy, paste,
- * print, docs toggle), and save/load. Edits are made on a working copy of
- * `srcBrainDef`, which carries the source brain's id; `onSubmit` is invoked with
- * the resulting brain when the user confirms.
+ * Props for a continuous {@link BrainEditorDialog}: every edit reaches the host
+ * through `onChange` as it is made, and closing hands nothing over and
+ * discards nothing.
  */
-export function BrainEditorDialog({ isOpen, onOpenChange, srcBrainDef, onSubmit }: BrainEditorDialogProps) {
+export interface ContinuousBrainEditorDialogProps extends BrainEditorDialogCommonProps {
+  /** True for a continuous session. */
+  continuous: true;
+  /** Called after each edit, as in any session; a continuous session's edits reach the host through it. */
+  onChange: (snapshot: () => BrainDef) => void;
+}
+
+/**
+ * Brain editor with page navigation, toolbar (undo/redo, copy, paste, print,
+ * docs toggle), and save/load. Edits are made on a working copy of
+ * `srcBrainDef`, which carries the source brain's id, and every edit, loading a
+ * whole brain included, is a step on the editor's undo history.
+ *
+ * A modal session ({@link BrainEditorDialogProps}) hands the edited brain to
+ * `onSubmit` when the user confirms, and asks before a close discards edits. A
+ * continuous session ({@link ContinuousBrainEditorDialogProps}) hands each edit
+ * to `onChange` as it is made and closes from a single control without asking.
+ */
+export function BrainEditorDialog(props: BrainEditorDialogProps | ContinuousBrainEditorDialogProps) {
+  const { isOpen, onOpenChange, srcBrainDef, onChange } = props;
+  const onSubmit = props.continuous === true ? undefined : props.onSubmit;
+  const chrome = brainEditorChrome(props);
   const { getDefaultBrain, docsIntegration, sidePanel, brainServices, tileCatalogs, projectNamespace } =
     useBrainEditorConfig();
   const isDocsOpen = docsIntegration?.isOpen ?? false;
@@ -200,7 +247,6 @@ export function BrainEditorDialog({ isOpen, onOpenChange, srcBrainDef, onSubmit 
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const [undoDepth, setUndoDepth] = useState(0);
   const [openingDepth, setOpeningDepth] = useState(0);
-  const [brainReplaced, setBrainReplaced] = useState(false);
   const [isConfirmingDiscard, setIsConfirmingDiscard] = useState(false);
   // The element holding the keyboard when the discard confirmation opened.
   const discardReturnFocusRef = useRef<HTMLElement | null>(null);
@@ -227,6 +273,19 @@ export function BrainEditorDialog({ isOpen, onOpenChange, srcBrainDef, onSubmit 
     updateUndoRedoState();
     return stopListening;
   }, [commandHistory]);
+
+  // Hands each edit the history records to the host's current onChange.
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  useEffect(
+    () =>
+      watchBrainEdits(
+        commandHistory,
+        () => brainDefRef.current,
+        (snapshot) => onChangeRef.current?.(snapshot)
+      ),
+    [commandHistory]
+  );
 
   // Read through a ref so the working copy resets only when the dialog opens
   // or the source brain changes. The host config (and with it this callback's
@@ -256,7 +315,6 @@ export function BrainEditorDialog({ isOpen, onOpenChange, srcBrainDef, onSubmit 
       });
       // Everything on the history from here on is the user's own work.
       setOpeningDepth(commandHistory.undoDepth());
-      setBrainReplaced(false);
       setIsConfirmingDiscard(false);
       setRevealRule(undefined);
     } else if (!isOpen) {
@@ -264,7 +322,6 @@ export function BrainEditorDialog({ isOpen, onOpenChange, srcBrainDef, onSubmit 
       setBrainDef(undefined);
       commandHistory.runAs(BrainEditOrigin.Editor, () => commandHistory.clear());
       setOpeningDepth(0);
-      setBrainReplaced(false);
       setIsConfirmingDiscard(false);
       setRevealRule(undefined);
     }
@@ -327,16 +384,10 @@ export function BrainEditorDialog({ isOpen, onOpenChange, srcBrainDef, onSubmit 
   }, [brainDef, currentPageNumber]);
 
   const handleSubmit = useCallback(() => {
-    const nextBrainDef = brainDef
-      ? (() => {
-          brainDef.purgeUnusedTiles();
-          return brainDef;
-        })()
-      : createEditableBrain();
-    onSubmit(nextBrainDef);
+    onSubmit?.(brainDef ? detachedBrainSnapshot(brainDef) : createEditableBrain());
   }, [brainDef, onSubmit, createEditableBrain]);
 
-  const holdsDiscardableEdits = hasDiscardableEdits({ undoDepth, openingDepth, brainReplaced });
+  const holdsDiscardableEdits = chrome.closeConfirmsDiscard && hasDiscardableEdits({ undoDepth, openingDepth });
 
   const takeKeyboard = useCallback(() => takePageGridKeyboard(document), []);
 
@@ -367,8 +418,9 @@ export function BrainEditorDialog({ isOpen, onOpenChange, srcBrainDef, onSubmit 
   );
 
   /**
-   * Close the editor without saving, first asking the user to confirm when the
-   * session holds work the close would lose.
+   * Close the editor, first asking the user to confirm when a modal session
+   * holds work the close would lose. A continuous session closes without
+   * asking.
    */
   const requestDiscardingClose = useCallback(() => {
     if (!holdsDiscardableEdits) {
@@ -378,6 +430,44 @@ export function BrainEditorDialog({ isOpen, onOpenChange, srcBrainDef, onSubmit 
     discardReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setIsConfirmingDiscard(true);
   }, [holdsDiscardableEdits, onOpenChange]);
+
+  // Every control the footer can stand; the session's chrome picks which stand, and in what order.
+  const footerControls: Record<BrainEditorFooterControl, ReactNode> = {
+    cancel: (
+      <Button
+        key="cancel"
+        variant="cancel"
+        className="rounded-lg"
+        onClick={requestDiscardingClose}
+        title="Discard Changes"
+      >
+        Cancel
+      </Button>
+    ),
+    submit: (
+      <Button
+        key="submit"
+        title="Save Changes"
+        aria-label="Save changes"
+        className="rounded-lg"
+        onClick={handleSubmit}
+        disabled={!brainDef}
+      >
+        OK
+      </Button>
+    ),
+    close: (
+      <Button
+        key="close"
+        title="Close"
+        aria-label="Close the brain editor"
+        className="rounded-lg"
+        onClick={() => onOpenChange(false)}
+      >
+        Close
+      </Button>
+    ),
+  };
 
   const handleConfirmDiscard = useCallback(() => {
     discardReturnFocusRef.current = null;
@@ -562,11 +652,11 @@ export function BrainEditorDialog({ isOpen, onOpenChange, srcBrainDef, onSubmit 
 
       loadedBrain.compile();
 
-      setBrainDef(loadedBrain);
-      setCurrentPageNumber(1);
-      setTotalPageCount(loadedBrain.pages().size());
-      commandHistory.clear();
-      setBrainReplaced(true);
+      // Read after the picker's wait, so a load lands on the working copy
+      // standing once the file is read.
+      const workingBrainDef = brainDefRef.current;
+      if (!workingBrainDef) return;
+      replaceBrainContent(commandHistory, workingBrainDef, loadedBrain, extraCatalogs);
     } catch (err) {
       // User cancelled or error occurred
       if (err instanceof Error && err.name !== "AbortError") {
@@ -576,6 +666,7 @@ export function BrainEditorDialog({ isOpen, onOpenChange, srcBrainDef, onSubmit 
   }, [commandHistory, brainServices, tileCatalogs, projectNamespace]);
 
   const handleLoadDefault = useCallback(() => {
+    if (!brainDef) return;
     const defaultBrain = getDefaultBrain?.();
     if (!defaultBrain) return;
 
@@ -586,12 +677,8 @@ export function BrainEditorDialog({ isOpen, onOpenChange, srcBrainDef, onSubmit 
     }
     cloned.compile();
 
-    setBrainDef(cloned);
-    setCurrentPageNumber(1);
-    setTotalPageCount(cloned.pages().size());
-    commandHistory.clear();
-    setBrainReplaced(true);
-  }, [getDefaultBrain, commandHistory, tileCatalogs]);
+    replaceBrainContent(commandHistory, brainDef, cloned, extraCatalogs);
+  }, [brainDef, getDefaultBrain, commandHistory, tileCatalogs]);
 
   const handleBrainNameClick = () => {
     if (brainDef) {
@@ -740,7 +827,7 @@ export function BrainEditorDialog({ isOpen, onOpenChange, srcBrainDef, onSubmit 
           // up it belongs to that rule, and the page gives it back to where it
           // was picked up from. An open documentation panel takes it next and
           // closes, leaving the editor open. Once nothing else claims it, it
-          // closes the editor, through the discard confirmation when the
+          // closes the editor, through the discard confirmation when a modal
           // session holds user work.
           onEscapeKeyDown={(e) => {
             if (armedTarget.target || rulePickup.pickup) {
@@ -1140,20 +1227,7 @@ export function BrainEditorDialog({ isOpen, onOpenChange, srcBrainDef, onSubmit 
                 aria-label="Zoom level"
               />
             </div>
-            <div className="flex gap-2">
-              <Button variant="cancel" className="rounded-lg" onClick={requestDiscardingClose} title="Discard Changes">
-                Cancel
-              </Button>
-              <Button
-                title="Save Changes"
-                aria-label="Save changes"
-                className="rounded-lg"
-                onClick={handleSubmit}
-                disabled={!brainDef}
-              >
-                OK
-              </Button>
-            </div>
+            <div className="flex gap-2">{chrome.footerControls.map((control) => footerControls[control])}</div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
