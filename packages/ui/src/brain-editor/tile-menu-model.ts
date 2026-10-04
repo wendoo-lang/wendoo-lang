@@ -5,7 +5,7 @@ import { EditLiteralCommand, ReplaceTileCommand } from "@wendoo/core/brain/model
 import type { BrainTileFactoryDef, BrainTileLiteralDef } from "@wendoo/core/brain/tiles";
 import { manufactureLiteralTile } from "@wendoo/core/brain/tiles";
 import { CoreTypeIds } from "@wendoo/core/runtime";
-import type { CustomLiteralType } from "./BrainEditorContext";
+import { type CustomLiteralType, type DialogLiteralType, dialogLiteralType } from "./BrainEditorContext";
 
 /** Keys naming the entries a placed tile's menu can offer. */
 export const TileMenuEntryKeys = {
@@ -50,7 +50,7 @@ export interface LiteralValueEditor {
   /** The literal tile standing in the rule. */
   readonly literalDef: BrainTileLiteralDef;
   /** The host's editor for that literal's value type, which renders and parses the input fields. */
-  readonly customType: CustomLiteralType;
+  readonly customType: DialogLiteralType;
   /** The literal factory producing that type, which mints a literal of a submitted value. */
   readonly factory: BrainTileFactoryDef;
   /**
@@ -63,9 +63,9 @@ export interface LiteralValueEditor {
 
 /**
  * The value editor `tileDef` offers, and undefined when it offers none: the
- * tile is not a literal, `customLiteralTypes` holds no editor for its value
- * type, or `tiles` holds no literal factory producing that type to mint
- * through.
+ * tile is not a literal, `customLiteralTypes` holds no entry carrying the
+ * dialog members for its value type, or `tiles` holds no literal factory
+ * producing that type to mint through.
  *
  * @param tileDef the placed tile the menu stands on
  * @param customLiteralTypes the custom literal editors the host supplied
@@ -81,7 +81,7 @@ export function literalValueEditor(
 ): LiteralValueEditor | undefined {
   if (tileDef.kind !== "literal" || !tiles) return undefined;
   const literalDef = tileDef as BrainTileLiteralDef;
-  const customType = customLiteralTypes.find((candidate) => candidate.typeId === literalDef.valueType);
+  const customType = dialogLiteralType(literalDef.valueType, customLiteralTypes);
   if (!customType) return undefined;
   const factory = tiles.find(
     (candidate) =>

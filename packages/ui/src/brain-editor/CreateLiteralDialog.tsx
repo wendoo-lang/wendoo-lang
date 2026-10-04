@@ -5,7 +5,7 @@ import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { kStripPopupAttribute } from "./BrainCandidateStrip";
-import { type CustomLiteralType, useBrainEditorConfig } from "./BrainEditorContext";
+import { type CustomLiteralType, dialogLiteralType, useBrainEditorConfig } from "./BrainEditorContext";
 import { DisplayFormatPicker } from "./DisplayFormatPicker";
 
 /** The id the dialog's name field carries, which its own label points at. */
@@ -13,15 +13,16 @@ export const kLiteralNameFieldId = "literalDisplayName";
 
 /**
  * Whether the create-literal dialog stands its name field for `literalType`:
- * a type the host supplies a `customLiteralTypes` editor for takes one, and the
- * built-in text and number forms take none.
+ * a type the host supplies a `customLiteralTypes` entry carrying the dialog
+ * members for takes one, and the built-in text and number forms and a
+ * display-only type take none.
  */
 export function literalTypeTakesName(
   literalType: string,
   customLiteralTypes: ReadonlyArray<CustomLiteralType>
 ): boolean {
   if (literalType === CoreTypeIds.String || literalType === CoreTypeIds.Number) return false;
-  return customLiteralTypes.some((candidate) => candidate.typeId === literalType);
+  return dialogLiteralType(literalType, customLiteralTypes) !== undefined;
 }
 
 /**
@@ -120,7 +121,9 @@ interface CreateLiteralDialogProps {
 /**
  * Dialog that names the value of a literal tile. Renders inputs appropriate for
  * the given `literalType`: built-in string/number forms, or fields from the
- * matching `customLiteralTypes` entry in {@link BrainEditorConfig}. Its content
+ * matching `customLiteralTypes` entry in {@link BrainEditorConfig} carrying the
+ * dialog members; for a display-only type it renders no fields and takes no
+ * submission. Its content
  * carries {@link kStripPopupAttribute}, so the keyboard landing in it counts as
  * staying in the candidate strip the literal was minted from.
  */
@@ -135,7 +138,7 @@ export function CreateLiteralDialog({
   initialName,
 }: CreateLiteralDialogProps) {
   const { customLiteralTypes } = useBrainEditorConfig();
-  const customType = customLiteralTypes.find((t) => t.typeId === literalType);
+  const customType = dialogLiteralType(literalType, customLiteralTypes);
   const [stringValue, setStringValue] = useState("");
   const [numberValue, setNumberValue] = useState("");
   const [displayFormat, setDisplayFormat] = useState<LiteralDisplayFormat>("default");

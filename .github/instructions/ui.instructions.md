@@ -92,24 +92,30 @@ Host apps supply a `BrainEditorConfig` object with:
 
 ### CustomLiteralType
 
-Each entry defines a custom literal that `CreateLiteralDialog` names the value of,
-both for a new tile and for one being edited in place:
+Each entry defines a literal type the host supports: it formats values for
+tiles, may draw them in a placed literal's value box, and -- when it carries the
+four DIALOG MEMBERS (`isValid`, `parseValue`, `toInputState`,
+`renderInputFields`) -- supports `CreateLiteralDialog` naming the value of a
+new tile and of one being edited in place. An entry carrying none of them is
+DISPLAY-ONLY: `isDialogLiteralType` says which an entry is, and
+`dialogLiteralType` finds a type's dialog-capable entry, which every dialog
+path reads, so a display-only type is never offered a value dialog:
 
 | Field               | Type                                                                                  | Purpose                                                    |
 | ------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | `typeId`            | `string`                                                                              | The brain type system type ID                              |
 | `description`       | `string`                                                                              | Description shown in the dialog                            |
 | `nameBase`          | `string`                                                                              | Optional. The word this type's default names are numbered from ("image" -> "image 1"); falls back to the `dataTypeNames` entry, then to a generic word |
-| `isValid`           | `(state: Record<string, string>) => boolean`                                          | Whether the current input state can be submitted           |
-| `parseValue`        | `(state: Record<string, string>) => unknown`                                          | The runtime value the input state names                    |
-| `toInputState`      | `(value: unknown) => Record<string, string>`                                          | The input state an existing value opens seeded with        |
-| `renderInputFields` | `(state, onChange: (key, value) => void, onSubmit: () => void) => ReactNode`          | The input fields for this literal type                     |
+| `isValid`           | `(state: Record<string, string>) => boolean`                                          | Optional dialog member. Whether the current input state can be submitted |
+| `parseValue`        | `(state: Record<string, string>) => unknown`                                          | Optional dialog member. The runtime value the input state names |
+| `toInputState`      | `(value: unknown) => Record<string, string>`                                          | Optional dialog member. The input state an existing value opens seeded with |
+| `renderInputFields` | `(state, onChange: (key, value) => void, onSubmit: () => void) => ReactNode`          | Optional dialog member. The input fields for this literal type |
 | `formatValue`       | `(value: unknown) => string`                                                          | How the value reads in a tile                              |
 | `renderValue`       | `(value: unknown) => ReactNode`                                                       | Optional. What a placed literal's value box draws instead of the `formatValue` text; `undefined`, as omitting it does, draws that text |
 
 A placed literal offers value entries in its tile menu when a
-`customLiteralTypes` entry matches its value type AND the edit-time tile catalog
-holds a literal factory producing that type. `literalValueEditor` resolves that
+`customLiteralTypes` entry carrying the dialog members matches its value type
+AND the edit-time tile catalog holds a literal factory producing that type. `literalValueEditor` resolves that
 pair and reads one more thing from the brain's own catalog: `editable`, true
 only for a literal that catalog holds. The model behind the entries is
 `brain-editor/tile-menu-model.ts`, and it offers two:
@@ -124,9 +130,9 @@ only for a literal that catalog holds. The model behind the entries is
   through the factory and replaces the placement, so a literal an environment
   catalog provides is forked rather than changed.
 
-Every literal of a `customLiteralTypes` type also takes a NAME, which the dialog
-stands its own field for (`literalTypeTakesName` decides, and the built-in text
-and number forms take none). That field is REQUIRED: `literalNameAccepted`
+Every literal of a dialog-capable `customLiteralTypes` type also takes a NAME,
+which the dialog stands its own field for (`literalTypeTakesName` decides, and
+the built-in text and number forms and a display-only type take none). That field is REQUIRED: `literalNameAccepted`
 refuses a name of nothing but whitespace, and the dialog takes no submission
 while it does. What the field holds is trimmed on the way out --
 `submittedLiteralName` drops the surrounding whitespace, so " rock " names

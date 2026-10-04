@@ -45,9 +45,11 @@ export {
 } from "./accelerators";
 export type { ActionArgEntry, ActionArgTileEntry, ActionArgTypeEntry, TypeDisplaySources } from "./action-arg-tiles";
 export { getActionArgEntries, resolveTypeDisplayName } from "./action-arg-tiles";
-export type { BrainEditorConfig, CustomLiteralType } from "./BrainEditorContext";
+export type { BrainEditorConfig, CustomLiteralType, DialogLiteralType } from "./BrainEditorContext";
 export {
   BrainEditorProvider,
+  dialogLiteralType,
+  isDialogLiteralType,
   useBrainEditorConfig,
   useLocalizer,
   useOptionalBrainEditorConfig,

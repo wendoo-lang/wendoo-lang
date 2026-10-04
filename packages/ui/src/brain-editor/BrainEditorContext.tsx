@@ -9,9 +9,12 @@ import type { TileSourceLibrary } from "./tile-library-groups";
 import type { TileVisual } from "./types";
 
 /**
- * Describes a custom literal type that the host app supports beyond the
- * core String/Number types. The brain editor uses this to render additional
- * input fields in CreateLiteralDialog and to format values in TileValue.
+ * A literal type the host app supports beyond the core String/Number types.
+ * It formats values for display in tiles, and may draw them in a placed
+ * literal's value box. With the dialog members -- `isValid`, `parseValue`,
+ * `toInputState` and `renderInputFields` -- it also supports creating and
+ * editing values in CreateLiteralDialog; a type carrying none of them is
+ * display-only, and the editor offers no value dialog for its literals.
  */
 export interface CustomLiteralType {
   /** The type ID string (e.g. "struct:vector2"). */
@@ -25,18 +28,18 @@ export interface CustomLiteralType {
    * by neither is numbered from a generic one.
    */
   nameBase?: string;
-  /** Returns true when the current input state is valid. */
-  isValid: (state: Record<string, string>) => boolean;
-  /** Parse the input state into the runtime value. */
-  parseValue: (state: Record<string, string>) => unknown;
+  /** Dialog member: returns true when the current input state is valid. */
+  isValid?: (state: Record<string, string>) => boolean;
+  /** Dialog member: parse the input state into the runtime value. */
+  parseValue?: (state: Record<string, string>) => unknown;
   /**
-   * The input state that renders `value` back into the fields, which the
-   * create-literal dialog seeds itself with when it opens on an existing
-   * literal. A value of another shape yields an empty state.
+   * Dialog member: the input state that renders `value` back into the fields,
+   * which the create-literal dialog seeds itself with when it opens on an
+   * existing literal. A value of another shape yields an empty state.
    */
-  toInputState: (value: unknown) => Record<string, string>;
-  /** Render the input fields for this literal type. */
-  renderInputFields: (
+  toInputState?: (value: unknown) => Record<string, string>;
+  /** Dialog member: render the input fields for this literal type. */
+  renderInputFields?: (
     state: Record<string, string>,
     onChange: (key: string, value: string) => void,
     onSubmit: () => void
@@ -49,6 +52,33 @@ export interface CustomLiteralType {
    * as leaving the field out does, draws that text.
    */
   renderValue?: (value: unknown) => ReactNode;
+}
+
+/** A {@link CustomLiteralType} carrying every dialog member, so CreateLiteralDialog creates and edits its values. */
+export type DialogLiteralType = CustomLiteralType &
+  Required<Pick<CustomLiteralType, "isValid" | "parseValue" | "toInputState" | "renderInputFields">>;
+
+/** Whether `customType` carries every dialog member, and so supports creating and editing values in a dialog. */
+export function isDialogLiteralType(customType: CustomLiteralType): customType is DialogLiteralType {
+  return (
+    customType.isValid !== undefined &&
+    customType.parseValue !== undefined &&
+    customType.toInputState !== undefined &&
+    customType.renderInputFields !== undefined
+  );
+}
+
+/**
+ * The entry of `customLiteralTypes` for `typeId` that supports creating and
+ * editing values in a dialog, or `undefined` when none matches or the matching
+ * entry is display-only.
+ */
+export function dialogLiteralType(
+  typeId: string,
+  customLiteralTypes: ReadonlyArray<CustomLiteralType>
+): DialogLiteralType | undefined {
+  const customType = customLiteralTypes.find((candidate) => candidate.typeId === typeId);
+  return customType !== undefined && isDialogLiteralType(customType) ? customType : undefined;
 }
 
 /**
