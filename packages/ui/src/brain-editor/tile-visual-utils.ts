@@ -33,13 +33,14 @@ export function tileBorderColor(baseColor: string): string {
 /**
  * How a tile chip renders, derived from its kind:
  *
- * - "value" -- shows its value in a boxed value field (literal, variable, accessor, output)
+ * - "value" -- shows its value in a boxed value field (literal, variable, output)
+ * - "accessor" -- an icon chip whose corner carries the silhouette of its result data type's icon (accessor)
  * - "action" -- an icon chip that may carry the async-completion badge (sensor, actuator)
  * - "parameter" -- an icon chip with a data-type badge (parameter)
  * - "factory" -- an icon chip drawn at reduced scale (factory)
  * - "generic" -- a plain icon chip (all other kinds)
  */
-export type TileVisualCategory = "value" | "action" | "parameter" | "factory" | "generic";
+export type TileVisualCategory = "value" | "accessor" | "action" | "parameter" | "factory" | "generic";
 
 /** Maps every {@link BrainTileKind} to the {@link TileVisualCategory} its chip renders as. */
 export const tileVisualCategoryByKind: Record<BrainTileKind, TileVisualCategory> = {
@@ -53,7 +54,7 @@ export const tileVisualCategoryByKind: Record<BrainTileKind, TileVisualCategory>
   factory: "factory",
   controlFlow: "generic",
   modifier: "generic",
-  accessor: "value",
+  accessor: "accessor",
   page: "generic",
   output: "value",
   missing: "generic",

@@ -24,7 +24,8 @@ function PrintTile({ tileDef, side }: PrintTileProps) {
     kDefaultTileHue;
 
   const category = tileVisualCategory(tileDef);
-  const isValueTile = category === "value";
+  // A printed accessor reads its field name in a value box, its own icon in the corner.
+  const isValueTile = category === "value" || category === "accessor";
   const isFactoryTile = category === "factory";
 
   return (

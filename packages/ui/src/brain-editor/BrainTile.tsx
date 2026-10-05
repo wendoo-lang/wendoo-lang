@@ -1,4 +1,5 @@
 import { type IBrainTileDef, isActionTileDef, RuleSide } from "@wendoo/core/brain";
+import type { BrainTileAccessorDef } from "@wendoo/core/brain/tiles";
 import { CircleAlert, ClockFading } from "lucide-react";
 import { type ButtonHTMLAttributes, forwardRef, useLayoutEffect, useState } from "react";
 import { staticAssetUrl } from "../asset-url";
@@ -95,6 +96,15 @@ export const BrainTile = forwardRef<HTMLButtonElement, BrainTileProps>(
     const isValueTile = category === "value";
     // True when this value tile's type supplies its own node for the value box.
     const drawsOwnValue = isValueTile && customLiteralValueNode(tileDef, customLiteralTypes) !== undefined;
+    // An accessor's result data type's icon, as the host maps its type id.
+    const resultTypeIconUrl =
+      category === "accessor"
+        ? editorConfig.dataTypeIcons.get((tileDef as BrainTileAccessorDef).fieldTypeId)
+        : undefined;
+    // The silhouette in the tile's top-left corner: a value tile's own icon, or
+    // an accessor's result data type's icon where it differs from the face.
+    // Undefined draws no corner.
+    const cornerIconUrl = isValueTile ? iconUrl : resultTypeIconUrl !== iconUrl ? resultTypeIconUrl : undefined;
     const isFactoryTile = category === "factory";
     const isActionTile = isActionTileDef(tileDef);
     const isAsyncAction = isActionTile && tileDef.action.isAsync === true;
@@ -169,15 +179,15 @@ export const BrainTile = forwardRef<HTMLButtonElement, BrainTileProps>(
           aria-label={tileAccessibleName(editorConfig, tileDef)}
           {...props}
         >
-          {isValueTile && (
+          {cornerIconUrl !== undefined && (
             <div
               style={{
                 backgroundColor: darkerSaturatedColor,
-                WebkitMaskImage: `url(${iconUrl})`,
+                WebkitMaskImage: `url(${cornerIconUrl})`,
                 WebkitMaskSize: "contain",
                 WebkitMaskRepeat: "no-repeat",
                 WebkitMaskPosition: "center",
-                maskImage: `url(${iconUrl})`,
+                maskImage: `url(${cornerIconUrl})`,
                 maskSize: "contain",
                 maskRepeat: "no-repeat",
                 maskPosition: "center",
