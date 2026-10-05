@@ -387,12 +387,10 @@ export function isOperatorSymbolPrefix(text: string): boolean {
 const noTileMatchAliases: readonly string[] = [];
 
 /**
- * The texts beyond its label that `tileDef` is reachable by while typing: an
- * operator's typing notation, and the tile's own `metadata.label` -- the name
- * the picker and the documentation title it by, which a tile reading its
- * sentence with a different word would otherwise not be findable under. Like
- * every alias it is matching input only and never reaches a chip, a placed
- * tile, or a sentence.
+ * The alias texts `tileDef` is matched by while typing, alongside its chip's
+ * label: an operator's typing notation, then the tile's own non-empty
+ * `metadata.label`. Aliases are matching input only and never become chip
+ * text, a placed tile, or a sentence word.
  */
 function tileMatchAliases(tileDef: IBrainTileDef): readonly string[] {
   const symbols = operatorSymbolAliases.get(tileDef.tileId);
@@ -635,7 +633,7 @@ function findNumberLiteralFactory(candidates: readonly StripCandidate[]): BrainT
  * armed position accepts a numeric literal. The candidate's tile is a preview
  * def manufactured by the factory; committing it re-manufactures through the
  * catalog so the placed tile is registered. `labelOf` reads the preview, so a
- * formatted literal's chip carries the formatted reading its sentence gives it.
+ * formatted literal's chip carries its formatted value.
  */
 export function mintNumberLiteralCandidate(
   candidates: readonly StripCandidate[],

@@ -165,9 +165,9 @@ sentence. The sentence system's invariants bind the category's wording and rende
 ### Word and span
 
 - **Each shaper is one word segment** in the sentence, carrying its tile's span. Its
-  `language.form` is simultaneously the sentence word, the candidate-chip label, and the
-  typed handle -- one string. A form may contain spaces ("just once" is one segment) but a
-  shaper never owns two segments.
+  label and its `language.form` are one string: the sentence word (the form), and
+  the candidate-chip label and typed handle (the label). A form may contain spaces
+  ("just once" is one segment) but a shaper never owns two segments.
 - A shaper's arguments are their own tiles and their own words, following the shaper's
   word in tile order. A duration-bearing form therefore **ends where the duration
   begins**: the form is the leading phrase and the duration literal is the next word

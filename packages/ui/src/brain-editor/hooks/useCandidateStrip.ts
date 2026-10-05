@@ -1,11 +1,6 @@
 import { List, type ReadonlyBitSet, type ReadonlyList, type UniqueSet } from "@wendoo/core";
 import { type IBrainTileDef, type ITileCatalog, RuleSide } from "@wendoo/core/brain";
-import {
-  buildInsertionContext,
-  suggestTiles,
-  type TileSuggestion,
-  tileSentenceWord,
-} from "@wendoo/core/brain/language-service";
+import { buildInsertionContext, suggestTiles, type TileSuggestion } from "@wendoo/core/brain/language-service";
 import type { BrainRuleDef } from "@wendoo/core/brain/model";
 import { manufactureLiteralTile, manufactureVariableTile } from "@wendoo/core/brain/tiles";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -149,20 +144,15 @@ export function useCandidateStrip({
     setFilter("");
   }, [target]);
 
-  // A placeable tile's chip carries the word its sentence reads it with. A
-  // factory manufactures the tile that gets placed, and keeps the label the
-  // host app presents it under.
-  const localizer = useLocalizer();
+  // Every chip carries its tile's resolved label, which is also the text the filter matches.
   const labelOf = useCallback(
-    (tileDef: IBrainTileDef) =>
-      tileDef.kind === "factory"
-        ? resolveTileVisual(editorConfig, tileDef).label
-        : tileSentenceWord(tileDef, localizer),
-    [editorConfig, localizer]
+    (tileDef: IBrainTileDef) => resolveTileVisual(editorConfig, tileDef).label,
+    [editorConfig]
   );
 
   // Matching normalizes the typed text and every candidate text through the
   // active locale's search fold.
+  const localizer = useLocalizer();
   const foldText = useCallback((text: string) => localizer.foldForSearch(text), [localizer]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: revision and commitCounter are intentional re-query signals

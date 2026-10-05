@@ -25,7 +25,7 @@ import {
   RuleSide,
 } from "@wendoo/core/brain";
 import { __test__appendTile, __test__createBrainServices } from "@wendoo/core/brain/__test__";
-import { buildInsertionContext, suggestTiles, tileSentenceWord } from "@wendoo/core/brain/language-service";
+import { buildInsertionContext, suggestTiles } from "@wendoo/core/brain/language-service";
 import type { BrainCommand, BrainRuleDef } from "@wendoo/core/brain/model";
 import {
   BrainTileActuatorDef,
@@ -79,6 +79,7 @@ import {
 import { deriveEditorMode, type EditorMode } from "./editor-mode";
 import { kBestNextCandidateCount } from "./hooks/useCandidateStrip";
 import { makeBrain } from "./test-only-rule-fixtures";
+import { resolveTileVisualFrom } from "./tile-visual-utils";
 
 let services: BrainServices;
 let localizer: Localizer;
@@ -103,9 +104,9 @@ function foldText(text: string): string {
   return localizer.foldForSearch(text);
 }
 
-/** The word a tile's chip carries, resolved as the strip resolves it. */
+/** The label a tile's chip carries, resolved as the strip resolves it from a host supplying no visual resolver. */
 function traceLabelOf(tileDef: IBrainTileDef): string {
-  return tileSentenceWord(tileDef, localizer);
+  return resolveTileVisualFrom(undefined, tileDef).label;
 }
 
 function makeSensorTile(sensorId: string): IBrainTileDef {
@@ -433,9 +434,7 @@ class ComposerTrace {
     if (value === undefined) return undefined;
     const cached = this.pendingTextChips.get(value);
     if (cached) return cached;
-    const minted = mintTextLiteralCandidate(this.offeringFor(this.state.filter, this), value, (tileDef) =>
-      tileSentenceWord(tileDef, localizer)
-    );
+    const minted = mintTextLiteralCandidate(this.offeringFor(this.state.filter, this), value, traceLabelOf);
     if (minted) this.pendingTextChips.set(value, minted);
     return minted;
   }
@@ -1745,7 +1744,7 @@ describe("typed numbers", () => {
   function numberOffering(): (filter: string) => readonly StripCandidate[] {
     const factory = numberFactoryCandidate();
     return (filter: string) => {
-      const minted = mintNumberLiteralCandidate([factory], filter, (tileDef) => tileSentenceWord(tileDef, localizer));
+      const minted = mintNumberLiteralCandidate([factory], filter, traceLabelOf);
       return minted ? [minted] : [];
     };
   }
@@ -3207,13 +3206,13 @@ describe("typing a formula", () => {
   });
 
   test("a two-character operator is one word", () => {
-    assert.deepEqual(typedOnWhenSide("1>=3"), { placed: ["1", "is greater than or equal to"], pending: "3" });
-    assert.deepEqual(typedOnWhenSide("1!=3"), { placed: ["1", "is not equal to"], pending: "3" });
-    assert.deepEqual(typedOnWhenSide("1<=3"), { placed: ["1", "is less than or equal to"], pending: "3" });
+    assert.deepEqual(typedOnWhenSide("1>=3"), { placed: ["1", "greater than or equal to"], pending: "3" });
+    assert.deepEqual(typedOnWhenSide("1!=3"), { placed: ["1", "not equal to"], pending: "3" });
+    assert.deepEqual(typedOnWhenSide("1<=3"), { placed: ["1", "less than or equal to"], pending: "3" });
   });
 
   test("a minus past the end of an operator joins the number instead of extending it", () => {
-    assert.deepEqual(typedOnWhenSide("1>=-3"), { placed: ["1", "is greater than or equal to"], pending: "-3" });
+    assert.deepEqual(typedOnWhenSide("1>=-3"), { placed: ["1", "greater than or equal to"], pending: "-3" });
   });
 
   test("a minus where only a value fits opens a negative number", () => {
@@ -3266,7 +3265,7 @@ describe("typing a formula", () => {
     const trace = formulaTrace(["foo"]);
     typeFormula(trace, "!foo");
 
-    assert.deepEqual(placedWords(trace), ["not"]);
+    assert.deepEqual(placedWords(trace), ["NOT"]);
     assert.equal(trace.state.filter, "foo");
   });
 
@@ -3283,7 +3282,7 @@ describe("typing a formula", () => {
   });
 
   test("two equals signs are one word", () => {
-    assert.deepEqual(typedOnWhenSide("1==3"), { placed: ["1", "is equal to"], pending: "3" });
+    assert.deepEqual(typedOnWhenSide("1==3"), { placed: ["1", "equal to"], pending: "3" });
   });
 
   test("a bracketed formula with embedded variables places every tile in order", () => {

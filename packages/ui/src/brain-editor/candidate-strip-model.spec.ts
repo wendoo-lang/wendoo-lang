@@ -36,7 +36,6 @@ import {
   TileCompatibility,
   type TileSuggestion,
   type TileSuggestionResult,
-  tileSentenceWord,
 } from "@wendoo/core/brain/language-service";
 import { BrainDef, type BrainRuleDef } from "@wendoo/core/brain/model";
 import {
@@ -95,6 +94,7 @@ import {
 } from "./candidate-strip-model";
 import { kBestNextCandidateCount } from "./hooks/useCandidateStrip";
 import type { TileSourceLibrary } from "./tile-library-groups";
+import { resolveTileVisualFrom } from "./tile-visual-utils";
 
 let services: BrainServices;
 
@@ -266,8 +266,8 @@ function articleModifierTileId(modifierId: string): string {
 
 /**
  * Register object modifier tiles worded as the host apps' own object tiles are:
- * the label is the bare noun a user types, and the sentence form the chip is
- * labelled with opens with an article.
+ * the label, which the chip carries, is the bare noun a user types, and the
+ * sentence form opens with an article.
  */
 function registerArticleModifiers(): void {
   const specs: readonly (readonly [string, string, string])[] = [
@@ -412,22 +412,13 @@ function result(exact: TileSuggestion[], withConversion: TileSuggestion[]): Tile
 }
 
 /**
- * The label the strip resolves a tile by, exactly as the strip itself does: the
- * word the tile's sentence reads it as, which is a variable's own name, a
- * literal's value, and every other tile's authored form or label.
+ * The label the strip puts on a tile's chip, exactly as the strip itself
+ * resolves it from a host supplying no visual resolver: the tile's own label,
+ * else its kind's default label (a variable's name, a literal's formatted
+ * value, an accessor's field name, an output's name, or the catalog fallback).
  */
 function stripLabel(tileDef: IBrainTileDef): string {
-  return tileSentenceWord(tileDef, services.app.localizer);
-}
-
-/**
- * The word each tile's sentence reads it as, resolved against `brain`'s own
- * localizer: the label the strip puts on its chips, and the reading a formatted
- * literal carries.
- */
-function sentenceLabel(brain: BrainDef): (tileDef: IBrainTileDef) => string {
-  const localizer = brain.servicesLocalizer();
-  return (tileDef) => tileSentenceWord(tileDef, localizer);
+  return resolveTileVisualFrom(undefined, tileDef).label;
 }
 
 /** What an offering is built for beyond the side it is armed on. */
@@ -802,7 +793,7 @@ describe("mintNumberLiteralCandidate", () => {
 
   test("a trailing s mints the value in the time-seconds format", () => {
     const { candidates, brain } = offeringForEmptyWhenSide();
-    const labelOf = sentenceLabel(brain);
+    const labelOf = stripLabel;
 
     const minted = mintNumberLiteralCandidate(candidates, "0.5s", labelOf);
 
@@ -815,7 +806,7 @@ describe("mintNumberLiteralCandidate", () => {
 
   test("a trailing ms mints the value its milliseconds reading names", () => {
     const { candidates, brain } = offeringForEmptyWhenSide();
-    const labelOf = sentenceLabel(brain);
+    const labelOf = stripLabel;
 
     const minted = mintNumberLiteralCandidate(candidates, "500ms", labelOf);
 
@@ -827,7 +818,7 @@ describe("mintNumberLiteralCandidate", () => {
 
   test("a trailing percent sign mints the fraction its percent reading names", () => {
     const { candidates, brain } = offeringForEmptyWhenSide();
-    const labelOf = sentenceLabel(brain);
+    const labelOf = stripLabel;
 
     const minted = mintNumberLiteralCandidate(candidates, "50%", labelOf);
 
@@ -839,7 +830,7 @@ describe("mintNumberLiteralCandidate", () => {
 
   test("the typed digits carry their own precision into the percent format", () => {
     const { candidates, brain } = offeringForEmptyWhenSide();
-    const labelOf = sentenceLabel(brain);
+    const labelOf = stripLabel;
 
     const minted = mintNumberLiteralCandidate(candidates, "12.5%", labelOf);
 
@@ -852,7 +843,7 @@ describe("mintNumberLiteralCandidate", () => {
   test("digits with no specifier mint in the default format", () => {
     const { candidates, brain } = offeringForEmptyWhenSide();
 
-    const minted = mintNumberLiteralCandidate(candidates, "42", sentenceLabel(brain));
+    const minted = mintNumberLiteralCandidate(candidates, "42", stripLabel);
 
     assert.ok(minted && minted.origin.kind === "minted-literal");
     assert.equal(minted.origin.displayFormat, LiteralDisplayFormats.Default);
@@ -861,7 +852,7 @@ describe("mintNumberLiteralCandidate", () => {
 
   test("mints nothing for trailing text that is not a format specifier", () => {
     const { candidates, brain } = offeringForEmptyWhenSide();
-    const labelOf = sentenceLabel(brain);
+    const labelOf = stripLabel;
 
     for (const typed of ["5x", "5S", "5 s", "5%%", "5m", "5sec"]) {
       assert.equal(mintNumberLiteralCandidate(candidates, typed, labelOf), undefined, typed);
@@ -870,7 +861,7 @@ describe("mintNumberLiteralCandidate", () => {
 
   test("mints nothing for a specifier with no number in front of it", () => {
     const { candidates, brain } = offeringForEmptyWhenSide();
-    const labelOf = sentenceLabel(brain);
+    const labelOf = stripLabel;
 
     for (const typed of ["s", "ms", "%"]) {
       assert.equal(mintNumberLiteralCandidate(candidates, typed, labelOf), undefined, typed);
@@ -879,7 +870,7 @@ describe("mintNumberLiteralCandidate", () => {
 
   test("mints nothing while the number is still being typed", () => {
     const { candidates, brain } = offeringForEmptyWhenSide();
-    const labelOf = sentenceLabel(brain);
+    const labelOf = stripLabel;
 
     assert.equal(mintNumberLiteralCandidate(candidates, "1.", labelOf), undefined);
     assert.equal(mintNumberLiteralCandidate(candidates, "-", labelOf), undefined);
@@ -907,7 +898,7 @@ describe("mintTextLiteralCandidate", () => {
   test("a typed text value mints a literal carrying the value verbatim", () => {
     const { candidates, brain } = offeringForEmptyWhenSide();
 
-    const minted = mintTextLiteralCandidate(candidates, "hello world. ok", sentenceLabel(brain));
+    const minted = mintTextLiteralCandidate(candidates, "hello world. ok", stripLabel);
 
     assert.ok(minted && minted.origin.kind === "minted-literal");
     assert.equal(minted.tileDef.kind, "literal");
@@ -921,7 +912,7 @@ describe("mintTextLiteralCandidate", () => {
   test("the empty value mints its own literal", () => {
     const { candidates, brain } = offeringForEmptyWhenSide();
 
-    const minted = mintTextLiteralCandidate(candidates, "", sentenceLabel(brain));
+    const minted = mintTextLiteralCandidate(candidates, "", stripLabel);
 
     assert.ok(minted && minted.origin.kind === "minted-literal");
     assert.equal((minted.tileDef as BrainTileLiteralDef).value, "");
@@ -936,7 +927,7 @@ describe("mintTextLiteralCandidate", () => {
 
   test("each distinct value registers its own tile, and a repeated value reuses the registered one", () => {
     const { candidates, brain } = offeringForEmptyWhenSide();
-    const labelOf = sentenceLabel(brain);
+    const labelOf = stripLabel;
     const first = mintTextLiteralCandidate(candidates, "go left", labelOf);
     const second = mintTextLiteralCandidate(candidates, "go right", labelOf);
     assert.ok(first && first.origin.kind === "minted-literal");
@@ -977,7 +968,7 @@ describe("a formatted literal the composer types", () => {
    */
   function placeTypedLiteral(typed: string) {
     const { candidates, brain } = offeringForEmptyWhenSide();
-    const labelOf = sentenceLabel(brain);
+    const labelOf = stripLabel;
     const minted = mintNumberLiteralCandidate(candidates, typed, labelOf);
     assert.ok(minted && minted.origin.kind === "minted-literal", `${typed} mints a literal`);
     const placed = manufactureLiteralTile(
@@ -1074,7 +1065,7 @@ describe("a literal the armed position already offers", () => {
 
   test("holds one chip for that tile, which the mint does not double", () => {
     const { candidates, brain } = offeringWithNumberLiteral(42);
-    const labelOf = sentenceLabel(brain);
+    const labelOf = stripLabel;
     const tileId = registeredLiteralTileId(candidates, 42);
 
     const offering = resolveStripOffering(candidates, "42", labelOf, foldText);
@@ -1085,7 +1076,7 @@ describe("a literal the armed position already offers", () => {
 
   test("still places that tile when the one chip commits", () => {
     const { candidates, brain } = offeringWithNumberLiteral(42);
-    const labelOf = sentenceLabel(brain);
+    const labelOf = stripLabel;
     const tileId = registeredLiteralTileId(candidates, 42);
 
     const offering = resolveStripOffering(candidates, "42", labelOf, foldText);
@@ -1339,7 +1330,7 @@ describe("resolveStripOffering", () => {
 
   test("a typed format specifier mints its literal, ahead of the offering and never unknown", () => {
     const { candidates, brain } = offeringForEmptyWhenSide();
-    const labelOf = sentenceLabel(brain);
+    const labelOf = stripLabel;
 
     for (const [typed, format] of [
       ["0.5s", LiteralDisplayFormats.TimeSeconds],
@@ -1367,7 +1358,7 @@ describe("resolveStripOffering", () => {
 
   test("a typed precision the plain format rounds away still mints and is never unknown", () => {
     const { candidates, brain } = offeringForEmptyWhenSide();
-    const labelOf = sentenceLabel(brain);
+    const labelOf = stripLabel;
 
     for (const typed of ["0.125s", "0.5ms", "1.50"]) {
       const offering = resolveStripOffering(candidates, typed, labelOf, foldText);
@@ -1385,7 +1376,7 @@ describe("resolveStripOffering", () => {
 
   test("trailing text that is not a format specifier stays unknown", () => {
     const { candidates, brain } = offeringForEmptyWhenSide();
-    const labelOf = sentenceLabel(brain);
+    const labelOf = stripLabel;
 
     const offering = resolveStripOffering(candidates, "5x", labelOf, foldText);
 
@@ -1416,7 +1407,7 @@ describe("a number the composer is partway through typing", () => {
 
   test("is neither matched nor unknown, so nothing reads as amber", () => {
     const { candidates, brain } = offeringForEmptyWhenSide();
-    const labelOf = sentenceLabel(brain);
+    const labelOf = stripLabel;
 
     for (const typed of inProgress) {
       const offering = resolveStripOffering(candidates, typed, labelOf, foldText);
@@ -1428,7 +1419,7 @@ describe("a number the composer is partway through typing", () => {
 
   test("offers no variable to mint", () => {
     const { candidates, brain } = offeringForEmptyWhenSide();
-    const labelOf = sentenceLabel(brain);
+    const labelOf = stripLabel;
 
     for (const typed of inProgress) {
       const offering = resolveStripOffering(candidates, typed, labelOf, foldText);
@@ -1439,7 +1430,7 @@ describe("a number the composer is partway through typing", () => {
 
   test("commits nothing on any commit key", () => {
     const { candidates, brain } = offeringForEmptyWhenSide();
-    const labelOf = sentenceLabel(brain);
+    const labelOf = stripLabel;
 
     for (const typed of inProgress) {
       const offering = resolveStripOffering(candidates, typed, labelOf, foldText);
@@ -1452,7 +1443,7 @@ describe("a number the composer is partway through typing", () => {
 
   test("the next digit brings the literal back", () => {
     const { candidates, brain } = offeringForEmptyWhenSide();
-    const labelOf = sentenceLabel(brain);
+    const labelOf = stripLabel;
 
     const offering = resolveStripOffering(candidates, "1.5", labelOf, foldText);
 
@@ -1814,8 +1805,7 @@ describe("toCandidateEntries", () => {
 describe("an object word whose sentence form opens with an article", () => {
   /**
    * The oracle's offering at the object position after the object sensor,
-   * labelled with the word each tile's sentence reads it as -- the label the
-   * strip puts on its chips.
+   * labelled as the strip labels its chips.
    */
   function offeringAfterObjectSensor(): StripCandidate[] {
     const brain = BrainDef.emptyBrainDef(services);
@@ -1829,10 +1819,7 @@ describe("an object word whose sentence form opens with an article", () => {
       existingTiles: tileSet.tiles(),
       ruleDef: rule,
     });
-    const localizer = brain.servicesLocalizer();
-    return buildStripCandidates(suggestTiles(context, catalogs, services), (tileDef) =>
-      tileSentenceWord(tileDef, localizer)
-    );
+    return buildStripCandidates(suggestTiles(context, catalogs, services), stripLabel);
   }
 
   /** The bare noun a user types for the object modifier, which is the tile's own label. */
@@ -1850,11 +1837,13 @@ describe("an object word whose sentence form opens with an article", () => {
     );
   });
 
-  test("the chip label is the sentence form, which the typed noun does not prefix", () => {
+  test("the chip carries the bare noun, not the sentence form", () => {
     const offering = offeringAfterObjectSensor();
-    const plant = offering.find((c) => c.tileDef.tileId === articleModifierTileId(articleModifierIds.plant));
+    const plantTileId = articleModifierTileId(articleModifierIds.plant);
+    const plant = offering.find((c) => c.tileDef.tileId === plantTileId);
     assert.ok(plant);
-    assert.equal(plant.label.startsWith(objectNoun(articleModifierTileId(articleModifierIds.plant))), false);
+    assert.equal(plant.label, objectNoun(plantTileId));
+    assert.notEqual(plant.label, coreTile(plantTileId).metadata?.language?.form);
   });
 
   test("the typed noun narrows the offering to that object word", () => {
@@ -1900,14 +1889,12 @@ describe("operator symbol aliases", () => {
 
   /**
    * The oracle's offering at the position that follows a number operand on
-   * `side`, which is where an infix operator is valid. `sentenceWords` labels the
-   * candidates with the word each tile's sentence reads it as, rather than the
-   * authored label the strip filters by.
+   * `side`, which is where an infix operator is valid, labelled as the strip
+   * labels its chips.
    */
   function offeringAfterOperand(
     side: RuleSide,
-    seed: "literal" | "variable",
-    sentenceWords = false
+    seed: "literal" | "variable"
   ): { candidates: StripCandidate[]; brain: BrainDef } {
     const brain = BrainDef.emptyBrainDef(services);
     const rule = brain.pages().get(0).children().get(0) as BrainRuleDef;
@@ -1926,7 +1913,7 @@ describe("operator symbol aliases", () => {
       ruleDef: rule,
     });
     const suggested = suggestTiles(context, catalogs, services);
-    return { candidates: buildStripCandidates(suggested, sentenceWords ? sentenceLabel(brain) : stripLabel), brain };
+    return { candidates: buildStripCandidates(suggested, stripLabel), brain };
   }
 
   /** The offering `symbol` is typed against: the assignment is a DO-side operator, every other symbol a WHEN-side one. */
@@ -1971,8 +1958,8 @@ describe("operator symbol aliases", () => {
   });
 
   test("a committed alias places the operator tile, whose sentence word is its own", () => {
-    const { candidates, brain } = offeringAfterOperand(RuleSide.When, "literal", true);
-    const labelOf = sentenceLabel(brain);
+    const { candidates, brain } = offeringAfterOperand(RuleSide.When, "literal");
+    const labelOf = stripLabel;
 
     const offering = resolveStripOffering(candidates, ">", labelOf, foldText);
     const placed = decideCandidateCommit(offering.visible, ">", "space", foldText);
@@ -1980,7 +1967,7 @@ describe("operator symbol aliases", () => {
     assert.ok(placed);
     assert.equal(placed.tileDef.tileId, greaterThanTileId);
     assert.equal(placed.origin.kind, "suggested");
-    assert.equal(placed.label, tileSentenceWord(coreTile(greaterThanTileId), brain.servicesLocalizer()));
+    assert.equal(placed.label, stripLabel(coreTile(greaterThanTileId)));
     assert.notEqual(placed.label, ">");
   });
 
@@ -2028,7 +2015,7 @@ describe("operator symbol aliases", () => {
   test("a typed negative number offers the literal and no operator", () => {
     const { candidates, brain } = offeringForEmptyWhenSide();
 
-    const offering = resolveStripOffering(candidates, "-5", sentenceLabel(brain), foldText);
+    const offering = resolveStripOffering(candidates, "-5", stripLabel, foldText);
 
     assert.equal(offering.visible[0]?.origin.kind, "minted-literal");
     assert.equal((offering.visible[0].tileDef as BrainTileLiteralDef).value, -5);
@@ -2042,7 +2029,7 @@ describe("operator symbol aliases", () => {
   test("a lone minus where minus is not valid stays empty and silent", () => {
     const { candidates, brain } = offeringForEmptyWhenSide();
 
-    const offering = resolveStripOffering(candidates, "-", sentenceLabel(brain), foldText);
+    const offering = resolveStripOffering(candidates, "-", stripLabel, foldText);
 
     assert.deepEqual(offering.visible, []);
     assert.equal(offering.isUnknown, false);
@@ -2090,21 +2077,21 @@ describe("operator symbol aliases", () => {
   });
 });
 
-describe("a tile the picker labels differently from its sentence word", () => {
+describe("a tile whose label differs from its sentence word", () => {
   /** The oracle's offering at the empty DO side of a fresh brain's first rule. */
   function doSideOffering(): StripCandidate[] {
     return offeringForEmptySide(RuleSide.Do).candidates;
   }
 
   /**
-   * The picker label `tileId` carries, asserted to differ from the word its
-   * sentence reads it with, so every assertion below is about a drifted tile.
+   * The label `tileId` carries, asserted to differ from the sentence form its
+   * sentence reads it with, so every assertion below is about such a tile.
    */
   function driftedLabel(tileId: string): string {
     const tileDef = coreTile(tileId);
     const label = tileDef.metadata?.label;
-    assert.ok(label, "the tile carries a picker label");
-    assert.notEqual(label, stripLabel(tileDef), "the tile's picker label drifts from its sentence word");
+    assert.ok(label, "the tile carries a label");
+    assert.notEqual(label, tileDef.metadata?.language?.form, "the tile's label differs from its sentence form");
     return label;
   }
 
@@ -2126,25 +2113,16 @@ describe("a tile the picker labels differently from its sentence word", () => {
     assert.ok(visible.some((c) => c.tileDef.tileId === switchPageTileId));
   });
 
-  test("the word its sentence reads it with still leads the offering", () => {
-    const word = stripLabel(coreTile(switchPageTileId));
-
-    const visible = filterStripCandidates(doSideOffering(), word, foldText);
-
-    assert.equal(visible[0]?.tileDef.tileId, switchPageTileId);
-  });
-
-  test("the label never becomes the chip's word", () => {
+  test("the chip carries the label", () => {
     const label = driftedLabel(switchPageTileId);
 
     const placed = filterStripCandidates(doSideOffering(), label, foldText)[0];
 
     assert.ok(placed);
-    assert.equal(placed.label, stripLabel(placed.tileDef));
-    assert.notEqual(placed.label, label);
+    assert.equal(placed.label, label);
   });
 
-  test("both keys commit the tile the label reached, carrying its own word", () => {
+  test("both keys commit the tile the label reached, carrying its label", () => {
     const label = driftedLabel(switchPageTileId);
     const visible = filterStripCandidates(doSideOffering(), label, foldText);
 
@@ -2155,7 +2133,7 @@ describe("a tile the picker labels differently from its sentence word", () => {
     }
   });
 
-  test("a label alias climbs the ladder without jumping it", () => {
+  test("a later word of a label climbs the ladder without jumping it", () => {
     const noun = stripLabel(coreTile(labelAliasRankTileIds.sentenceWord));
     const { candidates } = offeringForEmptyWhenSide();
     const offered = candidates.map((c) => c.tileDef.tileId);
@@ -2166,10 +2144,10 @@ describe("a tile the picker labels differently from its sentence word", () => {
 
     const visible = filterStripCandidates(candidates, noun, foldText).map((c) => c.tileDef.tileId);
 
-    assert.ok(visible.includes(labelAliasRankTileIds.aliasOnly), "the alias reaches its tile");
+    assert.ok(visible.includes(labelAliasRankTileIds.aliasOnly), "the later word reaches its tile");
     assert.ok(
       visible.indexOf(labelAliasRankTileIds.sentenceWord) < visible.indexOf(labelAliasRankTileIds.aliasOnly),
-      "the tile whose own word is the typed noun leads the one reached through a label alias"
+      "the tile whose whole label is the typed noun leads the one reached through a later word"
     );
   });
 });
@@ -2212,7 +2190,7 @@ describe("search folding", () => {
 
   test("every commit key places the accented candidate the unaccented query names", () => {
     const { candidates, brain } = offeringForEmptyWhenSide();
-    const offering = resolveStripOffering(candidates, "cafe", sentenceLabel(brain), foldText);
+    const offering = resolveStripOffering(candidates, "cafe", stripLabel, foldText);
 
     assert.equal(offering.isUnknown, false);
     for (const key of ["enter", "space"] as const) {
