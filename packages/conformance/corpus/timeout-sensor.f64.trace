@@ -1,0 +1,162 @@
+mctrace 1
+profile 3e8
+precision f64
+tick 1 time 4049000000000000 dt 0000000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+action 5 site 2 args 1 nil result bool 0
+action 410 site 4 args 0 result number 7ff8000000000000
+action 5 site 5 args 1 number 7ff8000000000000 result bool 0
+action 405 site 7 args 1 number 4000000000000000 result nil
+tick 2 time 4059000000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+action 5 site 2 args 1 nil result bool 0
+action 410 site 4 args 0 result number 7ff8000000000000
+action 5 site 5 args 1 number 7ff8000000000000 result bool 0
+action 405 site 7 args 1 number 4000000000000000 result number 0000000000000000
+action 401 site 8 args 1 number 4010000000000000 result void
+action 5 site 9 args 1 number 3fc0000000000000 result bool 0
+tick 3 time 4062c00000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+action 5 site 2 args 1 nil result bool 0
+action 410 site 4 args 0 result number 7ff8000000000000
+action 5 site 5 args 1 number 7ff8000000000000 result bool 0
+action 405 site 7 args 1 number 4000000000000000 result nil
+tick 4 time 4069000000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+action 5 site 2 args 1 nil result bool 0
+action 410 site 4 args 0 result number 7ff8000000000000
+action 5 site 5 args 1 number 7ff8000000000000 result bool 0
+action 405 site 7 args 1 number 4000000000000000 result number 0000000000000000
+action 401 site 8 args 1 number 4010000000000000 result void
+action 5 site 9 args 1 number 3fc0000000000000 result bool 0
+tick 5 time 406f400000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+action 5 site 2 args 1 nil result bool 0
+action 410 site 4 args 0 result number 7ff8000000000000
+action 5 site 5 args 1 number 7ff8000000000000 result bool 0
+action 405 site 7 args 1 number 4000000000000000 result nil
+tick 6 time 4072c00000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 1
+action 401 site 1 args 1 number 3ff0000000000000 result void
+action 5 site 2 args 1 nil result bool 0
+action 410 site 4 args 0 result number 7ff8000000000000
+action 5 site 5 args 1 number 7ff8000000000000 result bool 0
+action 405 site 7 args 1 number 4000000000000000 result number 0000000000000000
+action 401 site 8 args 1 number 4010000000000000 result void
+action 5 site 9 args 1 number 3fc0000000000000 result bool 0
+tick 7 time 4075e00000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+action 5 site 2 args 1 nil result bool 0
+action 410 site 4 args 0 result number 7ff8000000000000
+action 5 site 5 args 1 number 7ff8000000000000 result bool 0
+action 405 site 7 args 1 number 4000000000000000 result nil
+tick 8 time 4079000000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+action 5 site 2 args 1 nil result bool 0
+action 410 site 4 args 0 result number 7ff8000000000000
+action 5 site 5 args 1 number 7ff8000000000000 result bool 0
+action 405 site 7 args 1 number 4000000000000000 result number 0000000000000000
+action 401 site 8 args 1 number 4010000000000000 result void
+action 5 site 9 args 1 number 3fc0000000000000 result bool 0
+tick 9 time 407c200000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+action 5 site 2 args 1 nil result bool 0
+action 410 site 4 args 0 result number 7ff8000000000000
+action 5 site 5 args 1 number 7ff8000000000000 result bool 0
+action 405 site 7 args 1 number 4000000000000000 result nil
+tick a time 407f400000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+action 5 site 2 args 1 nil result bool 0
+action 410 site 4 args 0 result number 7ff8000000000000
+action 5 site 5 args 1 number 7ff8000000000000 result bool 0
+action 405 site 7 args 1 number 4000000000000000 result number 0000000000000000
+action 401 site 8 args 1 number 4010000000000000 result void
+action 5 site 9 args 1 number 3fc0000000000000 result bool 0
+tick b time 4081300000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 1
+action 401 site 1 args 1 number 3ff0000000000000 result void
+action 5 site 2 args 1 nil result bool 0
+action 410 site 4 args 0 result number 7ff8000000000000
+action 5 site 5 args 1 number 7ff8000000000000 result bool 0
+action 405 site 7 args 1 number 4000000000000000 result nil
+tick c time 4082c00000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+action 5 site 2 args 1 nil result bool 0
+action 410 site 4 args 0 result number 7ff8000000000000
+action 5 site 5 args 1 number 7ff8000000000000 result bool 0
+action 405 site 7 args 1 number 4000000000000000 result number 0000000000000000
+action 401 site 8 args 1 number 4010000000000000 result void
+action 5 site 9 args 1 number 3fc0000000000000 result bool 0
+tick d time 4084500000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+action 5 site 2 args 1 nil result bool 0
+action 410 site 4 args 0 result number 7ff8000000000000
+action 5 site 5 args 1 number 7ff8000000000000 result bool 0
+action 405 site 7 args 1 number 4000000000000000 result nil
+tick e time 4085e00000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+action 5 site 2 args 1 nil result bool 0
+action 410 site 4 args 0 result number 7ff8000000000000
+action 5 site 5 args 1 number 7ff8000000000000 result bool 0
+action 405 site 7 args 1 number 4000000000000000 result number 0000000000000000
+action 401 site 8 args 1 number 4010000000000000 result void
+action 5 site 9 args 1 number 3fc0000000000000 result bool 0
+tick f time 4087700000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+action 5 site 2 args 1 nil result bool 0
+action 410 site 4 args 0 result number 7ff8000000000000
+action 5 site 5 args 1 number 7ff8000000000000 result bool 0
+action 405 site 7 args 1 number 4000000000000000 result nil
+tick 10 time 4089000000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 1
+action 401 site 1 args 1 number 3ff0000000000000 result void
+action 5 site 2 args 1 nil result bool 0
+action 410 site 4 args 0 result number 7ff8000000000000
+action 5 site 5 args 1 number 7ff8000000000000 result bool 0
+action 405 site 7 args 1 number 4000000000000000 result number 0000000000000000
+action 401 site 8 args 1 number 4010000000000000 result void
+action 5 site 9 args 1 number 3fc0000000000000 result bool 0
+tick 11 time 408a900000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+action 5 site 2 args 1 nil result bool 0
+action 410 site 4 args 0 result number 7ff8000000000000
+action 5 site 5 args 1 number 7ff8000000000000 result bool 0
+action 405 site 7 args 1 number 4000000000000000 result nil
+tick 12 time 408c200000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+action 5 site 2 args 1 nil result bool 0
+action 410 site 4 args 0 result number 7ff8000000000000
+action 5 site 5 args 1 number 7ff8000000000000 result bool 0
+action 405 site 7 args 1 number 4000000000000000 result number 0000000000000000
+action 401 site 8 args 1 number 4010000000000000 result void
+action 5 site 9 args 1 number 3fc0000000000000 result bool 0
+tick 13 time 408db00000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+action 5 site 2 args 1 nil result bool 0
+action 410 site 4 args 0 result number 7ff8000000000000
+action 5 site 5 args 1 number 7ff8000000000000 result bool 0
+action 405 site 7 args 1 number 4000000000000000 result nil
+tick 14 time 408f400000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+action 5 site 2 args 1 nil result bool 0
+action 410 site 4 args 0 result number 7ff8000000000000
+action 5 site 5 args 1 number 7ff8000000000000 result bool 0
+action 405 site 7 args 1 number 4000000000000000 result number 0000000000000000
+action 401 site 8 args 1 number 4010000000000000 result void
+action 5 site 9 args 1 number 3fc0000000000000 result bool 0
+tick 15 time 4090680000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 1
+action 401 site 1 args 1 number 3ff0000000000000 result void
+action 5 site 2 args 1 nil result bool 1
+action 401 site 3 args 1 number 4000000000000000 result void
+action 410 site 4 args 0 result number 7ff8000000000000
+action 5 site 5 args 1 number 7ff8000000000000 result bool 0
+action 405 site 7 args 1 number 4000000000000000 result nil
+tick 16 time 4091300000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+action 5 site 2 args 1 nil result bool 0
+action 410 site 4 args 0 result number 7ff8000000000000
+action 5 site 5 args 1 number 7ff8000000000000 result bool 0
+action 405 site 7 args 1 number 4000000000000000 result number 0000000000000000
+action 401 site 8 args 1 number 4010000000000000 result void
+action 5 site 9 args 1 number 3fc0000000000000 result bool 0

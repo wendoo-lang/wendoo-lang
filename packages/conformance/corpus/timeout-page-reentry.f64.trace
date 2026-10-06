@@ -1,0 +1,55 @@
+mctrace 1
+profile 3e8
+precision f64
+tick 1 time 4049000000000000 dt 0000000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+tick 2 time 4059000000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+tick 3 time 4062c00000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+tick 4 time 4069000000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+tick 5 time 406f400000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+tick 6 time 4072c00000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 1
+action 0 site 1 args 2 number 4000000000000000 nil result void
+tick 7 time 4075e00000000000 dt 4049000000000000
+action 5 site 2 args 1 number 3fd0000000000000 result bool 0
+tick 8 time 4079000000000000 dt 4049000000000000
+action 5 site 2 args 1 number 3fd0000000000000 result bool 0
+tick 9 time 407c200000000000 dt 4049000000000000
+action 5 site 2 args 1 number 3fd0000000000000 result bool 0
+tick a time 407f400000000000 dt 4049000000000000
+action 5 site 2 args 1 number 3fd0000000000000 result bool 0
+tick b time 4081300000000000 dt 4049000000000000
+action 5 site 2 args 1 number 3fd0000000000000 result bool 0
+tick c time 4082c00000000000 dt 4049000000000000
+action 5 site 2 args 1 number 3fd0000000000000 result bool 1
+action 0 site 3 args 2 number 3ff0000000000000 nil result void
+tick d time 4084500000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+tick e time 4085e00000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+tick f time 4087700000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+tick 10 time 4089000000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+tick 11 time 408a900000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 0
+tick 12 time 408c200000000000 dt 4049000000000000
+action 5 site 0 args 1 number 3fd0000000000000 result bool 1
+action 0 site 1 args 2 number 4000000000000000 nil result void
+tick 13 time 408db00000000000 dt 4049000000000000
+action 5 site 2 args 1 number 3fd0000000000000 result bool 0
+tick 14 time 408f400000000000 dt 4049000000000000
+action 5 site 2 args 1 number 3fd0000000000000 result bool 0
+tick 15 time 4090680000000000 dt 4049000000000000
+action 5 site 2 args 1 number 3fd0000000000000 result bool 0
+tick 16 time 4091300000000000 dt 4049000000000000
+action 5 site 2 args 1 number 3fd0000000000000 result bool 0
+tick 17 time 4091f80000000000 dt 4049000000000000
+action 5 site 2 args 1 number 3fd0000000000000 result bool 0
+tick 18 time 4092c00000000000 dt 4049000000000000
+action 5 site 2 args 1 number 3fd0000000000000 result bool 1
+action 0 site 3 args 2 number 3ff0000000000000 nil result void

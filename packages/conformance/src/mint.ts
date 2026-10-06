@@ -12,7 +12,12 @@ import {
 } from "@wendoo/core/runtime";
 import { type CorpusCaseEntry, manifestEntry, programBinPath, programJsonPath, tracePath } from "./corpus";
 import { createConformanceEnvironment } from "./environment";
-import { CONFORMANCE_PROFILE_ID, CONFORMANCE_SCHEDULER_CONFIG, ConformanceWorld } from "./profile";
+import {
+  CONFORMANCE_PROFILE_ID,
+  CONFORMANCE_SCHEDULER_CONFIG,
+  ConformanceRandomStream,
+  ConformanceWorld,
+} from "./profile";
 import { ObservableTraceWriter, observableTraceVmEvents } from "./trace";
 
 /**
@@ -109,15 +114,16 @@ function linkCase(def: ConformanceCase): LinkedBrainProgram {
 
 /**
  * Replays `bytes` over `schedule` and returns the rendered observable trace.
- * The run reads nothing outside the decoded program, the schedule, and a fresh
- * {@link ConformanceWorld}.
+ * The run reads nothing outside the decoded program, the schedule, a fresh
+ * {@link ConformanceWorld}, and a fresh {@link ConformanceRandomStream} every
+ * random read draws from.
  *
  * @param bytes - Wire binary of the case's compiled program.
  * @param precision - Numeric precision the run computes and renders at.
  * @param schedule - Tick advances in milliseconds, one think per entry.
  */
 export function runTrace(bytes: Uint8Array, precision: NumberPrecision, schedule: readonly number[]): string {
-  const environment = createConformanceEnvironment(precision);
+  const environment = createConformanceEnvironment(precision, new ConformanceRandomStream());
   const decoded = linkedBrainProgramFromBytes(stream.byteArrayFromUint8Array(bytes), {
     precision,
     typeRegistry: environment.brainServices.runtime.types,

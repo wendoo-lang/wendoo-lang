@@ -3,6 +3,7 @@ import type {
   CreateHostActuatorOptions,
   CreateHostSensorOptions,
   ExecutionContext,
+  IRngServices,
   ReadonlyList,
   Value,
   WendooModule,
@@ -160,6 +161,30 @@ export const CONFORMANCE_ANCHOR_READING = { x: 1.5, y: 2.25 } as const;
  */
 export const CONFORMANCE_TARGET_READING = { first: 1.5, second: 8.5 } as const;
 
+/**
+ * The numbers a conformance run's random stream yields, in order, starting
+ * over from the first once the last has been drawn. Every draw lies in
+ * `[0, 1)` and is exactly representable at f32, so it reads as the same
+ * number at either precision.
+ */
+export const CONFORMANCE_RANDOM_DRAWS = [0.25, 0.875, 0, 0.5, 0.0625] as const;
+
+/**
+ * The random stream every random read of a conformance run draws from: the
+ * {@link CONFORMANCE_RANDOM_DRAWS} in order, cycling. A fresh instance starts
+ * at the first draw, so give each run its own.
+ */
+export class ConformanceRandomStream implements IRngServices {
+  private nextIndex = 0;
+
+  /** Returns the next declared draw and advances the stream, wrapping after the last. */
+  next(): number {
+    const draw = CONFORMANCE_RANDOM_DRAWS[this.nextIndex];
+    this.nextIndex = (this.nextIndex + 1) % CONFORMANCE_RANDOM_DRAWS.length;
+    return draw;
+  }
+}
+
 /** The mutable host object behind every `Anchor` value of one world. */
 export interface ConformanceAnchorObject {
   x: number;
@@ -211,6 +236,7 @@ export const ConformanceActionKeys = {
   DeferTarget: "sensor.conformance.defer-target",
   EmitAll: "actuator.conformance.emit-all",
   DestroyAnchor: "actuator.conformance.destroy-anchor",
+  NotANumber: "sensor.conformance.not-a-number",
 } as const;
 
 /**
@@ -284,6 +310,11 @@ export const ConformanceHostActions = {
     actionId: TARGET_ACTION_ID_BASE + 15,
     fnId: TARGET_FUNC_ID_BASE + 16,
   },
+  NotANumber: {
+    key: ConformanceActionKeys.NotANumber,
+    actionId: TARGET_ACTION_ID_BASE + 16,
+    fnId: TARGET_FUNC_ID_BASE + 18,
+  },
 } as const;
 
 /**
@@ -321,6 +352,7 @@ const deferAnchorCallDef = mkCallDef(bag());
 const deferTargetCallDef = mkCallDef(bag());
 const emitAllCallDef = mkCallDef(bag(repeated(AnonAny, { min: 0 })));
 const destroyAnchorCallDef = mkCallDef(bag());
+const notANumberCallDef = mkCallDef(bag());
 
 const kEchoValueSlotId = getSlotId(echoCallDef, AnonValue);
 const kDeferEchoValueSlotId = getSlotId(deferEchoCallDef, AnonValue);
@@ -705,6 +737,10 @@ function execDestroyAnchor(ctx: ExecutionContext): Value {
   return VOID_VALUE;
 }
 
+function execNotANumber(): Value {
+  return mkNumberValue(Number.NaN);
+}
+
 /** The number in field `fieldId` of a closed `Point` operand, or undefined when it carries none. */
 function pointFieldNumber(operand: Value | undefined, fieldId: number): number | undefined {
   if (!isStructValue(operand)) {
@@ -902,6 +938,18 @@ const destroyAnchorActuator = {
   metadata: { label: "destroy anchor" },
 } satisfies CreateHostActuatorOptions;
 
+const notANumberSensor = {
+  key: ConformanceHostActions.NotANumber.key,
+  actionId: ConformanceHostActions.NotANumber.actionId,
+  fnId: ConformanceHostActions.NotANumber.fnId,
+  callDef: notANumberCallDef,
+  fn: { exec: execNotANumber },
+  isAsync: false,
+  outputType: CoreTypeIds.Number,
+  inline: true,
+  metadata: { label: "not a number" },
+} satisfies CreateHostSensorOptions;
+
 const emitAllActuator = {
   key: ConformanceHostActions.EmitAll.key,
   actionId: ConformanceHostActions.EmitAll.actionId,
@@ -978,6 +1026,8 @@ const emitAllActuator = {
  *   argument slot is a repeated Any-typed value slot: compiled brain code
  *   gathers the tiles filling it, in source order, into one list value and
  *   passes the list in the dispatch's argument position.
+ * - `not a number()` -- synchronous inline sensor returning the number
+ *   not-a-number (NaN).
  * - `seek` -- literal tile carrying the `Mode` enum constant `seek`. `Mode`
  *   is the profile's program-local enum type (symbols `idle`, `seek`, `flee`,
  *   each valued by its own key), registered under the dynamic owner so its
@@ -1093,6 +1143,7 @@ export function conformanceModule(): WendooModule {
       api.registerHostSensor(createHostSensor(deferTargetSensor));
       api.registerHostActuator(createHostActuator(emitAllActuator));
       api.registerHostActuator(createHostActuator(destroyAnchorActuator));
+      api.registerHostSensor(createHostSensor(notANumberSensor));
       api.registerOperator({
         spec: {
           id: ConformanceOperators.DeferAdd.opId,

@@ -190,6 +190,10 @@
       "description": "A page change request naming no page -- an index outside the program's pages, or an id no page carries -- is a no-op: the active page stays active, keeps running, and loses no fiber."
     },
     {
+      "id": "random-sensor-draw",
+      "description": "The random sensor reads the next number of the host's random stream, a number from 0 up to but not including 1, at the profile's precision."
+    },
+    {
       "id": "repeated-arg-list-gather",
       "description": "The arguments filling one repeated value slot gather, in source order, into a single list value built with LIST_NEW and one LIST_PUSH per element."
     },
@@ -284,6 +288,18 @@
     {
       "id": "struct-value-render",
       "description": "A struct value in an observable position renders as its struct token: the field count in minimal hex, then one value token per field slot, in slot order."
+    },
+    {
+      "id": "timeout-sensor-bad-delay",
+      "description": "The timeout sensor reads false, leaving its timer as it was, when its delay slot holds a not-a-number or a value that is not a number; only an empty slot takes the default delay."
+    },
+    {
+      "id": "timeout-sensor-period",
+      "description": "The timeout sensor arms its timer at its first read with its delay in seconds, one when its slot is empty, reads true on the first think whose time reaches the armed time, and re-arms from that think."
+    },
+    {
+      "id": "timeout-sensor-reset",
+      "description": "The timeout sensor re-arms its timer and reads false when its call site was not read on the think before -- its page was entered again, or its rule did not run -- so a timer runs its full delay from each fresh start."
     },
     {
       "id": "try-catch-handler",

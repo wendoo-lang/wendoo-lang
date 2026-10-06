@@ -361,6 +361,14 @@
       "schedule": [16, 16, 16, 16]
     },
     {
+      "id": "random-sensor",
+      "source": "packages/conformance/src/cases/random-sensor.spec.ts",
+      "summary": "One call site of the random sensor read on every think, each reading the next number of the profile's declared draw list, cycling past its end.",
+      "behaviors": ["host-sync-action-call", "random-sensor-draw", "rule-when-empty"],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16, 16, 16, 16]
+    },
+    {
       "id": "string-operators",
       "source": "packages/conformance/src/cases/string-operators.spec.ts",
       "summary": "String concatenation and string equality over literals drawn from the program's string constant pool.",
@@ -563,6 +571,37 @@
       ],
       "precisions": ["f32", "f64"],
       "schedule": [16, 16, 16, 16, 16, 16]
+    },
+    {
+      "id": "timeout-page-reentry",
+      "source": "packages/conformance/src/cases/timeout-page-reentry.spec.ts",
+      "summary": "A two-page brain whose pages each switch to the other once their own timer runs out, pinning that a timer runs its full delay from every entry of its page.",
+      "behaviors": [
+        "page-switch",
+        "rule-when-gate-falsy",
+        "rule-when-gate-truthy",
+        "timeout-sensor-period",
+        "timeout-sensor-reset"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50]
+    },
+    {
+      "id": "timeout-sensor",
+      "source": "packages/conformance/src/cases/timeout-sensor.spec.ts",
+      "summary": "Timers read on one page: first firing exactly at the armed time, periodic re-firing, the default one-second delay, a not-a-number delay that never fires, and a timer re-armed on every read because its call site skips thinks.",
+      "behaviors": [
+        "child-rule-spawn",
+        "host-sync-sensor-result",
+        "rule-when-gate-falsy",
+        "rule-when-gate-truthy",
+        "rule-when-presence-gate",
+        "timeout-sensor-bad-delay",
+        "timeout-sensor-period",
+        "timeout-sensor-reset"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50]
     },
     {
       "id": "typed-value-observability",

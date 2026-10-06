@@ -65,6 +65,8 @@ export interface ConformanceTiles {
   readonly deferAnchor: IBrainTileDef;
   /** Inline asynchronous sensor tile of `defer target()`, returning a `Target` native struct value. */
   readonly deferTarget: IBrainTileDef;
+  /** Inline synchronous sensor tile of `not a number()`, returning the number not-a-number. */
+  readonly notANumber: IBrainTileDef;
   /** Accessor tile reading the `x` field of a `Point` struct value. */
   readonly pointX: IBrainTileDef;
   /** Accessor tile reading the `y` field of a `Point` struct value. */
@@ -132,6 +134,7 @@ export function conformanceTiles(environment: WendooEnvironment): ConformanceTil
     deferPoint: requireTile(environment, mkSensorTileId(ConformanceHostActions.DeferPoint.key)),
     deferAnchor: requireTile(environment, mkSensorTileId(ConformanceHostActions.DeferAnchor.key)),
     deferTarget: requireTile(environment, mkSensorTileId(ConformanceHostActions.DeferTarget.key)),
+    notANumber: requireTile(environment, mkSensorTileId(ConformanceHostActions.NotANumber.key)),
     pointX: requireTile(environment, mkAccessorTileId(CONFORMANCE_POINT_TYPE_ID, "x")),
     pointY: requireTile(environment, mkAccessorTileId(CONFORMANCE_POINT_TYPE_ID, "y")),
     anchorX: requireTile(environment, mkAccessorTileId(CONFORMANCE_ANCHOR_TYPE_ID, "x")),
@@ -160,6 +163,26 @@ export function corePageTiles(environment: WendooEnvironment): CorePageTiles {
     previousPage: requireTile(environment, mkSensorTileId(CoreHostActions.PreviousPage.key)),
     onPageEntered: requireTile(environment, mkSensorTileId(CoreHostActions.OnPageEntered.key)),
   };
+}
+
+/**
+ * Looks up the core module's `timeout` sensor tile in `environment`: a
+ * WHEN-side sensor taking an optional anonymous number of seconds.
+ *
+ * @param environment - Environment the core module is installed in.
+ */
+export function coreTimeoutTile(environment: WendooEnvironment): IBrainTileDef {
+  return requireTile(environment, mkSensorTileId(CoreHostActions.Timeout.key));
+}
+
+/**
+ * Looks up the core module's `random number` sensor tile in `environment`: a
+ * sensor taking no arguments, placeable on either side and inline.
+ *
+ * @param environment - Environment the core module is installed in.
+ */
+export function coreRandomTile(environment: WendooEnvironment): IBrainTileDef {
+  return requireTile(environment, mkSensorTileId(CoreHostActions.Random.key));
 }
 
 /** A freshly created one-page brain and the page its rules are authored on. */
