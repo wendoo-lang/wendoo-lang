@@ -98,14 +98,18 @@ reader has to ask what they mean.
 
 ## Temporary Files and Deletion Discipline
 
-Never run `rm -rf`, `rm -r`, or any recursive or wildcard deletion you compose
-yourself. No cleanup convenience justifies the risk of wiping unexamined
-content. Established package scripts that clean their own build output are
-unaffected; the ban is on deletion commands an agent writes.
+Clean up your own scratch before declaring work complete: every temporary
+file and directory you created is yours to delete, never to leave behind.
+The one banned command is `rm -rf` (or any force-recursive equivalent); a
+plain `rm -r` on a directory you created this session is allowed. No
+cleanup convenience justifies force-deleting unexamined content.
+Established package scripts that clean their own build output are
+unaffected.
 
 - Create temporary files in the session scratchpad, never in the repo tree.
-- Track every temporary file you create by exact path, and delete each one
-  individually (`rm <exact-path>`) when done with it.
+- Track what you create by exact path; delete files with `rm <exact-path>`
+  and your own directories with `rm -r <exact-path>`, never with `-f` and
+  never through a wildcard.
 - Never delete a file or directory you did not create this session.
 
 ## Build Outputs Are Never Tracked
