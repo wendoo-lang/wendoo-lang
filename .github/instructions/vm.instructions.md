@@ -166,7 +166,7 @@ Page activation calls `onPageEntered` for each `actionCallSites` entry (host-bac
 
 ## OperatorOverloads
 
-`OperatorOverloads.binary`/`unary` auto-register the `HostFn` in the `FunctionRegistry` under a generated name (`$$op_{op}_{types}_to_{resultType}`) and add the overload to the `OperatorTable`. Resolve with `OperatorOverloads.resolve(id, argTypes)`.
+`OperatorOverloads.binary`/`unary` auto-register the `HostFn` in the `FunctionRegistry` under a generated name (`$$op_{op}_{types}_to_{resultType}`) and add the overload to the `OperatorTable`. Before registering anything they refuse an operator id the table does not hold and an overload over operand types the operator already holds, by `OperatorOverloadErrorCode`; the earlier overload stands. Resolve with `OperatorOverloads.resolve(id, argTypes)`.
 
 ## TypeRegistry
 

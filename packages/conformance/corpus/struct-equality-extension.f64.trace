@@ -1,0 +1,15 @@
+mctrace 1
+profile 3e8
+precision f64
+tick 1 time 4030000000000000 dt 0000000000000000
+action 40a site 1 args 1 bool 1 result bool 1
+action 40a site 4 args 1 bool 0 result bool 0
+action 40a site 6 args 1 bool 0 result bool 0
+action 40a site 8 args 1 bool 0 result bool 0
+action 40a site a args 1 bool 0 result bool 0
+tick 2 time 4040000000000000 dt 4030000000000000
+action 40a site 1 args 1 bool 1 result bool 1
+action 40a site 4 args 1 bool 0 result bool 0
+action 40a site 6 args 1 bool 0 result bool 0
+action 40a site 8 args 1 bool 0 result bool 0
+action 40a site a args 1 bool 0 result bool 0

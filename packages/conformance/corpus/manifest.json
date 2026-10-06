@@ -480,6 +480,23 @@
       "schedule": [16, 16, 16, 16]
     },
     {
+      "id": "struct-equality-extension",
+      "source": "packages/conformance/src/cases/struct-equality-extension.spec.ts",
+      "summary": "The core equality operator over two struct operands, resolved to an overload the profile adds to it without re-declaring it, comparing equal and unequal structs and a struct variable holding nil on either side.",
+      "behaviors": [
+        "child-rule-spawn",
+        "child-rule-synchronous-cascade",
+        "host-sync-action-call",
+        "operator-overload-extension",
+        "operator-struct-overload",
+        "rule-when-empty",
+        "struct-constant-push",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
       "id": "struct-field-reads",
       "source": "packages/conformance/src/cases/struct-field-reads.spec.ts",
       "summary": "An asynchronous struct reading captured into a variable, with slot-indexed field reads feeding the emits and no struct value in an observable position.",

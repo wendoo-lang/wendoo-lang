@@ -46,7 +46,14 @@ import {
   VOID_VALUE,
 } from "@wendoo/core/app";
 import { BrainTileOperatorDef } from "@wendoo/core/brain/tiles";
-import { ErrorCode, safeNumBinary, TARGET_TYPE_ATOM_BASE } from "@wendoo/core/runtime";
+import {
+  CoreOpId,
+  ErrorCode,
+  FALSE_VALUE,
+  mkBooleanValue,
+  safeNumBinary,
+  TARGET_TYPE_ATOM_BASE,
+} from "@wendoo/core/runtime";
 
 /**
  * Numeric device-profile id written into the binary program envelope of every
@@ -356,6 +363,18 @@ export const ConformanceHostActions = {
 export const ConformanceOperators = {
   DeferAdd: { opId: "conformance.defer-add", fnId: TARGET_FUNC_ID_BASE + 9 },
   PointAdd: { opId: "conformance.point-add", fnId: TARGET_FUNC_ID_BASE + 17 },
+} as const;
+
+/**
+ * Overloads the conformance host profile adds to core operators, each with the
+ * id of the core operator it extends and the stable funcId of its host
+ * function. The funcIds continue the target partition offsets
+ * {@link ConformanceHostActions} and {@link ConformanceOperators} use, and
+ * serialized programs record them verbatim: append new records at the next
+ * free offset and never renumber or reuse one.
+ */
+export const ConformanceOperatorOverloads = {
+  PointEqual: { opId: CoreOpId.EqualTo, fnId: TARGET_FUNC_ID_BASE + 20 },
 } as const;
 
 const AnonValue = param(CoreParameterId.AnonymousNumber, { name: "value", anonymous: true });
@@ -806,6 +825,19 @@ function execPointAdd(ctx: ExecutionContext, args: ReadonlyList<Value>): Value {
   return mkPointValue(ctx, numerics.round(lhsX + rhsX), numerics.round(lhsY + rhsY));
 }
 
+function execPointEqual(_ctx: ExecutionContext, args: ReadonlyList<Value>): Value {
+  const lhs = args.get(kOperatorLhsSlotId);
+  const rhs = args.get(kOperatorRhsSlotId);
+  const lhsX = pointFieldNumber(lhs, ConformancePointField.X);
+  const lhsY = pointFieldNumber(lhs, ConformancePointField.Y);
+  const rhsX = pointFieldNumber(rhs, ConformancePointField.X);
+  const rhsY = pointFieldNumber(rhs, ConformancePointField.Y);
+  if (lhsX === undefined || lhsY === undefined || rhsX === undefined || rhsY === undefined) {
+    return FALSE_VALUE;
+  }
+  return mkBooleanValue(lhsX === rhsX && lhsY === rhsY);
+}
+
 function execDeferAdd(ctx: ExecutionContext, args: ReadonlyList<Value>, handle: AsyncHandle): void {
   const numerics = ctx.services.app.numerics;
   const sum = safeNumBinary(args, (a, b) => numerics.round(a + b));
@@ -1057,6 +1089,12 @@ const emitAllActuator = {
  *   operands, evaluating to a fresh closed `Point` carrying the fieldwise sums
  *   at the profile's precision. An operand carrying no `Point` reading
  *   evaluates nil.
+ * - `lhs == rhs` over two `Point` operands -- a synchronous overload the
+ *   profile adds to the core `eq` operator, which keeps its own tile, so no
+ *   tile of the profile's own stands for it. True exactly when both operands
+ *   carry `Point` readings whose `x` fields are equal numbers and whose `y`
+ *   fields are equal numbers at the profile's precision; an operand carrying
+ *   no `Point` reading, nil included, compares false.
  * - `defer point()` -- asynchronous inline sensor whose handle resolves to a
  *   fresh `Point` struct reading `{x: 1.5, y: 2.25}` exactly one tick after
  *   its dispatch. The struct is constructed at settle time, immediately
@@ -1255,6 +1293,15 @@ export function conformanceModule(): WendooModule {
           { placement: TilePlacement.EitherSide, metadata: { label: "point plus" } },
           api.brainServices
         )
+      );
+      api.brainServices.edit.operatorOverloads.binary(
+        ConformanceOperatorOverloads.PointEqual.opId,
+        CONFORMANCE_POINT_TYPE_ID,
+        CONFORMANCE_POINT_TYPE_ID,
+        CoreTypeIds.Boolean,
+        ConformanceOperatorOverloads.PointEqual.fnId,
+        { exec: execPointEqual },
+        false
       );
     },
   };

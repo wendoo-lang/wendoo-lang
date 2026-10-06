@@ -83,6 +83,17 @@ function argsKey(argTypes: TypeId[]): string {
   return argTypes.join("|");
 }
 
+/** Stable error codes thrown when an operator overload cannot be registered. */
+export const OperatorOverloadErrorCode = {
+  /** The overload names an operator id the operator table does not hold. */
+  UnknownOperator: "OPERATOR_OVERLOAD_UNKNOWN_OPERATOR",
+  /** The operator already holds an overload for the same operand types; that earlier overload stands. */
+  Duplicate: "OPERATOR_OVERLOAD_DUPLICATE",
+} as const;
+
+/** Union of all {@link OperatorOverloadErrorCode} values. */
+export type OperatorOverloadErrorCode = (typeof OperatorOverloadErrorCode)[keyof typeof OperatorOverloadErrorCode];
+
 /**
  * Represents a registered operator with multiple type-specific overloads.
  * Manages the collection of overloads for a single operator based on argument types.
@@ -201,6 +212,27 @@ export class OperatorOverloads implements IOperatorOverloads {
   }
 
   /**
+   * The registered operator `op`, checked to hold no overload for
+   * `argTypes` yet, before anything is registered for a new overload.
+   * Throws an error whose message starts with
+   * {@link OperatorOverloadErrorCode.UnknownOperator} when the table holds
+   * no operator `op`, or with {@link OperatorOverloadErrorCode.Duplicate}
+   * when it already holds an overload for `argTypes`.
+   */
+  private operatorOpenTo(op: OpId, argTypes: TypeId[]): IRegisteredOperator {
+    const reg = this.table_.get(op);
+    if (!reg) {
+      throw new Error(`${OperatorOverloadErrorCode.UnknownOperator}: no operator '${op}'`);
+    }
+    if (reg.get(argTypes)) {
+      throw new Error(
+        `${OperatorOverloadErrorCode.Duplicate}: operator '${op}' already has an overload for (${argsKey(argTypes)})`
+      );
+    }
+    return reg;
+  }
+
+  /**
    * Registers a binary operator overload with specific left-hand, right-hand, and result types.
    * @param op - The operator identifier
    * @param lhs - The type ID of the left operand
@@ -208,7 +240,9 @@ export class OperatorOverloads implements IOperatorOverloads {
    * @param resultType - The type ID of the operation result
    * @param fnId - Author-assigned stable funcId for the implementing host function
    * @returns The registered operator instance
-   * @throws {Error} If the operator is not found in the table
+   * @throws {Error} Coded {@link OperatorOverloadErrorCode.UnknownOperator} if the operator is not found in
+   *   the table, or {@link OperatorOverloadErrorCode.Duplicate} if it already has an overload for `lhs` and
+   *   `rhs`; either way nothing is registered
    */
   binary(
     op: OpId,
@@ -219,13 +253,9 @@ export class OperatorOverloads implements IOperatorOverloads {
     fn: HostFn,
     isAsync = false
   ): IRegisteredOperator {
+    const reg = this.operatorOpenTo(op, [lhs, rhs]);
     const fnName = `$$op_${op}_${lhs}_${rhs}_to_${resultType}`;
     const fnEntry = this.functions.register(fnId, fnName, isAsync, fn, binaryCallDef);
-
-    const reg = this.table_.get(op);
-    if (!reg) {
-      throw new Error(`No such op ${op}`);
-    }
     reg.add({
       argTypes: [lhs, rhs],
       resultType,
@@ -241,16 +271,14 @@ export class OperatorOverloads implements IOperatorOverloads {
    * @param resultType - The type ID of the operation result
    * @param fnId - Author-assigned stable funcId for the implementing host function
    * @returns The registered operator instance
-   * @throws {Error} If the operator is not found in the table
+   * @throws {Error} Coded {@link OperatorOverloadErrorCode.UnknownOperator} if the operator is not found in
+   *   the table, or {@link OperatorOverloadErrorCode.Duplicate} if it already has an overload for `arg`;
+   *   either way nothing is registered
    */
   unary(op: OpId, arg: TypeId, resultType: TypeId, fnId: number, fn: HostFn, isAsync = false): IRegisteredOperator {
+    const reg = this.operatorOpenTo(op, [arg]);
     const fnName = `$$op_${op}_${arg}_to_${resultType}`;
     const fnEntry = this.functions.register(fnId, fnName, isAsync, fn, unaryCallDef);
-
-    const reg = this.table_.get(op);
-    if (!reg) {
-      throw new Error(`No such op ${op}`);
-    }
     reg.add({
       argTypes: [arg],
       resultType,

@@ -90,7 +90,9 @@ export interface IOperatorOverloads {
   table(): IOperatorTable;
   /**
    * Register a binary overload whose host function registers under the
-   * author-assigned stable `fnId`.
+   * author-assigned stable `fnId`. Throws, registering nothing, when `op` is
+   * not in the table or already has an overload for `lhs` and `rhs`; the
+   * error message starts with the `OperatorOverloadErrorCode` naming which.
    */
   binary(
     op: OpId,
@@ -103,7 +105,9 @@ export interface IOperatorOverloads {
   ): IRegisteredOperator;
   /**
    * Register a unary overload whose host function registers under the
-   * author-assigned stable `fnId`.
+   * author-assigned stable `fnId`. Throws, registering nothing, when `op` is
+   * not in the table or already has an overload for `arg`; the error message
+   * starts with the `OperatorOverloadErrorCode` naming which.
    */
   unary(op: OpId, arg: TypeId, result: TypeId, fnId: number, fn: HostFn, isAsync: boolean): IRegisteredOperator;
   remove(op: OpId, argTypes: TypeId[]): boolean;

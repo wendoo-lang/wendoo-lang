@@ -166,6 +166,10 @@
       "description": "Logical `and` and `or` evaluate as a branch over a duplicated left operand rather than a host call, and leave the operand that decided the result on the stack."
     },
     {
+      "id": "operator-overload-extension",
+      "description": "An overload added to a core operator without re-declaring it resolves by operand type through the core operator's own tile and dispatches its host function, which receives an operand of the declared type holding nil as nil."
+    },
+    {
       "id": "operator-string-compare",
       "description": "String concatenation and string equality operate on string operands."
     },
