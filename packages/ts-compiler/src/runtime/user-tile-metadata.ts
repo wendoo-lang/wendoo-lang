@@ -209,7 +209,13 @@ function buildOutputTiles(
       docsMarkdown: output.docs,
       tags: output.tags,
     };
-    outputTiles.push(new BrainTileOutputDef(typeId, output.name, { metadata, namespace: program.projectNamespace }));
+    outputTiles.push(
+      new BrainTileOutputDef(typeId, output.name, {
+        metadata,
+        namespace: program.projectNamespace,
+        writableResult: output.writableResult,
+      })
+    );
   }
   return outputTiles;
 }

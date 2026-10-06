@@ -233,6 +233,12 @@ export interface ExtractedOutput {
   icon?: string;
   docs?: string;
   tags?: string[];
+  /**
+   * When true, the output's value is a writable l-value: a brain may write a
+   * field through the output's tile. Absent when the config declares none,
+   * which reads as false.
+   */
+  writableResult?: boolean;
 }
 
 /** Modifier arg spec extracted from a `modifier(...)` call. */

@@ -18,6 +18,50 @@
       "schedule": [16, 16, 16, 16, 16, 16, 16]
     },
     {
+      "id": "action-output-field-write",
+      "source": "packages/conformance/src/cases/action-output-field-write.spec.ts",
+      "summary": "A field assignment through the tile of a writable-result output, observed in place on the struct the output holds by the rules below it, with the struct's other field untouched and the next run writing a fresh struct.",
+      "behaviors": [
+        "action-output-field-write",
+        "action-output-read",
+        "child-rule-spawn",
+        "child-rule-synchronous-cascade",
+        "host-sync-sensor-result",
+        "root-rule-respawn",
+        "struct-field-access"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
+      "id": "action-output-field-write-rejected",
+      "source": "packages/conformance/src/cases/action-output-field-write-rejected.spec.ts",
+      "summary": "A field assignment through the tile of an output not declared writable-result, refused at compile time so the program carries no store and the rule below reads the field the sensor wrote.",
+      "behaviors": [
+        "action-output-field-write-rejected",
+        "action-output-read",
+        "child-rule-spawn",
+        "host-sync-sensor-result",
+        "root-rule-respawn"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
+      "id": "action-output-read",
+      "source": "packages/conformance/src/cases/action-output-read.spec.ts",
+      "summary": "A sensor writing a fresh struct to each of its two named outputs on every run, each output read back through its tile in the sensor's rule and in a child rule.",
+      "behaviors": [
+        "action-output-read",
+        "child-rule-spawn",
+        "host-sync-sensor-result",
+        "root-rule-respawn",
+        "struct-field-access"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
       "id": "arithmetic-and-gate",
       "source": "packages/conformance/src/cases/arithmetic-and-gate.spec.ts",
       "summary": "Number arithmetic through the core operator host calls, behind a truthy and a falsy WHEN gate.",

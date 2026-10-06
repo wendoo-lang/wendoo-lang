@@ -3,10 +3,10 @@ import { type BrainTileDefCreateOptions, TilePlacement } from "../interfaces";
 import { BrainTileDefBase } from "../model/tiledef";
 
 /**
- * Tile definition for an action output value-tile: an inline, read-only value
- * exposed by an action's declared output. The tile reads the backing rule
- * variable keyed by {@link mkOutputVarKey} (`__out.<outputType>.<name>`), which
- * the action writes via `setSensorOutput`.
+ * Tile definition for an action output value-tile: an inline value exposed by
+ * an action's declared output. The tile reads the backing rule variable keyed
+ * by {@link mkOutputVarKey} (`__out.<outputType>.<name>`), which the action
+ * writes via `setSensorOutput`.
  *
  * Identity is the `(outputType, name)` pair: two actions declaring the same
  * identity produce the same {@link mkOutputTileId tile id} and therefore one
@@ -33,6 +33,12 @@ export class BrainTileOutputDef extends BrainTileDefBase {
   readonly outputKey: string;
 
   /**
+   * When true, the output's value is a writable l-value: a field write through
+   * this tile is permitted. Defaults to false, making the value read-only.
+   */
+  readonly writableResult: boolean;
+
+  /**
    * @param outputType - the resolved {@link TypeId} of the output value
    * @param outputName - the bare output name declared on the sensor
    */
@@ -44,6 +50,7 @@ export class BrainTileOutputDef extends BrainTileDefBase {
     this.outputType = outputType;
     this.namespace = opts.namespace;
     this.outputKey = mkOutputVarKey(outputType, identityName);
+    this.writableResult = opts.writableResult ?? false;
   }
 }
 
@@ -65,6 +72,7 @@ export function buildDescriptorOutputTiles(outputs: readonly ActionOutputSpec[])
           docsMarkdown: output.docsMarkdown,
           tags: output.tags,
         },
+        writableResult: output.writableResult,
       })
     );
   }

@@ -281,6 +281,25 @@ export function assertCompiledOps(
   }
 }
 
+/**
+ * The `number <bits>` value token of `value` at `precision`, as the trace
+ * renders it: the raw IEEE bit pattern in lowercase hex, eight digits at f32
+ * and sixteen at f64.
+ *
+ * @param value - Number the token renders.
+ * @param precision - Precision the trace renders numbers at.
+ */
+export function numberToken(value: number, precision: NumberPrecision): string {
+  if (precision === "f32") {
+    const view = new DataView(new ArrayBuffer(4));
+    view.setFloat32(0, value);
+    return `number ${view.getUint32(0).toString(16).padStart(8, "0")}`;
+  }
+  const view = new DataView(new ArrayBuffer(8));
+  view.setFloat64(0, value);
+  return `number ${view.getUint32(0).toString(16).padStart(8, "0")}${view.getUint32(4).toString(16).padStart(8, "0")}`;
+}
+
 /** The lines of `trace` that begin with `prefix`, in emission order. */
 export function traceLines(trace: string, prefix: string): string[] {
   return trace.split("\n").filter((line) => line.startsWith(prefix));

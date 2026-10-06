@@ -258,6 +258,12 @@ export interface ActionOutputSpec {
   iconUrl?: string;
   docsMarkdown?: string;
   tags?: readonly string[];
+  /**
+   * When true, the output's value is a writable l-value: a field write through
+   * the output's tile is permitted. Defaults to false, making the value
+   * read-only.
+   */
+  writableResult?: boolean;
 }
 
 /** Static metadata for a registered action: its key, kind, call grammar, async flag, named outputs, and (for sensors) output type. */

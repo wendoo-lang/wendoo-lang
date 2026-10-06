@@ -13,6 +13,7 @@ import {
   BitSet,
   BrainTileLiteralDef,
   bag,
+  buildDescriptorOutputTiles,
   CoreCapabilityBits,
   CoreParameterId,
   CoreTypeIds,
@@ -36,9 +37,11 @@ import {
   type StructTypeDef,
   type StructValue,
   setCallSiteState,
+  setSensorOutput,
   TARGET_ACTION_ID_BASE,
   TARGET_FUNC_ID_BASE,
   TilePlacement,
+  TRUE_VALUE,
   TypeUtils,
   VOID_VALUE,
 } from "@wendoo/core/app";
@@ -170,6 +173,26 @@ export const CONFORMANCE_TARGET_READING = { first: 1.5, second: 8.5 } as const;
 export const CONFORMANCE_RANDOM_DRAWS = [0.25, 0.875, 0, 0.5, 0.0625] as const;
 
 /**
+ * Names of the two `Point` outputs `point outputs` declares: `open`, declared
+ * `writableResult`, and `sealed`, not. Each name, with the `Point` type,
+ * forms the output's identity.
+ */
+export const ConformancePointOutputName = {
+  Open: "open",
+  Sealed: "sealed",
+} as const;
+
+/**
+ * Field values of the fresh `Point` structs `point outputs` writes to its
+ * outputs on every run. Every value is exactly representable at f32, and
+ * distinct from every other reading the profile produces.
+ */
+export const CONFORMANCE_POINT_OUTPUTS_READING = {
+  open: { x: 5.5, y: -1.5 },
+  sealed: { x: 6.25, y: 0.75 },
+} as const;
+
+/**
  * The random stream every random read of a conformance run draws from: the
  * {@link CONFORMANCE_RANDOM_DRAWS} in order, cycling. A fresh instance starts
  * at the first draw, so give each run its own.
@@ -237,6 +260,7 @@ export const ConformanceActionKeys = {
   EmitAll: "actuator.conformance.emit-all",
   DestroyAnchor: "actuator.conformance.destroy-anchor",
   NotANumber: "sensor.conformance.not-a-number",
+  PointOutputs: "sensor.conformance.point-outputs",
 } as const;
 
 /**
@@ -315,6 +339,11 @@ export const ConformanceHostActions = {
     actionId: TARGET_ACTION_ID_BASE + 16,
     fnId: TARGET_FUNC_ID_BASE + 18,
   },
+  PointOutputs: {
+    key: ConformanceActionKeys.PointOutputs,
+    actionId: TARGET_ACTION_ID_BASE + 17,
+    fnId: TARGET_FUNC_ID_BASE + 19,
+  },
 } as const;
 
 /**
@@ -353,6 +382,7 @@ const deferTargetCallDef = mkCallDef(bag());
 const emitAllCallDef = mkCallDef(bag(repeated(AnonAny, { min: 0 })));
 const destroyAnchorCallDef = mkCallDef(bag());
 const notANumberCallDef = mkCallDef(bag());
+const pointOutputsCallDef = mkCallDef(bag());
 
 const kEchoValueSlotId = getSlotId(echoCallDef, AnonValue);
 const kDeferEchoValueSlotId = getSlotId(deferEchoCallDef, AnonValue);
@@ -741,6 +771,18 @@ function execNotANumber(): Value {
   return mkNumberValue(Number.NaN);
 }
 
+function execPointOutputs(ctx: ExecutionContext): Value {
+  const { open, sealed } = CONFORMANCE_POINT_OUTPUTS_READING;
+  setSensorOutput(ctx, CONFORMANCE_POINT_TYPE_ID, ConformancePointOutputName.Open, mkPointValue(ctx, open.x, open.y));
+  setSensorOutput(
+    ctx,
+    CONFORMANCE_POINT_TYPE_ID,
+    ConformancePointOutputName.Sealed,
+    mkPointValue(ctx, sealed.x, sealed.y)
+  );
+  return TRUE_VALUE;
+}
+
 /** The number in field `fieldId` of a closed `Point` operand, or undefined when it carries none. */
 function pointFieldNumber(operand: Value | undefined, fieldId: number): number | undefined {
   if (!isStructValue(operand)) {
@@ -950,6 +992,21 @@ const notANumberSensor = {
   metadata: { label: "not a number" },
 } satisfies CreateHostSensorOptions;
 
+const pointOutputsSensor = {
+  key: ConformanceHostActions.PointOutputs.key,
+  actionId: ConformanceHostActions.PointOutputs.actionId,
+  fnId: ConformanceHostActions.PointOutputs.fnId,
+  callDef: pointOutputsCallDef,
+  fn: { exec: execPointOutputs },
+  isAsync: false,
+  outputType: CoreTypeIds.Boolean,
+  outputs: [
+    { name: ConformancePointOutputName.Open, type: CONFORMANCE_POINT_TYPE_ID, writableResult: true },
+    { name: ConformancePointOutputName.Sealed, type: CONFORMANCE_POINT_TYPE_ID },
+  ],
+  metadata: { label: "point outputs" },
+} satisfies CreateHostSensorOptions;
+
 const emitAllActuator = {
   key: ConformanceHostActions.EmitAll.key,
   actionId: ConformanceHostActions.EmitAll.actionId,
@@ -1028,6 +1085,12 @@ const emitAllActuator = {
  *   passes the list in the dispatch's argument position.
  * - `not a number()` -- synchronous inline sensor returning the number
  *   not-a-number (NaN).
+ * - `point outputs()` -- synchronous sensor returning `true`, which on every
+ *   run first writes two fresh `Point` structs to its two declared `Point`
+ *   outputs: `{x: 5.5, y: -1.5}` to `open`, declared `writableResult`, so a
+ *   brain may write a field through its tile, and `{x: 6.25, y: 0.75}` to
+ *   `sealed`, whose value is read-only. Each output's tile reads the struct in
+ *   the sensor's rule and the rules below it.
  * - `seek` -- literal tile carrying the `Mode` enum constant `seek`. `Mode`
  *   is the profile's program-local enum type (symbols `idle`, `seek`, `flee`,
  *   each valued by its own key), registered under the dynamic owner so its
@@ -1144,6 +1207,11 @@ export function conformanceModule(): WendooModule {
       api.registerHostActuator(createHostActuator(emitAllActuator));
       api.registerHostActuator(createHostActuator(destroyAnchorActuator));
       api.registerHostSensor(createHostSensor(notANumberSensor));
+      const pointOutputs = createHostSensor(pointOutputsSensor);
+      api.registerHostSensor(pointOutputs);
+      for (const outputTile of buildDescriptorOutputTiles(pointOutputs.descriptor.outputs ?? [])) {
+        api.registerTile(outputTile);
+      }
       api.registerOperator({
         spec: {
           id: ConformanceOperators.DeferAdd.opId,

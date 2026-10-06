@@ -21,9 +21,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { IBrainDef, WendooEnvironment } from "@wendoo/core/app";
-import { CoreOpId, NativeType, type NumberPrecision, Op } from "@wendoo/core/runtime";
+import { CoreOpId, NativeType, Op } from "@wendoo/core/runtime";
 import { appendDo, appendWhen, conformanceTiles, newBrain, operatorTile, pointVariable } from "../authoring";
-import { assertCaseIsStable, assertCompiledOps, eventKinds, mintCase, traceEventsByTick, traceLines } from "../mint";
+import {
+  assertCaseIsStable,
+  assertCompiledOps,
+  eventKinds,
+  mintCase,
+  numberToken,
+  traceEventsByTick,
+  traceLines,
+} from "../mint";
 import {
   CONFORMANCE_POINT_CONSTANT,
   CONFORMANCE_POINT_TYPE_ID,
@@ -32,18 +40,6 @@ import {
 } from "../profile";
 
 const CASE_ID = "struct-constant-render";
-
-/** The `number <bits>` token of `value` at `precision`, as the trace renders it. */
-function numberToken(value: number, precision: NumberPrecision): string {
-  if (precision === "f32") {
-    const view = new DataView(new ArrayBuffer(4));
-    view.setFloat32(0, value);
-    return `number ${view.getUint32(0).toString(16).padStart(8, "0")}`;
-  }
-  const view = new DataView(new ArrayBuffer(8));
-  view.setFloat64(0, value);
-  return `number ${view.getUint32(0).toString(16).padStart(8, "0")}${view.getUint32(4).toString(16).padStart(8, "0")}`;
-}
 
 function build(environment: WendooEnvironment): IBrainDef {
   const tiles = conformanceTiles(environment);

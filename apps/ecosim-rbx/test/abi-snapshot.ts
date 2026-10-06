@@ -232,6 +232,7 @@ export function snapshotTile(tile: IBrainTileDef): JsonValue {
     snapshot.outputName = tile.outputName;
     snapshot.outputType = tile.outputType;
     snapshot.namespace = tile.namespace ?? null;
+    snapshot.writableResult = tile.writableResult;
   }
 
   return snapshot;

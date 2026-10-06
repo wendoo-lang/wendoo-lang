@@ -24,7 +24,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { IBrainDef, WendooEnvironment } from "@wendoo/core/app";
-import { CoreFuncId, CoreOpId, type NumberPrecision, Op } from "@wendoo/core/runtime";
+import { CoreFuncId, CoreOpId, Op } from "@wendoo/core/runtime";
 import {
   appendDo,
   booleanLiteral,
@@ -35,7 +35,7 @@ import {
   operatorTile,
   stringLiteral,
 } from "../authoring";
-import { assertCaseIsStable, assertCompiledOps, mintCase, traceLines } from "../mint";
+import { assertCaseIsStable, assertCompiledOps, mintCase, numberToken, traceLines } from "../mint";
 import { ConformanceHostActions } from "../profile";
 
 const CASE_ID = "implicit-conversions";
@@ -48,18 +48,6 @@ const TEXT_TOKENS = ['string "7"', 'string "false"', 'string "a7"'] as const;
 
 /** The rendered bool token of each emit-flag rule, in rule order, post-conversion. */
 const FLAG_TOKENS = ["bool 1", "bool 0", "bool 1", "bool 0"] as const;
-
-/** The `number <bits>` token of `value` at `precision`, as the trace renders it. */
-function numberToken(value: number, precision: NumberPrecision): string {
-  if (precision === "f32") {
-    const view = new DataView(new ArrayBuffer(4));
-    view.setFloat32(0, value);
-    return `number ${view.getUint32(0).toString(16).padStart(8, "0")}`;
-  }
-  const view = new DataView(new ArrayBuffer(8));
-  view.setFloat64(0, value);
-  return `number ${view.getUint32(0).toString(16).padStart(8, "0")}${view.getUint32(4).toString(16).padStart(8, "0")}`;
-}
 
 function build(environment: WendooEnvironment): IBrainDef {
   const tiles = conformanceTiles(environment);

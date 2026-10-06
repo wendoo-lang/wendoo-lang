@@ -63,8 +63,9 @@ function markParenGroup(expr: Expr, state: ParenGroupState): void {
 /**
  * Build the diagnostic message and params for an assignment whose target is a
  * writable field hanging off a read-only base. Names the specific read-only
- * element in the access chain: a read-only field, or a sensor whose result is
- * read-only. `params` is undefined when the chain bottoms out at neither.
+ * element in the access chain: a read-only field, a sensor whose result is
+ * read-only, or an output whose value is read-only. `params` is undefined when
+ * the chain bottoms out at none of these.
  */
 function describeReadOnlyResultAssignment(
   target: FieldAccessExpr,
@@ -89,6 +90,13 @@ function describeReadOnlyResultAssignment(
     return {
       message: `Cannot assign to a field of "${sensorLabel}" because its result is read-only`,
       params: { tileId: cur.tileDef.tileId, tileLabel: sensorLabel },
+    };
+  }
+  if (cur.kind === "output") {
+    const outputLabel = tileSentenceWord(cur.tileDef, localizer);
+    return {
+      message: `Cannot assign to a field of "${outputLabel}" because its value is read-only`,
+      params: { tileId: cur.tileDef.tileId, tileLabel: outputLabel },
     };
   }
   return { message: `Cannot assign to a field of a read-only value` };

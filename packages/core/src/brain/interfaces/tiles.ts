@@ -123,9 +123,10 @@ export interface BrainTileDefCreateOptions {
    */
   consumesWhenResult?: TypeId;
   /**
-   * When true (sensors only), the sensor's returned value is a writable l-value:
-   * a field write on its result is permitted. Defaults to false, making the
-   * result read-only. Ignored on non-sensor tiles.
+   * When true (sensors and outputs only), the tile's value -- a sensor's
+   * returned value, an output's stored value -- is a writable l-value: a field
+   * write on it is permitted. Defaults to false, making the value read-only.
+   * Ignored on other tiles.
    */
   writableResult?: boolean;
   metadata?: ITileMetadata;

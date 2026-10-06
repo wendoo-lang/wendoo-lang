@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import { before, describe, test } from "node:test";
-import type { BrainServices } from "@wendoo/core/brain";
-import { __test__createBrainServices } from "@wendoo/core/brain/__test__";
-import { CoreTypeIds, mkOutputTileId, mkOutputVarKey } from "@wendoo/core/runtime";
+import { type BrainServices, mkAccessorTileId, mkOperatorTileId, mkVariableTileId } from "@wendoo/core/brain";
+import { __test__appendTile, __test__createBrainServices } from "@wendoo/core/brain/__test__";
+import { BrainDef, type BrainRuleDef } from "@wendoo/core/brain/model";
+import { BrainTileLiteralDef, type BrainTileOutputDef, BrainTileVariableDef } from "@wendoo/core/brain/tiles";
+import { CoreOpId, CoreTypeIds, extractNumberValue, mkOutputTileId, mkOutputVarKey } from "@wendoo/core/runtime";
 import { buildCompiledActionBundle } from "../runtime/action-bundle.js";
+import { registerUserTile } from "../runtime/registration-bridge.js";
+import { buildUserTileMetadata } from "../runtime/user-tile-metadata.js";
 import { TEST_PROJECT_NAMESPACE } from "../testing/index.js";
 import { expectDiagnostic } from "../testsupport/diag-coverage.js";
 import { buildAmbientDeclarations } from "./ambient.js";
@@ -298,5 +302,158 @@ describe("derived output tiles", () => {
     assert.ok(bundle.tiles.some((t) => t.tileId === mkOutputTileId(CoreTypeIds.String, scopedValue)));
     assert.ok(bundle.tiles.some((t) => t.tileId === mkOutputTileId(CoreTypeIds.Number, scopedValue)));
     assert.notEqual(mkOutputVarKey(CoreTypeIds.String, scopedValue), mkOutputVarKey(CoreTypeIds.Number, scopedValue));
+  });
+});
+
+/** A user-declared struct type the writable-output sensor writes. */
+const SPOT_SOURCE = `import { NumberType, StructType, type StructOf } from "wendoo";
+
+export const Spot = StructType({
+  name: "spot",
+  fields: { x: NumberType, y: NumberType },
+  accessors: true,
+});
+export type Spot = StructOf<typeof Spot>;
+`;
+
+/** A sensor writing a fresh `Spot` to two outputs: `found`, declared writableResult, and `seen`, not. */
+const LOCATE_SOURCE = `import { Sensor, setOutput, type Context } from "wendoo";
+import { Spot } from "./spot";
+
+export default Sensor({
+  id: "snlocate",
+  name: "locate",
+  outputs: [
+    { name: "found", type: Spot, writableResult: true },
+    { name: "seen", type: Spot },
+  ],
+  onExecute(ctx: Context): boolean {
+    setOutput(ctx, "found", Spot({ x: 3, y: 4 }));
+    setOutput(ctx, "seen", Spot({ x: 3, y: 4 }));
+    return true;
+  },
+});
+`;
+
+describe("writableResult outputs", () => {
+  before(() => {
+    services = __test__createBrainServices();
+  });
+
+  test("an output's writableResult is carried onto the compiled program; an absent flag stays absent", () => {
+    const result = compileProject({
+      "rx.ts": sensorSource(
+        "snrx",
+        "rx",
+        `[{ name: "live", type: "number", writableResult: true }, { name: "off", type: "number", writableResult: false }, { name: "plain", type: "number" }]`,
+        ``
+      ),
+    });
+    const entry = result.results.get("rx.ts");
+    assert.ok(entry?.program, `expected a compiled program: ${JSON.stringify(entry?.diagnostics)}`);
+    const outputs = entry.program.outputs ?? [];
+    assert.equal(outputs[0].writableResult, true);
+    assert.equal(outputs[1].writableResult, false);
+    assert.ok(!("writableResult" in outputs[2]), "an output declaring no flag carries none");
+  });
+
+  test("a non-boolean output writableResult is diagnosed", () => {
+    const result = compileProject({
+      "bad.ts": sensorSource("snbad", "bad", `[{ name: "value", type: "number", writableResult: 1 as any }]`, ``),
+    });
+    const entry = result.results.get("bad.ts");
+    assert.ok(entry);
+    assert.ok(entry.diagnostics.some((d) => d.code === DescriptorDiagCode.OutputWritableResultMustBeBoolean));
+  });
+
+  test("the derived output tile carries the declared writableResult", () => {
+    const result = compileProject({
+      "rx.ts": sensorSource(
+        "snrx",
+        "rx",
+        `[{ name: "live", type: "number", writableResult: true }, { name: "plain", type: "number" }]`,
+        ``
+      ),
+    });
+    const bundle = buildCompiledActionBundle(result, { services });
+    assert.ok(bundle);
+    const tileFor = (name: string) =>
+      bundle.tiles.find(
+        (t) => t.tileId === mkOutputTileId(CoreTypeIds.Number, scopedOutputName(TEST_PROJECT_NAMESPACE, name))
+      ) as BrainTileOutputDef | undefined;
+    assert.equal(tileFor("live")?.writableResult, true);
+    assert.equal(tileFor("plain")?.writableResult, false);
+  });
+
+  /**
+   * Compiles the `locate` sensor, registers it, and runs one think of a brain
+   * whose rule writes `x` through the named output and whose child rule reads
+   * `x` back through the same output into a number variable. Returns the
+   * variable's value.
+   */
+  function writeThroughOutputAndReadBack(outputName: string): number | undefined {
+    const brainServices = __test__createBrainServices();
+    const ambientSource = buildAmbientDeclarations(brainServices.runtime.types);
+    const project = new UserTileProject({
+      projectNamespace: TEST_PROJECT_NAMESPACE,
+      ambientFiles: [{ path: "ambient.d.ts", content: ambientSource }],
+      services: brainServices,
+    });
+    project.setFiles(new Map(Object.entries({ "spot.ts": SPOT_SOURCE, "locate.ts": LOCATE_SOURCE })));
+    const result = project.compileAll();
+    assert.equal(result.tsErrors.size, 0, `TS errors: ${JSON.stringify([...result.tsErrors])}`);
+    const entry = result.results.get("locate.ts");
+    assert.ok(entry?.program, `expected a compiled program: ${JSON.stringify(entry?.diagnostics)}`);
+    assert.deepEqual(entry.diagnostics, []);
+    const program = entry.program;
+    registerUserTile(program, brainServices);
+
+    const metadata = buildUserTileMetadata(program, (name) => brainServices.runtime.types.resolveByName(name));
+    assert.ok(metadata);
+    const outputTile = metadata.outputTiles.find((tile) => tile.outputName === outputName);
+    assert.ok(outputTile, `expected an output tile named ${outputName}`);
+    const xAccessor = brainServices.edit.tiles.get(mkAccessorTileId(outputTile.outputType, "x"));
+    assert.ok(xAccessor, "expected the spot's x accessor tile");
+    const assign = brainServices.edit.tiles.get(mkOperatorTileId(CoreOpId.Assign));
+    assert.ok(assign);
+    const readBack = new BrainTileVariableDef(
+      mkVariableTileId("read-back"),
+      "read-back",
+      CoreTypeIds.Number,
+      "read-back"
+    );
+
+    const brainDef = new BrainDef(brainServices);
+    const pageResult = brainDef.appendNewPage();
+    assert.ok(pageResult.success);
+    const rule = pageResult.value!.page.children().get(0) as BrainRuleDef;
+    __test__appendTile(rule.when(), metadata.actionTile as never);
+    for (const tile of [
+      outputTile,
+      xAccessor,
+      assign,
+      new BrainTileLiteralDef(CoreTypeIds.Number, 9, {}, brainServices),
+    ]) {
+      __test__appendTile(rule.do(), tile as never);
+    }
+    const child = rule.appendNewRule();
+    for (const tile of [readBack, assign, outputTile, xAccessor]) {
+      __test__appendTile(child.do(), tile as never);
+    }
+
+    const brain = brainDef.compile();
+    brain.initialize();
+    brain.startup();
+    brain.think(16);
+    const value = brain.getVariable("read-back");
+    return value === undefined ? undefined : extractNumberValue(value);
+  }
+
+  test("a compiled user sensor's writableResult output is a writable base end to end", () => {
+    assert.equal(writeThroughOutputAndReadBack("found"), 9, "the child rule reads the field the parent wrote");
+  });
+
+  test("a compiled user sensor's plain output stays read-only: the write is refused and the field keeps its value", () => {
+    assert.equal(writeThroughOutputAndReadBack("seen"), 3, "the child rule reads the value the sensor wrote");
   });
 });

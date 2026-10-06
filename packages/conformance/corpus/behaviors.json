@@ -6,6 +6,18 @@
       "description": "Per-callsite host state and state slots persist across thinks at one call site and survive page reactivation."
     },
     {
+      "id": "action-output-field-write",
+      "description": "A field assignment through the tile of an output declared writable-result reads the output's rule variable and stores the field in place, so later reads of the output in that rule and the rules below it see the write."
+    },
+    {
+      "id": "action-output-field-write-rejected",
+      "description": "A field assignment through the tile of an output not declared writable-result is refused at compile time: the program carries no store for it, and the output keeps the value the action wrote."
+    },
+    {
+      "id": "action-output-read",
+      "description": "A host action's named output, written by the action's body on its run, reads back through the output's tile in the action's rule and the rules below it."
+    },
+    {
       "id": "async-handle-cancel",
       "description": "A cancelled handle throws Cancelled in the fiber awaiting it."
     },

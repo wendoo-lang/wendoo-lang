@@ -68,7 +68,7 @@ export enum ParseDiagCode {
   /** Assignment to a read-only field access */
   ReadOnlyFieldAssignment = 1014,
 
-  /** Assignment to a field of a read-only base value (e.g. a sensor result) */
+  /** Assignment to a field of a read-only base value (e.g. a sensor result or an output value) */
   ReadOnlyResultFieldAssignment = 1015,
 
   /** Tile placed on a rule side its placement flags do not allow */

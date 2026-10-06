@@ -9,6 +9,7 @@ import {
   mkControlFlowTileId,
   mkLiteralTileId,
   mkOperatorTileId,
+  mkOutputTileId,
   mkParameterTileId,
   mkSensorTileId,
 } from "@wendoo/core/app";
@@ -25,6 +26,7 @@ import {
   ConformanceHostActions,
   ConformanceOperators,
   ConformanceParameterId,
+  ConformancePointOutputName,
 } from "./profile";
 
 /** The tiles a conformance case authors its rules from. */
@@ -67,6 +69,12 @@ export interface ConformanceTiles {
   readonly deferTarget: IBrainTileDef;
   /** Inline synchronous sensor tile of `not a number()`, returning the number not-a-number. */
   readonly notANumber: IBrainTileDef;
+  /** WHEN-side sensor tile of `point outputs()`, writing a fresh `Point` to each of its two outputs. */
+  readonly pointOutputs: IBrainTileDef;
+  /** Output tile reading the `open` `Point` output of `point outputs`, a value a field write may go through. */
+  readonly pointOpen: IBrainTileDef;
+  /** Output tile reading the `sealed` `Point` output of `point outputs`, a read-only value. */
+  readonly pointSealed: IBrainTileDef;
   /** Accessor tile reading the `x` field of a `Point` struct value. */
   readonly pointX: IBrainTileDef;
   /** Accessor tile reading the `y` field of a `Point` struct value. */
@@ -135,6 +143,9 @@ export function conformanceTiles(environment: WendooEnvironment): ConformanceTil
     deferAnchor: requireTile(environment, mkSensorTileId(ConformanceHostActions.DeferAnchor.key)),
     deferTarget: requireTile(environment, mkSensorTileId(ConformanceHostActions.DeferTarget.key)),
     notANumber: requireTile(environment, mkSensorTileId(ConformanceHostActions.NotANumber.key)),
+    pointOutputs: requireTile(environment, mkSensorTileId(ConformanceHostActions.PointOutputs.key)),
+    pointOpen: requireTile(environment, mkOutputTileId(CONFORMANCE_POINT_TYPE_ID, ConformancePointOutputName.Open)),
+    pointSealed: requireTile(environment, mkOutputTileId(CONFORMANCE_POINT_TYPE_ID, ConformancePointOutputName.Sealed)),
     pointX: requireTile(environment, mkAccessorTileId(CONFORMANCE_POINT_TYPE_ID, "x")),
     pointY: requireTile(environment, mkAccessorTileId(CONFORMANCE_POINT_TYPE_ID, "y")),
     anchorX: requireTile(environment, mkAccessorTileId(CONFORMANCE_ANCHOR_TYPE_ID, "x")),

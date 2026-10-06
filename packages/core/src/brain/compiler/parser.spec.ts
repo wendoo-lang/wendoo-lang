@@ -25,6 +25,7 @@ import {
   BrainTileLiteralDef,
   BrainTileModifierDef,
   BrainTileOperatorDef,
+  BrainTileOutputDef,
   BrainTileParameterDef,
   BrainTileSensorDef,
   BrainTileVariableDef,
@@ -1027,6 +1028,88 @@ describe("Assignment target l-value (read-only sensor result)", () => {
     const expr = result.exprs.get(0);
     assert.equal(expr.kind, "assignment");
     assert.equal(result.diags.size(), 0);
+  });
+});
+
+describe("Assignment target l-value (output base)", () => {
+  let accessorX: BrainTileAccessorDef;
+  let accessorMag: BrainTileAccessorDef;
+  let accessorInner: BrainTileAccessorDef;
+  let readOnlyOutput: BrainTileOutputDef;
+  let writableOutput: BrainTileOutputDef;
+  let writableOuterOutput: BrainTileOutputDef;
+  let readOnlyOuterOutput: BrainTileOutputDef;
+
+  before(() => {
+    const outerTypeId = mkTypeId(NativeType.Struct, "lvalue-out-outer");
+    const innerTypeId = mkTypeId(NativeType.Struct, "lvalue-out-inner");
+    accessorX = new BrainTileAccessorDef(innerTypeId, "x", CoreTypeIds.Number);
+    accessorMag = new BrainTileAccessorDef(innerTypeId, "mag", CoreTypeIds.Number, { readOnly: true });
+    accessorInner = new BrainTileAccessorDef(outerTypeId, "inner", innerTypeId);
+    readOnlyOutput = new BrainTileOutputDef(innerTypeId, "seen", { metadata: { label: "seen spot" } });
+    writableOutput = new BrainTileOutputDef(innerTypeId, "found", {
+      metadata: { label: "found spot" },
+      writableResult: true,
+    });
+    writableOuterOutput = new BrainTileOutputDef(outerTypeId, "found", { writableResult: true });
+    readOnlyOuterOutput = new BrainTileOutputDef(outerTypeId, "seen");
+  });
+
+  function parse(tiles: IBrainTileDef[]) {
+    return parseBrainTiles(List.from(tiles), services.app.localizer);
+  }
+
+  test("[writableOutput] [x] = [10] -> accepted (writableResult opt-in)", () => {
+    const result = parse([writableOutput, accessorX, opAssign, literal10]);
+    const expr = result.exprs.get(0);
+    assert.equal(expr.kind, "assignment");
+    if (expr.kind === "assignment") {
+      assert.equal(expr.target.kind, "fieldAccess");
+      if (expr.target.kind === "fieldAccess") {
+        assert.equal(expr.target.object.kind, "output");
+      }
+    }
+    assert.equal(result.diags.size(), 0, "should have no diagnostics");
+  });
+
+  test("[output] [x] = [10] -> rejected with ReadOnlyResultFieldAssignment (1015) naming the output", () => {
+    const result = parse([readOnlyOutput, accessorX, opAssign, literal10]);
+    const expr = result.exprs.get(0);
+    assert.equal(expr.kind, "errorExpr");
+    assert.equal(result.diags.size(), 1);
+    const diag = result.diags.get(0);
+    assert.equal(diag.code, 1015, "diagnostic code should be ReadOnlyResultFieldAssignment (1015)");
+    assert.equal(diag.params?.tileId, readOnlyOutput.tileId, "the diagnostic should name the read-only output tile");
+  });
+
+  test("[writableOutput] = [10] -> rejected with InvalidAssignmentTarget (1013): the output itself is no target", () => {
+    const result = parse([writableOutput, opAssign, literal10]);
+    const expr = result.exprs.get(0);
+    assert.equal(expr.kind, "errorExpr");
+    assert.equal(result.diags.size(), 1);
+    assert.equal(result.diags.get(0).code, 1013, "diagnostic code should be InvalidAssignmentTarget (1013)");
+  });
+
+  test("[writableOutput] [mag] = [10] -> rejected with ReadOnlyFieldAssignment (1014): the field stays read-only", () => {
+    const result = parse([writableOutput, accessorMag, opAssign, literal10]);
+    const expr = result.exprs.get(0);
+    assert.equal(expr.kind, "errorExpr");
+    assert.equal(result.diags.size(), 1);
+    assert.equal(result.diags.get(0).code, 1014, "diagnostic code should be ReadOnlyFieldAssignment (1014)");
+  });
+
+  test("[writableOuterOutput] [inner] [x] = [10] -> accepted (writable output root, all writable)", () => {
+    const result = parse([writableOuterOutput, accessorInner, accessorX, opAssign, literal10]);
+    assert.equal(result.exprs.get(0).kind, "assignment");
+    assert.equal(result.diags.size(), 0);
+  });
+
+  test("[outerOutput] [inner] [x] = [10] -> rejected (recurses through the read-only output base)", () => {
+    const result = parse([readOnlyOuterOutput, accessorInner, accessorX, opAssign, literal10]);
+    assert.equal(result.exprs.get(0).kind, "errorExpr");
+    const diag = result.diags.get(0);
+    assert.equal(diag.code, 1015);
+    assert.equal(diag.params?.tileId, readOnlyOuterOutput.tileId);
   });
 });
 

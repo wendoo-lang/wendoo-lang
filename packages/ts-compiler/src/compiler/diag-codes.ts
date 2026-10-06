@@ -223,6 +223,8 @@ export enum DescriptorDiagCode {
   LanguageFrameMustBeFrameName = 2079,
   /** a config's `language.bare` is not a string literal */
   LanguageBareMustBeStringLiteral = 2080,
+  /** an output's writableResult is not a boolean literal */
+  OutputWritableResultMustBeBoolean = 2081,
 }
 
 /**

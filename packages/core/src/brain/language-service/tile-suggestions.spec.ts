@@ -2401,6 +2401,37 @@ describe("Accessor suggestions after value sensors", () => {
     );
   });
 
+  test("[writable output] [value] -> assign offered; [output] [value] -> assign NOT offered", () => {
+    const writableOutput = new BrainTileOutputDef(readingStructTypeId, "found", { writableResult: true });
+    const readOnlyOutput = new BrainTileOutputDef(readingStructTypeId, "seen");
+    const assignTileId = mkOperatorTileId(CoreOpId.Assign);
+    const availableOutputKeys = new UniqueSet<string>([writableOutput.outputKey, readOnlyOutput.outputKey]);
+
+    const writableExpr = parseTilesForSuggestions(List.from<IBrainTileDef>([writableOutput, accValueDef]));
+    assert.equal(writableExpr.kind, "fieldAccess");
+    const writable = suggestTiles(
+      { ruleSide: RuleSide.Do, expr: writableExpr, availableOutputKeys },
+      catalogList(),
+      services
+    );
+    assert.ok(
+      listFind(writable.exact, (s) => s.tileDef.tileId === assignTileId) !== undefined,
+      "assign should be offered after a field access on a writableResult output"
+    );
+
+    const readOnlyExpr = parseTilesForSuggestions(List.from<IBrainTileDef>([readOnlyOutput, accValueDef]));
+    assert.equal(readOnlyExpr.kind, "fieldAccess");
+    const readOnly = suggestTiles(
+      { ruleSide: RuleSide.Do, expr: readOnlyExpr, availableOutputKeys },
+      catalogList(),
+      services
+    );
+    assert.ok(
+      listFind(readOnly.exact, (s) => s.tileDef.tileId === assignTileId) === undefined,
+      "assign should NOT be offered after a field access on an output not declared writableResult"
+    );
+  });
+
   test("[$reading] [value] -> assign offered (variable base, unchanged)", () => {
     const expr = parseTilesForSuggestions(List.from<IBrainTileDef>([readingVarDef, accValueDef]));
     assert.equal(expr.kind, "fieldAccess");
@@ -4425,6 +4456,31 @@ describe("Replacement roles carry position constraints", () => {
     assert.ok(!offeredAnywhere(result, ptNumLit.tileId), "a literal base makes the field access read-only");
     assert.ok(!offeredAnywhere(result, ptNilLit.tileId), "nil is not a writable base");
     assert.ok(!offeredAnywhere(result, ptNumSensor.tileId), "a sensor-result base is not writable");
+  });
+
+  test("Replacing a field-access base under assignment offers a writableResult output, not a read-only one", () => {
+    const writableOutput = new BrainTileOutputDef(ptStructTypeId, "ptFound", { writableResult: true });
+    const readOnlyOutput = new BrainTileOutputDef(ptStructTypeId, "ptSeen");
+    services.edit.tiles.registerTileDef(writableOutput);
+    services.edit.tiles.registerTileDef(readOnlyOutput);
+    const assignOpDef = services.edit.tiles.get(mkOperatorTileId(CoreOpId.Assign)) as BrainTileOperatorDef;
+    const tiles = List.from<IBrainTileDef>([ptStructVar, ptAccNum, assignOpDef, ptNumLit]);
+    const expr = parseTilesForSuggestions(tiles);
+    assert.equal(expr.kind, "assignment");
+
+    const result = suggestTiles(
+      {
+        ruleSide: RuleSide.Do,
+        expr,
+        replaceTileIndex: 0,
+        availableOutputKeys: new UniqueSet<string>([writableOutput.outputKey, readOnlyOutput.outputKey]),
+      },
+      catalogList(),
+      services
+    );
+
+    assert.ok(offeredAnywhere(result, writableOutput.tileId), "a writableResult output is a writable base");
+    assert.ok(!offeredAnywhere(result, readOnlyOutput.tileId), "a read-only output base is not writable");
   });
 
   test("Replacing a binary operand offers only operator-compatible types", () => {

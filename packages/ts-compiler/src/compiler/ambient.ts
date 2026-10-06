@@ -403,6 +403,12 @@ const AMBIENT_MODULE_END = `
     icon?: string;
     docs?: string;
     tags?: string[];
+    /**
+     * When true, a brain may write a field through this output's tile, as in
+     * assigning to an accessor tile placed after it; the write reaches the
+     * value \`setOutput\` stored. Defaults to false.
+     */
+    writableResult?: boolean;
   }
 
   /**

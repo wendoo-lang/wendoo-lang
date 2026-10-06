@@ -645,7 +645,7 @@ function extractOutputs(node: ts.Expression, checker: ts.TypeChecker, addDiag: A
   return result;
 }
 
-/** Extract a single `outputs` entry: a `{ name, type, label?, icon?, docs?, tags? }` object literal. */
+/** Extract a single `outputs` entry: a `{ name, type, label?, icon?, docs?, tags?, writableResult? }` object literal. */
 function extractOutput(node: ts.Expression, checker: ts.TypeChecker, addDiag: AddDiag): ExtractedOutput | undefined {
   if (!ts.isObjectLiteralExpression(node)) {
     addDiag(DescriptorDiagCode.OutputEntryMustBeObjectLiteral, node, "Each `outputs` entry must be an object literal.");
@@ -659,6 +659,7 @@ function extractOutput(node: ts.Expression, checker: ts.TypeChecker, addDiag: Ad
   let icon: string | undefined;
   let docs: string | undefined;
   let tags: string[] | undefined;
+  let writableResult: boolean | undefined;
 
   for (const prop of node.properties) {
     const member = configMember(prop, checker, addDiag);
@@ -670,6 +671,19 @@ function extractOutput(node: ts.Expression, checker: ts.TypeChecker, addDiag: Ad
           name = value.text;
         } else {
           addDiag(DescriptorDiagCode.OutputNameMustBeStringLiteral, value, "Output `name` must be a string literal.");
+        }
+        break;
+      case "writableResult":
+        if (value.kind === ts.SyntaxKind.TrueKeyword) {
+          writableResult = true;
+        } else if (value.kind === ts.SyntaxKind.FalseKeyword) {
+          writableResult = false;
+        } else {
+          addDiag(
+            DescriptorDiagCode.OutputWritableResultMustBeBoolean,
+            value,
+            "Output `writableResult` must be a boolean literal."
+          );
         }
         break;
       case "type":
@@ -739,6 +753,9 @@ function extractOutput(node: ts.Expression, checker: ts.TypeChecker, addDiag: Ad
   const result: ExtractedOutput = { name, type, label, icon, docs, tags };
   if (typeNode) {
     result.typeNode = typeNode;
+  }
+  if (writableResult !== undefined) {
+    result.writableResult = writableResult;
   }
   return result;
 }
