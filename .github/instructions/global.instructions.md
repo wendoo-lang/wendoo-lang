@@ -180,9 +180,15 @@ exactly as it found it.
 ## Tests Never Key on Display Prose
 
 Static display chrome -- placeholders, labels, button captions, tooltips,
-aria-labels, and any other user-facing wording -- is not a test contract.
-Do not assert it in tests: wording changes freely and will be localized, and
-a test keyed to it breaks without any behavior change.
+aria-labels, icon pixel art, sentence-composition words (a tile's form,
+frame, and bare words), docs text, and any other user-facing wording or
+imagery -- is not a test contract. Do not assert it in tests, and do not
+let a golden or snapshot pin it alongside structure: wording and drawings
+change freely (wording will also be localized), and a test keyed to either
+breaks without any behavior change. Identity stays assertable -- a tile's
+NAME and ids are structure, its label is display. Pin an icon's PRESENCE,
+dimensions, and decodability where they matter; never its pixels. Pin that
+a display field is PRESENT where that matters; never its content.
 
 - Assert structure and behavior instead: the element exists (queried by role
   or a test id), its disabled/enabled state, the callback fired, the value
