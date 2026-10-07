@@ -119,17 +119,19 @@ export function extractVector2(ctx: ExecutionContext, value: StructValue): Vecto
 // -------------------------------------------------------
 
 /**
- * Resolve the Actor from a native-backed actorRef StructValue.
+ * Resolve the live Actor from a native-backed actorRef StructValue.
  * The `native` field is either a resolver function `(ctx) => Actor | undefined`
  * or a direct `Actor` reference.
+ *
+ * Returns undefined when the handle is empty, when a resolver finds no actor,
+ * and when the actor is dying (the engine has killed it): a killed actor
+ * resolves as no actor.
  */
 export function resolveActor(source: StructValue, ctx: ExecutionContext): Actor | undefined {
   const raw = source.native;
   if (raw === undefined || raw === null) return undefined;
-  if (TypeUtils.isFunction(raw)) {
-    return (raw as (ctx: ExecutionContext) => Actor | undefined)(ctx);
-  }
-  return raw as Actor;
+  const actor = TypeUtils.isFunction(raw) ? (raw as (ctx: ExecutionContext) => Actor | undefined)(ctx) : (raw as Actor);
+  return actor?.isDying ? undefined : actor;
 }
 
 /**
@@ -155,8 +157,7 @@ function actorRefSnapshotNative(source: StructValue, ctx: ExecutionContext): unk
  * resolves to an actor the engine has not killed.
  */
 function actorRefExists(source: StructValue, ctx: ExecutionContext): boolean {
-  const actor = resolveActor(source, ctx);
-  return actor !== undefined && !actor.isDying;
+  return resolveActor(source, ctx) !== undefined;
 }
 
 /**

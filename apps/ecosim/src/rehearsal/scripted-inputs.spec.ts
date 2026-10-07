@@ -164,6 +164,35 @@ describe("scripted world causes in an ecosim rehearsal", () => {
     );
   });
 
+  test("goes on stepping once the creature under study has died", async () => {
+    let underStudy: Actor | undefined;
+    const next = createSeededRng(SEED);
+    const world = await createRehearsalWorld({
+      environment: createRehearsalEnvironment({ modules: [createEcosimModule()], rng: next }),
+      next,
+      shippedBrains: CONTENT.shippedBrains,
+      observer: {
+        onSpawn: (actor: Actor) => {
+          if (underStudy === undefined && actor.archetype === SUBJECT) underStudy = actor;
+        },
+      },
+      scripted: { inputs: [{ kind: "carnivore-ahead", at: 0, value: IN_VIEW }], subject: () => underStudy },
+    });
+    try {
+      world.step();
+      assert.ok(underStudy, "the creature under study spawned on the first step");
+      underStudy.drainEnergy(underStudy.energy);
+      world.step();
+      assert.equal(world.actors().includes(underStudy), false, "the engine took the drained creature out of the world");
+
+      assert.doesNotThrow(() => {
+        for (let think = 0; think < SENSING_LAG; think++) world.step();
+      });
+    } finally {
+      world.shutdown();
+    }
+  });
+
   test("reproduces a scripted run exactly from the same seed", async () => {
     const tiles = ["tile.sensor->sensor.see", "tile.modifier->modifier.actor_kind.carnivore"];
 

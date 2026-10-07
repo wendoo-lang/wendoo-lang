@@ -110,46 +110,52 @@ class StubData {
  * The surface of `Phaser.Physics.Matter.Sprite` that engine, actor, movement,
  * sensor and actuator code touches, backed by a real Matter body. Transform and
  * velocity operations delegate to the same `Matter.Body` calls the Phaser
- * component makes.
+ * component makes. {@link destroy} leaves the sprite as Phaser leaves a
+ * destroyed one: `body` is undefined, and every transform or velocity call
+ * throws `TypeError`.
  */
 class BodySprite {
   readonly data = new StubData();
-  private alive = true;
+  /** The sprite's Matter body, or undefined once the sprite is destroyed. */
+  body: MatterJS.BodyType | undefined;
 
   constructor(
-    readonly body: MatterJS.BodyType,
+    body: MatterJS.BodyType,
     readonly scene: HeadlessScene
-  ) {}
+  ) {
+    this.body = body;
+  }
 
   get x(): number {
-    return this.body.position.x;
+    return this.liveBody().position.x;
   }
 
   get y(): number {
-    return this.body.position.y;
+    return this.liveBody().position.y;
   }
 
   get rotation(): number {
-    return this.body.angle;
+    return this.liveBody().angle;
   }
 
   setPosition(x: number, y: number): this {
-    MatterBody.setPosition(this.body, { x, y });
+    MatterBody.setPosition(this.liveBody(), { x, y });
     return this;
   }
 
   setRotation(radians: number): this {
-    MatterBody.setAngle(this.body, radians);
+    MatterBody.setAngle(this.liveBody(), radians);
     return this;
   }
 
   setVelocity(x: number, y: number): this {
-    MatterBody.setVelocity(this.body, { x, y });
+    MatterBody.setVelocity(this.liveBody(), { x, y });
     return this;
   }
 
   applyForce(force: { x: number; y: number }): this {
-    MatterBody.applyForce(this.body, { x: this.body.position.x, y: this.body.position.y }, force);
+    const body = this.liveBody();
+    MatterBody.applyForce(body, { x: body.position.x, y: body.position.y }, force);
     return this;
   }
 
@@ -162,9 +168,15 @@ class BodySprite {
   }
 
   destroy(): void {
-    if (!this.alive) return;
-    this.alive = false;
+    if (!this.body) return;
     MatterComposite.remove(this.scene.matterWorld, this.body);
+    this.body = undefined;
+  }
+
+  /** The sprite's body. Throws `TypeError` once the sprite is destroyed. */
+  private liveBody(): MatterJS.BodyType {
+    if (!this.body) throw new TypeError("the sprite has been destroyed");
+    return this.body;
   }
 }
 
@@ -441,7 +453,7 @@ export const SCENARIO_INPUT_KINDS: readonly ScenarioInputKind[] = Object.entries
 export interface ScriptedCauses {
   /** Percepts the run scripts, each applied before the think it names. */
   readonly inputs: readonly ScenarioInput[];
-  /** The creature under study, or undefined while it is not in the world. */
+  /** The creature under study once it has spawned, or undefined before then. */
   subject(): Actor | undefined;
 }
 
@@ -476,11 +488,12 @@ class StagedCreatures {
   /**
    * Put every held creature where the scenario holds it, taking over the
    * world's own creature of a staged kind, or spawning one when the world
-   * has none. Does nothing until the creature under study is in the world.
+   * has none. Does nothing while the creature under study is not in the
+   * world: before it spawns, and after the engine has killed it.
    */
   place(): void {
     const subject = this.causes.subject();
-    if (!subject) return;
+    if (!subject || this.engine.getActorById(subject.actorId) !== subject) return;
     for (const [archetype, distance] of this.heldAt) {
       if (distance <= 0) continue;
       const facing = subject.sprite.rotation;
