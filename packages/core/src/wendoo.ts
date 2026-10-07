@@ -731,7 +731,7 @@ function registerOperatorDefinition(services: BrainServices, definition: Operato
       continue;
     }
 
-    throw new Error(`Operator '${definition.spec.id}' supports only unary or binary overloads in v1`);
+    throw new Error(`Operator '${definition.spec.id}' supports only unary or binary overloads`);
   }
 }
 

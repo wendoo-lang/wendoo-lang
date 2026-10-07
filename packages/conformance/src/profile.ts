@@ -1093,8 +1093,8 @@ const emitAllActuator = {
  *   profile adds to the core `eq` operator, which keeps its own tile, so no
  *   tile of the profile's own stands for it. True exactly when both operands
  *   carry `Point` readings whose `x` fields are equal numbers and whose `y`
- *   fields are equal numbers at the profile's precision; an operand carrying
- *   no `Point` reading, nil included, compares false.
+ *   fields are equal numbers; an operand carrying no `Point` reading, nil
+ *   included, compares false.
  * - `defer point()` -- asynchronous inline sensor whose handle resolves to a
  *   fresh `Point` struct reading `{x: 1.5, y: 2.25}` exactly one tick after
  *   its dispatch. The struct is constructed at settle time, immediately
