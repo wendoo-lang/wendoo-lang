@@ -112,6 +112,18 @@ interface CompilationContext {
 }
 
 /**
+ * The labels one action call's gated arguments jump to when a value placed in
+ * an anonymous slot evaluates to nothing. Each is minted by the first argument
+ * that needs it and marked at the call's gate tail.
+ */
+interface NothingGate {
+  /** Entry taken with the arg buffer and the tested value on the stack. */
+  argLabel?: number;
+  /** Entry taken with the arg buffer, a repeated slot's list, and the tested element on the stack. */
+  elementLabel?: number;
+}
+
+/**
  * Compilation diagnostic with node reference. An "error" blocks producing a
  * program; a "warning" reports degraded output that still compiles.
  */
@@ -638,30 +650,122 @@ export class ExprCompiler implements ExprVisitor<void> {
   // Actuators
   // ==========================================
 
+  /** Lowers an actuator call; its result is left on the stack, where the DO side ignores it. */
   visitActuator(expr: ActuatorExpr): void {
-    const action = expr.tileDef.action;
-    const argSlots = action.callDef.argSlots;
-
-    this.emitActionArguments(argSlots, expr.anons, expr.parameters, expr.modifiers);
-    const callSiteId = this.nextCallSiteId();
-    this.emitActionDispatch(action, argSlots.size(), callSiteId, expr.nodeId);
-
-    // Actuator return value is now on the stack, but it is ignored, currently.
+    this.emitActionCall(expr);
   }
 
   // ==========================================
   // Sensors (Queries/Readings)
   // ==========================================
 
+  /** Lowers a sensor call, leaving its reading on the stack. */
   visitSensor(expr: SensorExpr): void {
+    this.emitActionCall(expr);
+  }
+
+  /**
+   * Lowers an action call: its positional arg buffer, then its dispatch. Each
+   * anonymous argument placed as an expression other than a literal gates the
+   * call: when it evaluates to nothing (nil, void, or unknown), no later
+   * argument evaluates, the action is not dispatched, and NIL stands as the
+   * call's result. A literal, the nil literal included, and an argument slot
+   * the author left empty gate nothing; an empty slot arrives as NIL.
+   *
+   * Stack effect: `[] -> [result]`.
+   */
+  private emitActionCall(expr: ActuatorExpr | SensorExpr): void {
     const action = expr.tileDef.action;
     const argSlots = action.callDef.argSlots;
+    const argc = argSlots.size();
+    const gate: NothingGate = {};
 
-    this.emitActionArguments(argSlots, expr.anons, expr.parameters, expr.modifiers);
+    this.emitActionArguments(argSlots, expr.anons, expr.parameters, expr.modifiers, gate);
     const callSiteId = this.nextCallSiteId();
-    this.emitActionDispatch(action, argSlots.size(), callSiteId, expr.nodeId);
+    this.emitActionDispatch(action, argc, callSiteId, expr.nodeId);
+    this.emitNothingGateTail(gate, argc);
+  }
 
-    // Result is now on the stack
+  /**
+   * Emits the code after `value`, just evaluated onto the stack, that jumps to
+   * `gate`'s tail with `value` still on the stack when it evaluated to
+   * nothing, and falls through with it otherwise. A value whose static type is
+   * number, boolean, or string is tested with that type's own `!= nil`
+   * operator, so `0`, `false`, and the empty string pass; any other value
+   * passes when it is truthy, as every struct, enum, and function value is.
+   *
+   * Stack effect: `[value] -> [value]`.
+   *
+   * @param value - The argument expression whose value is on top of the stack.
+   * @param gate - The call's gate labels; the one this test jumps to is minted on first use.
+   * @param element - Whether `value` is an element of a repeated slot, with its list below it.
+   */
+  private emitNothingTest(value: Expr, gate: NothingGate, element: boolean): void {
+    let gateLabel: number;
+    if (element) {
+      gateLabel = gate.elementLabel ?? this.emitter.label();
+      gate.elementLabel = gateLabel;
+    } else {
+      gateLabel = gate.argLabel ?? this.emitter.label();
+      gate.argLabel = gateLabel;
+    }
+    this.emitter.dup();
+    const notNilFnId = this.notNilFnId(value.nodeId);
+    if (notNilFnId !== undefined) {
+      this.pushNil();
+      this.emitter.hostCall(notNilFnId, 2, this.nextCallSiteId());
+    }
+    this.emitter.jmpIfFalse(gateLabel);
+  }
+
+  /**
+   * The id of the `!= nil` host function for the static type of the value
+   * lowered from node `nodeId`, when that type is number, boolean, or string;
+   * otherwise undefined.
+   */
+  private notNilFnId(nodeId: number): number | undefined {
+    const typeId = this.context.typeEnv.get(nodeId)?.inferred;
+    const coreType = typeId === undefined ? undefined : this.context.typeRegistry.get(typeId)?.coreType;
+    switch (coreType) {
+      case NativeType.Number:
+        return CoreFuncId.OpNotEqualToNumberNil;
+      case NativeType.Boolean:
+        return CoreFuncId.OpNotEqualToBooleanNil;
+      case NativeType.String:
+        return CoreFuncId.OpNotEqualToStringNil;
+      default:
+        return undefined;
+    }
+  }
+
+  /**
+   * Emits the tail an action call's gated arguments jump to, after its
+   * dispatch: the dispatched call jumps past the tail, and the tail drops the
+   * arg buffer and the value that evaluated to nothing, then pushes NIL as the
+   * call's result. A repeated slot's element enters one instruction earlier,
+   * dropping its list too. Emits nothing when no argument is gated.
+   *
+   * @param gate - The labels the call's arguments jumped to.
+   * @param argc - Width of the call's arg buffer.
+   */
+  private emitNothingGateTail(gate: NothingGate, argc: number): void {
+    if (gate.argLabel === undefined && gate.elementLabel === undefined) {
+      return;
+    }
+    const endLabel = this.emitter.label();
+    this.emitter.jmp(endLabel);
+    if (gate.elementLabel !== undefined) {
+      this.emitter.mark(gate.elementLabel);
+      this.emitter.pop();
+    }
+    if (gate.argLabel !== undefined) {
+      this.emitter.mark(gate.argLabel);
+    }
+    for (let i = 0; i <= argc; i++) {
+      this.emitter.pop();
+    }
+    this.pushNil();
+    this.emitter.mark(endLabel);
   }
 
   /**
@@ -740,7 +844,8 @@ export class ExprCompiler implements ExprVisitor<void> {
     argSlots: ReadonlyList<BrainActionArgSlot>,
     anons: ReadonlyList<SlotExpr>,
     parameters: ReadonlyList<SlotExpr>,
-    modifiers: ReadonlyList<SlotExpr>
+    modifiers: ReadonlyList<SlotExpr>,
+    gate: NothingGate
   ): number {
     const argc = argSlots.size();
     for (let i = 0; i < argc; i++) {
@@ -752,10 +857,11 @@ export class ExprCompiler implements ExprVisitor<void> {
       this.emitter.stackSetRel(argc - 1 - slotId);
     };
 
-    // Emit anonymous arguments, then named parameters. Both accept repeated
-    // slots, whose same-slot values are gathered into one `List<T>`.
-    this.emitSlotExprs(anons, argSlots, emitSlotEntry);
-    this.emitSlotExprs(parameters, argSlots, emitSlotEntry);
+    // Emit anonymous arguments, each gating the call, then named parameters.
+    // Both accept repeated slots, whose same-slot values are gathered into one
+    // `List<T>`.
+    this.emitSlotExprs(anons, argSlots, emitSlotEntry, gate);
+    this.emitSlotExprs(parameters, argSlots, emitSlotEntry, undefined);
 
     // Emit modifiers -- count occurrences per slotId so repeated modifiers
     // produce a numeric count value instead of a boolean flag.
@@ -785,11 +891,16 @@ export class ExprCompiler implements ExprVisitor<void> {
    * entries are folded into it. Per-element type conversions are applied to each
    * element before its `LIST_PUSH`, exactly as a non-repeated slot converts its
    * single value.
+   *
+   * When `gate` is given, every value placed as an expression other than a
+   * literal -- each element of a repeated slot included -- is tested before
+   * its conversion, jumping to the gate's tail when it evaluated to nothing.
    */
   private emitSlotExprs(
     slotExprs: ReadonlyList<SlotExpr>,
     argSlots: ReadonlyList<BrainActionArgSlot>,
-    emitSlotEntry: (slotId: number, emitValue: () => void) => void
+    emitSlotEntry: (slotId: number, emitValue: () => void) => void,
+    gate: NothingGate | undefined
   ): void {
     const gathered = new Dict<number, boolean>();
     for (let i = 0; i < slotExprs.size(); i++) {
@@ -808,6 +919,9 @@ export class ExprCompiler implements ExprVisitor<void> {
               continue;
             }
             acceptExprVisitor(entry.expr, this);
+            if (gate !== undefined && entry.expr.kind !== "literal") {
+              this.emitNothingTest(entry.expr, gate, true);
+            }
             this.emitConversionIfNeeded(entry.expr.nodeId);
             this.emitter.listPush();
           }
@@ -815,6 +929,9 @@ export class ExprCompiler implements ExprVisitor<void> {
       } else {
         emitSlotEntry(slot.slotId, () => {
           acceptExprVisitor(slot.expr, this);
+          if (gate !== undefined && slot.expr.kind !== "literal") {
+            this.emitNothingTest(slot.expr, gate, false);
+          }
           // The conversion is stored on the entry's node (the ParameterExpr for
           // a named parameter, the value node for an anonymous arg) -- the same
           // node validateActionCallSlot annotates.

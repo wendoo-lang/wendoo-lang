@@ -330,6 +330,34 @@ export function numberVariable(brainDef: BrainDef, name: string): IBrainTileDef 
 }
 
 /**
+ * Mints a brain-scoped Boolean variable tile and registers it in `brainDef`'s
+ * catalog. The tile id and the variable's unique id are derived from `name`, so
+ * one authored case always names one variable slot.
+ *
+ * @param brainDef - Document the variable belongs to.
+ * @param name - Variable name, as authored and as compiled into the slot pool.
+ */
+export function booleanVariable(brainDef: BrainDef, name: string): IBrainTileDef {
+  const variable = new BrainTileVariableDef(`variable:conformance.${name}`, name, CoreTypeIds.Boolean, name);
+  brainDef.catalog().registerTileDef(variable);
+  return variable;
+}
+
+/**
+ * Mints a brain-scoped String variable tile and registers it in `brainDef`'s
+ * catalog. The tile id and the variable's unique id are derived from `name`, so
+ * one authored case always names one variable slot.
+ *
+ * @param brainDef - Document the variable belongs to.
+ * @param name - Variable name, as authored and as compiled into the slot pool.
+ */
+export function stringVariable(brainDef: BrainDef, name: string): IBrainTileDef {
+  const variable = new BrainTileVariableDef(`variable:conformance.${name}`, name, CoreTypeIds.String, name);
+  brainDef.catalog().registerTileDef(variable);
+  return variable;
+}
+
+/**
  * Mints a brain-scoped `Point`-typed variable tile and registers it in
  * `brainDef`'s catalog. The tile id and the variable's unique id are derived
  * from `name`, so one authored case always names one variable slot.

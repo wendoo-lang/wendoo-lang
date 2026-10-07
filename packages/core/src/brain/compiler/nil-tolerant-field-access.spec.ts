@@ -3,7 +3,9 @@
  * object is not a value (nil, void, or unknown) yields nil, at every link of
  * an accessor chain, and a field assignment through such an object skips the
  * store while its object and value still evaluate. These tests run compiled
- * brains on the VM and pin that no such read or write faults.
+ * brains on the VM and pin that no such read or write faults. A read under
+ * test is observed by assigning it to a brain variable and inspecting that
+ * variable after the run.
  */
 
 import assert from "node:assert/strict";
@@ -226,6 +228,8 @@ interface RunOutcome {
   readonly faults: ErrorValue[];
   /** Firing outcome of each rule that reached its WHEN gate, keyed by rule function id. */
   readonly gates: Map<number, boolean>;
+  /** The value the brain variable `name` holds after the run, or undefined when it holds none. */
+  variable(name: string): Value | undefined;
 }
 
 /** Links `def`, then runs `thinks` think steps of it, collecting error diagnostics, faults, and WHEN gates. */
@@ -251,7 +255,7 @@ function buildAndRun(environment: WendooEnvironment, def: IBrainDef, thinks = 1)
     .toArray()
     .filter((d) => d.severity === "error")
     .map((d) => d.code);
-  return { errors, faults, gates };
+  return { errors, faults, gates, variable: (name) => brain.getVariable(name) };
 }
 
 /** Asserts `outcome` built cleanly and ran without a VM fault. */
@@ -264,36 +268,33 @@ function assertRanClean(outcome: RunOutcome): void {
   );
 }
 
-/** Native type tags of `values`, in order. */
-function tags(values: readonly Value[]): Value["t"][] {
-  return values.map((v) => v.t);
-}
-
 describe("a field read through an object that is not a value yields nil", () => {
   test("a never-assigned struct variable's field reads nil", () => {
-    const { environment, brainDef, rule, fixture, accessors } = newBrain();
+    const { environment, brainDef, rule, accessors, assign } = newBrain();
     const pos = variable(brainDef, "pos", kPosTypeId);
+    const out = variable(brainDef, "out", CoreTypeIds.Number);
 
-    append(rule.do(), fixture.recordTile, pos, accessors.posX);
+    append(rule.do(), out, assign, pos, accessors.posX);
 
     const outcome = buildAndRun(environment, brainDef);
 
     assertRanClean(outcome);
-    assert.deepEqual(tags(fixture.recorded), [NativeType.Nil]);
+    assert.equal(outcome.variable("out")?.t, NativeType.Nil);
   });
 
   test("a held struct whose field reads nil chains to nil at depth 2", () => {
     const { environment, brainDef, rule, fixture, accessors, assign } = newBrain();
     const held = variable(brainDef, "held", kBodyTypeId);
+    const out = variable(brainDef, "out", CoreTypeIds.Number);
 
     append(rule.do(), held, assign, fixture.bodyTile);
     const child = rule.appendNewRule()!;
-    append(child.do(), fixture.recordTile, held, accessors.bodyPos, accessors.posX);
+    append(child.do(), out, assign, held, accessors.bodyPos, accessors.posX);
 
     const outcome = buildAndRun(environment, brainDef);
 
     assertRanClean(outcome);
-    assert.deepEqual(tags(fixture.recorded), [NativeType.Nil]);
+    assert.equal(outcome.variable("out")?.t, NativeType.Nil);
   });
 
   test("a live chain still reads its field", () => {
@@ -323,14 +324,15 @@ describe("a field read through an object that is not a value yields nil", () => 
   });
 
   test("a void object reads nil, not void", () => {
-    const { environment, brainDef, rule, fixture, accessors } = newBrain();
+    const { environment, brainDef, rule, fixture, accessors, assign } = newBrain();
+    const out = variable(brainDef, "out", CoreTypeIds.Number);
 
-    append(rule.do(), fixture.recordTile, fixture.voidBodyTile, accessors.bodyTag);
+    append(rule.do(), out, assign, fixture.voidBodyTile, accessors.bodyTag);
 
     const outcome = buildAndRun(environment, brainDef);
 
     assertRanClean(outcome);
-    assert.deepEqual(tags(fixture.recorded), [NativeType.Nil]);
+    assert.equal(outcome.variable("out")?.t, NativeType.Nil);
   });
 });
 
@@ -339,32 +341,35 @@ describe("a field assignment through an object that is not a value skips the sto
     const { environment, brainDef, rule, fixture, accessors, assign } = newBrain();
     const pos = variable(brainDef, "pos", kPosTypeId);
 
+    const out = variable(brainDef, "out", CoreTypeIds.Number);
+
     append(rule.do(), pos, accessors.posX, assign, fixture.fiveTile);
     const child = rule.appendNewRule()!;
-    append(child.do(), fixture.recordTile, pos, accessors.posX);
+    append(child.do(), out, assign, pos, accessors.posX);
 
     const outcome = buildAndRun(environment, brainDef);
 
     assertRanClean(outcome);
     assert.equal(fixture.fiveCalls(), 1, "the assigned value evaluated");
-    assert.deepEqual(tags(fixture.recorded), [NativeType.Nil], "no store reached the object");
+    assert.equal(outcome.variable("out")?.t, NativeType.Nil, "no store reached the object");
   });
 
   test("a void object held in a variable skips the store", () => {
     const { environment, brainDef, rule, fixture, accessors, assign } = newBrain();
     const held = variable(brainDef, "held", kBodyTypeId);
+    const out = variable(brainDef, "out", CoreTypeIds.Number);
 
     append(rule.do(), held, assign, fixture.voidBodyTile);
     const write = rule.appendNewRule()!;
     append(write.do(), held, accessors.bodyTag, assign, fixture.fiveTile);
     const read = write.appendNewRule()!;
-    append(read.do(), fixture.recordTile, held, accessors.bodyTag);
+    append(read.do(), out, assign, held, accessors.bodyTag);
 
     const outcome = buildAndRun(environment, brainDef);
 
     assertRanClean(outcome);
     assert.equal(fixture.fiveCalls(), 1, "the assigned value evaluated");
-    assert.deepEqual(tags(fixture.recorded), [NativeType.Nil]);
+    assert.equal(outcome.variable("out")?.t, NativeType.Nil);
   });
 
   test("a struct object still takes the store", () => {

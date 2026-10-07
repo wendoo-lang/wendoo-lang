@@ -51,10 +51,7 @@ function execTimeout(ctx: ExecutionContext, args: ReadonlyList<Value>): Value {
   let delay = DEFAULT_DELAY_SECONDS;
   const anonNumberValue = args.get(kAnonymousNumberSlotId);
   if (anonNumberValue !== undefined && !isNilValue(anonNumberValue)) {
-    // The user supplied a delay expression. If it failed to evaluate to a
-    // valid finite number (e.g. nil from an unassigned variable, or a
-    // NaN-poisoned arithmetic result), refuse to fire so the rule
-    // evaluates false rather than silently using the default delay.
+    // An empty slot arrives as nil and runs the default delay.
     if (!isNumberValue(anonNumberValue) || MathOps.isNaN(anonNumberValue.v)) {
       return FALSE_VALUE;
     }

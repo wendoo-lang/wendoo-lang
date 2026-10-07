@@ -12,7 +12,8 @@
  * object and the assigned value both evaluate, and a falsy object skips
  * `STRUCT_SET_FIELD` and discards the value. The trace pins that the value's
  * sensor still dispatches on every think, that nothing faults, and that the
- * child's read emits nil: the store never reached a struct.
+ * child's read is nil: the store never reached a struct, so the emit its
+ * read is placed in does not dispatch.
  */
 
 import assert from "node:assert/strict";
@@ -52,17 +53,12 @@ test(`${CASE_ID}: the committed corpus artifacts are byte-stable and its traces 
 
   const valueEvent = `action ${ConformanceHostActions.NotANumber.actionId.toString(16)}`;
   const emitEvent = `action ${ConformanceHostActions.Emit.actionId.toString(16)}`;
-  // Each think the assigned value's sensor dispatches, then the child emits.
-  const perThink = [
-    [valueEvent, emitEvent],
-    [valueEvent, emitEvent],
-  ];
+  // Each think the assigned value's sensor dispatches; the child's emit of its nil read is gated off.
+  const perThink = [[valueEvent], [valueEvent]];
 
   for (const variant of minted.variants) {
     assert.equal(traceLines(variant.trace, "fault ").length, 0);
     assert.deepEqual(traceEventsByTick(variant.trace).map(eventKinds), perThink);
-    for (const line of traceLines(variant.trace, `${emitEvent} `)) {
-      assert.ok(line.endsWith("args 1 nil result void"), `unexpected emit line: ${line}`);
-    }
+    assert.equal(traceLines(variant.trace, `${emitEvent} `).length, 0);
   }
 });

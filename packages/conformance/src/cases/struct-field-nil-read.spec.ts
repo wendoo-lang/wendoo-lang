@@ -9,9 +9,10 @@
  *
  * The compiler lowers each field read with a guard on its object: a falsy
  * object skips `STRUCT_GET_FIELD` and the read yields nil. The first rule's
- * WHEN therefore reads nil and does not fire, and the second rule emits nil.
- * The trace pins that neither rule faults on any think: the only events are
- * the second rule's emits, each carrying nil.
+ * WHEN therefore reads nil and does not fire, and the second rule's emit,
+ * whose placed value evaluates to nil, does not dispatch. The trace pins that
+ * neither rule faults on any think and neither emits: the trace holds its
+ * thinks and nothing else.
  */
 
 import assert from "node:assert/strict";
@@ -20,7 +21,7 @@ import type { IBrainDef, WendooEnvironment } from "@wendoo/core/app";
 import { Op } from "@wendoo/core/runtime";
 import { appendDo, appendWhen, conformanceTiles, newBrain, numberLiteral, pointVariable } from "../authoring";
 import { assertCaseIsStable, assertCompiledOps, eventKinds, mintCase, traceEventsByTick, traceLines } from "../mint";
-import { ConformanceHostActions, ConformancePointField } from "../profile";
+import { ConformancePointField } from "../profile";
 
 const CASE_ID = "struct-field-nil-read";
 
@@ -51,15 +52,11 @@ test(`${CASE_ID}: the committed corpus artifacts are byte-stable and its traces 
     { op: Op.PUSH_CONST_VAL },
   ]);
 
-  const emitEvent = `action ${ConformanceHostActions.Emit.actionId.toString(16)}`;
-  // The WHEN-gated rule never fires; the reading rule emits once per think.
-  const perThink = [[emitEvent], [emitEvent]];
+  // The WHEN-gated rule never fires; the reading rule's emit is gated off by its nil value.
+  const perThink = [[], []];
 
   for (const variant of minted.variants) {
     assert.equal(traceLines(variant.trace, "fault ").length, 0);
     assert.deepEqual(traceEventsByTick(variant.trace).map(eventKinds), perThink);
-    for (const line of traceLines(variant.trace, `${emitEvent} `)) {
-      assert.ok(line.endsWith("args 1 nil result void"), `unexpected emit line: ${line}`);
-    }
   }
 });

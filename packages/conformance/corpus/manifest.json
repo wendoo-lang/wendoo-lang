@@ -81,8 +81,8 @@
     {
       "id": "arithmetic-operators",
       "source": "packages/conformance/src/cases/arithmetic-operators.spec.ts",
-      "summary": "One rule per core number arithmetic operator beyond addition, emitting each result, and a division by zero that evaluates nil.",
-      "behaviors": ["host-sync-action-call", "operator-arithmetic-number", "rule-when-empty"],
+      "summary": "One rule per core number arithmetic operator beyond addition, emitting each result, and a division by zero that evaluates nil and so gates its emit off.",
+      "behaviors": ["action-placed-nil-gate", "host-sync-action-call", "operator-arithmetic-number", "rule-when-empty"],
       "precisions": ["f32", "f64"],
       "schedule": [16, 16]
     },
@@ -391,6 +391,57 @@
       "schedule": [16, 16, 16]
     },
     {
+      "id": "placed-falsy-values-pass",
+      "source": "packages/conformance/src/cases/placed-falsy-values-pass.spec.ts",
+      "summary": "Actuator calls whose placed anonymous values evaluate to 0, false, the empty string, and not-a-number, each dispatching with its value: a present falsy value gates nothing.",
+      "behaviors": [
+        "action-placed-nil-gate",
+        "host-sync-action-call",
+        "host-sync-sensor-result",
+        "rule-when-empty",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
+      "id": "placed-nil-actuator-gate",
+      "source": "packages/conformance/src/cases/placed-nil-actuator-gate.spec.ts",
+      "summary": "Actuator calls whose placed anonymous values read nil off a struct variable no rule assigns, a repeated slot's element and an asynchronous call among them, never dispatching, beside the same calls reading an assigned variable dispatching its value.",
+      "behaviors": [
+        "action-placed-nil-gate",
+        "child-rule-spawn",
+        "child-rule-synchronous-cascade",
+        "host-sync-action-call",
+        "list-value-render",
+        "repeated-arg-list-gather",
+        "root-rule-respawn",
+        "rule-when-empty",
+        "struct-constant-push",
+        "struct-field-nil-read",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
+      "id": "placed-nil-sensor-gate",
+      "source": "packages/conformance/src/cases/placed-nil-sensor-gate.spec.ts",
+      "summary": "WHEN-side sensor calls -- a profile sensor and the core timer -- whose placed anonymous value reads nil off a struct variable no rule assigns, never dispatching and never firing their rules, beside a sensor reading an assigned variable that dispatches and fires.",
+      "behaviors": [
+        "action-placed-nil-gate",
+        "host-sync-action-call",
+        "host-sync-sensor-result",
+        "rule-when-empty",
+        "rule-when-gate-falsy",
+        "rule-when-gate-truthy",
+        "struct-field-nil-read",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
       "id": "presence-gate",
       "source": "packages/conformance/src/cases/presence-gate.spec.ts",
       "summary": "A bare presence-gated value sensor as the WHEN root of a rule and of its `otherwise` sibling, delivering a falsy value and nil in turn.",
@@ -499,8 +550,9 @@
     {
       "id": "struct-field-nil-read",
       "source": "packages/conformance/src/cases/struct-field-nil-read.spec.ts",
-      "summary": "A field read of a struct variable no rule assigns, guarded by the compiler on its nil object, reading nil in a WHEN that therefore does not fire and in an emit, with nothing faulting.",
+      "summary": "A field read of a struct variable no rule assigns, guarded by the compiler on its nil object, reading nil in a WHEN that therefore does not fire and in an emit it therefore gates off, with nothing faulting.",
       "behaviors": [
+        "action-placed-nil-gate",
         "host-sync-action-call",
         "root-rule-respawn",
         "rule-when-empty",
@@ -514,8 +566,9 @@
     {
       "id": "struct-field-nil-write",
       "source": "packages/conformance/src/cases/struct-field-nil-write.spec.ts",
-      "summary": "A field assignment through a struct variable no rule assigns, guarded by the compiler on its nil object, evaluating its value and skipping the store, with the field reading back nil and nothing faulting.",
+      "summary": "A field assignment through a struct variable no rule assigns, guarded by the compiler on its nil object, evaluating its value and skipping the store, with the field reading back nil -- gating the emit it is placed in -- and nothing faulting.",
       "behaviors": [
+        "action-placed-nil-gate",
         "child-rule-spawn",
         "child-rule-synchronous-cascade",
         "host-sync-action-call",
@@ -560,8 +613,9 @@
     {
       "id": "struct-native-lifetime",
       "source": "packages/conformance/src/cases/struct-native-lifetime.spec.ts",
-      "summary": "A captured native-backed value read before and after the world destroys its host object, pinning that the type's field getter resolves nothing once the object is gone and every later read is nil.",
+      "summary": "A captured native-backed value read before and after the world destroys its host object, pinning that the type's field getter resolves nothing once the object is gone and every later read is nil, gating the emit it is placed in.",
       "behaviors": [
+        "action-placed-nil-gate",
         "async-sensor-when-evaluation",
         "child-rule-spawn",
         "child-rule-synchronous-cascade",

@@ -18,6 +18,10 @@
       "description": "A host action's named output, written by the action's body on its run, reads back through the output's tile in the action's rule and the rules below it."
     },
     {
+      "id": "action-placed-nil-gate",
+      "description": "A value placed in an action's anonymous slot that evaluates to nothing -- nil, void, or unknown -- gates the call: no later argument evaluates, the action is not dispatched (an asynchronous one takes no handle), and the call reads nil, so a WHEN it is read in does not fire. 0, false, the empty string, and not-a-number are values and dispatch; an empty slot and a literal gate nothing."
+    },
+    {
       "id": "async-handle-cancel",
       "description": "A cancelled handle throws Cancelled in the fiber awaiting it."
     },

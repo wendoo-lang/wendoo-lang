@@ -29,6 +29,7 @@ import {
   BrainTileActuatorDef,
   BrainTileLiteralDef,
   BrainTileOperatorDef,
+  BrainTileParameterDef,
   BrainTileSensorDef,
   BrainTileVariableDef,
   buildDescriptorOutputTiles,
@@ -38,6 +39,9 @@ import {
   type ActionDescriptor,
   type BooleanValue,
   BYTECODE_VERSION,
+  bag,
+  CoreFuncId,
+  CoreParameterId,
   CoreTypeIds,
   clearCallSiteState,
   extractBooleanValue,
@@ -2814,5 +2818,186 @@ describe("Field access emits nil-guarded id-based opcodes", () => {
       [Op.POP, undefined],
     ]);
     assert.equal(instrs.filter((ins) => ins.op === Op.SET_FIELD).length, 0, "should not emit name-keyed SET_FIELD");
+  });
+});
+
+// ---- Action arguments placed as expressions gate the call ----
+
+describe("Action arguments placed as expressions emit a gate on nothing", () => {
+  const kPinPosParamId = "anon.GatePinPos";
+  let pos: string;
+  let pairTile: BrainTileActuatorDef;
+  let deferTile: BrainTileActuatorDef;
+
+  before(() => {
+    pos = services.runtime.types.addStructType("GatePinPos", {
+      atomId: 1030,
+      fields: List.from([{ name: "x", typeId: CoreTypeIds.Number, fieldIndex: 0 }]),
+    });
+    services.edit.tiles.registerTileDef(new BrainTileParameterDef(kPinPosParamId, pos, { hidden: true }));
+    const anonPos = param(kPinPosParamId, { name: "pos", anonymous: true });
+    const anonNumber = param(CoreParameterId.AnonymousNumber, { name: "value", anonymous: true });
+
+    const pair = createHostActuator({
+      key: "test-gate-pin-pair",
+      actionId: 5901,
+      fnId: 6901,
+      callDef: mkCallDef(bag(anonPos, anonNumber)),
+      fn: { exec: () => VOID_VALUE },
+    });
+    services.runtime.functions.register(
+      pair.function.id,
+      pair.function.name,
+      pair.function.isAsync,
+      pair.function.fn,
+      pair.function.callDef
+    );
+    services.runtime.actions.register({
+      binding: "host",
+      descriptor: pair.descriptor,
+      id: pair.actionId,
+      execSync: () => VOID_VALUE,
+    });
+    pairTile = pair.tile as BrainTileActuatorDef;
+
+    const deferred = createHostActuator({
+      key: "test-gate-pin-defer",
+      actionId: 5902,
+      fnId: 6902,
+      callDef: mkCallDef(bag(anonPos)),
+      isAsync: true,
+      fn: { exec: () => undefined },
+    });
+    services.runtime.functions.register(
+      deferred.function.id,
+      deferred.function.name,
+      deferred.function.isAsync,
+      deferred.function.fn,
+      deferred.function.callDef
+    );
+    services.runtime.actions.register({
+      binding: "host",
+      descriptor: deferred.descriptor,
+      id: deferred.actionId,
+      execAsync: () => undefined,
+    });
+    deferTile = deferred.tile as BrainTileActuatorDef;
+  });
+
+  /** The DO section of a single-rule brain whose DO side is `doTiles`, from `DO_START` through `DO_END`. */
+  function doSection(doTiles: unknown[]): { instrs: Instr[]; values: ReadonlyList<Value> } {
+    const brainDef = buildBrain([], doTiles);
+    const result = compileBrain(
+      brainDef,
+      List.from([services.edit.tiles, brainDef.catalog()]),
+      services.shared.conversions,
+      services.runtime.actions,
+      services.runtime.types
+    );
+    assert.ok(result.program, "compile should succeed");
+    const code = result.program!.functions.get(0).code;
+    const instrs: Instr[] = [];
+    for (let i = 0; i < code.size(); i++) {
+      instrs.push(code.get(i));
+    }
+    const start = instrs.findIndex((ins) => ins.op === Op.DO_START);
+    const end = instrs.findIndex((ins) => ins.op === Op.DO_END);
+    return { instrs: instrs.slice(start, end + 1), values: result.program!.constantPools.values };
+  }
+
+  /** The `[op, a, b]` triple of each instruction. */
+  function shape(instrs: Instr[]): [number, number | undefined, number | undefined][] {
+    return instrs.map((ins) => [ins.op, ins.a, ins.b]);
+  }
+
+  test("a two-argument call tests each placed value, both jumping to one tail that stands NIL for the call", () => {
+    const pVar = new BrainTileVariableDef(mkVariableTileId("gate-pin-p"), "gp", pos, "gate-pin-p");
+    const nVar = mkVar("gn", CoreTypeIds.Number);
+
+    // DO: [pair] $p $n
+    const { instrs, values } = doSection([pairTile, pVar, nVar]);
+    const nil = instrs[1].a;
+    assert.equal(values.get(nil!).t, NativeType.Nil);
+    assert.deepEqual(shape(instrs), [
+      [Op.DO_START, undefined, undefined],
+      [Op.PUSH_CONST_VAL, nil, undefined],
+      [Op.PUSH_CONST_VAL, nil, undefined],
+      [Op.LOAD_VAR_SLOT, 0, undefined],
+      [Op.DUP, undefined, undefined],
+      [Op.JMP_IF_FALSE, 10, undefined],
+      [Op.STACK_SET_REL, 1, undefined],
+      [Op.LOAD_VAR_SLOT, 1, undefined],
+      [Op.DUP, undefined, undefined],
+      [Op.PUSH_CONST_VAL, nil, undefined],
+      [Op.HOST_CALL, CoreFuncId.OpNotEqualToNumberNil, 2],
+      [Op.JMP_IF_FALSE, 4, undefined],
+      [Op.STACK_SET_REL, 0, undefined],
+      [Op.HOST_ACTION_CALL, 5901, 2],
+      [Op.JMP, 5, undefined],
+      [Op.POP, undefined, undefined],
+      [Op.POP, undefined, undefined],
+      [Op.POP, undefined, undefined],
+      [Op.PUSH_CONST_VAL, nil, undefined],
+      [Op.DO_END, undefined, undefined],
+    ]);
+  });
+
+  test("a gated asynchronous call skips the dispatch and its AWAIT", () => {
+    const pVar = new BrainTileVariableDef(mkVariableTileId("gate-pin-async"), "ga", pos, "gate-pin-async");
+
+    // DO: [defer] $p
+    const { instrs } = doSection([deferTile, pVar]);
+    const nil = instrs[1].a;
+    assert.deepEqual(shape(instrs), [
+      [Op.DO_START, undefined, undefined],
+      [Op.PUSH_CONST_VAL, nil, undefined],
+      [Op.LOAD_VAR_SLOT, 0, undefined],
+      [Op.DUP, undefined, undefined],
+      [Op.JMP_IF_FALSE, 5, undefined],
+      [Op.STACK_SET_REL, 0, undefined],
+      [Op.HOST_ACTION_CALL_ASYNC, 5902, 1],
+      [Op.AWAIT, undefined, undefined],
+      [Op.JMP, 4, undefined],
+      [Op.POP, undefined, undefined],
+      [Op.POP, undefined, undefined],
+      [Op.PUSH_CONST_VAL, nil, undefined],
+      [Op.DO_END, undefined, undefined],
+    ]);
+  });
+
+  test("a literal argument is not tested, and a call with no placed expression emits no gate", () => {
+    const pVar = new BrainTileVariableDef(mkVariableTileId("gate-pin-lit"), "gl", pos, "gate-pin-lit");
+
+    // DO: [pair] $p 4
+    const { instrs } = doSection([pairTile, pVar, mkLiteral(4)]);
+    const nil = instrs[1].a;
+    assert.deepEqual(shape(instrs), [
+      [Op.DO_START, undefined, undefined],
+      [Op.PUSH_CONST_VAL, nil, undefined],
+      [Op.PUSH_CONST_VAL, nil, undefined],
+      [Op.LOAD_VAR_SLOT, 0, undefined],
+      [Op.DUP, undefined, undefined],
+      [Op.JMP_IF_FALSE, 6, undefined],
+      [Op.STACK_SET_REL, 1, undefined],
+      [Op.PUSH_CONST_NUM, instrs[7].a, undefined],
+      [Op.STACK_SET_REL, 0, undefined],
+      [Op.HOST_ACTION_CALL, 5901, 2],
+      [Op.JMP, 5, undefined],
+      [Op.POP, undefined, undefined],
+      [Op.POP, undefined, undefined],
+      [Op.POP, undefined, undefined],
+      [Op.PUSH_CONST_VAL, nil, undefined],
+      [Op.DO_END, undefined, undefined],
+    ]);
+
+    // DO: [pair]
+    const bare = doSection([pairTile]).instrs;
+    assert.deepEqual(shape(bare), [
+      [Op.DO_START, undefined, undefined],
+      [Op.PUSH_CONST_VAL, bare[1].a, undefined],
+      [Op.PUSH_CONST_VAL, bare[1].a, undefined],
+      [Op.HOST_ACTION_CALL, 5901, 2],
+      [Op.DO_END, undefined, undefined],
+    ]);
   });
 });

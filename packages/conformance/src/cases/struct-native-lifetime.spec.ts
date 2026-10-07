@@ -13,10 +13,11 @@
  * The first read dispatches the `Anchor` type's field getter against the live
  * host object and emits its `x`. `destroy anchor` then destroys that object
  * while `obj` keeps fronting it, so every later read resolves nothing: the
- * getter returns absent and the field read pushes nil. The trace pins both
- * sides -- the live reading before the destruction and the nil tokens after --
- * and the destruction outlives the root rule, so the re-capture on the second
- * dispatch reads nil from its first field read on.
+ * getter returns absent and the field read pushes nil, and an emit whose
+ * placed value evaluates to nil does not dispatch. The trace pins both sides
+ * -- the live reading before the destruction and no emit after it -- and the
+ * destruction outlives the root rule, so the re-capture on the second
+ * dispatch emits nothing from its first field read on.
  */
 
 import assert from "node:assert/strict";
@@ -74,14 +75,9 @@ test(`${CASE_ID}: the committed corpus artifacts are byte-stable and its traces 
   const destroyEvent = `action ${ConformanceHostActions.DestroyAnchor.actionId.toString(16)}`;
   const emitEvent = `action ${ConformanceHostActions.Emit.actionId.toString(16)}`;
   // The rule dispatches and parks on the odd thinks; on the even thinks it
-  // resumes, its DO emits the live `x`, and the cascade destroys the anchor
-  // and reads both fields off the destroyed object.
-  const perThink = [
-    [readEvent],
-    [emitEvent, destroyEvent, emitEvent, emitEvent],
-    [readEvent],
-    [emitEvent, destroyEvent, emitEvent, emitEvent],
-  ];
+  // resumes, its DO emits the live `x` on the first capture alone, and the
+  // cascade destroys the anchor, whose nil field reads emit nothing.
+  const perThink = [[readEvent], [emitEvent, destroyEvent], [readEvent], [destroyEvent]];
 
   for (const variant of minted.variants) {
     assert.equal(traceLines(variant.trace, "fault ").length, 0);
@@ -90,11 +86,8 @@ test(`${CASE_ID}: the committed corpus artifacts are byte-stable and its traces 
     const emits = traceLines(variant.trace, `${emitEvent} `);
     const liveToken = numberToken(CONFORMANCE_ANCHOR_READING.x, variant.precision);
     // Only the first emit of the first capture reads a live anchor; the
-    // destruction stands from then on, so every later read is nil.
-    const expected = [liveToken, "nil", "nil", "nil", "nil", "nil"];
-    for (const [index, line] of emits.entries()) {
-      assert.ok(line.endsWith(`args 1 ${expected[index]} result void`), `unexpected emit line: ${line}`);
-    }
-    assert.equal(emits.length, expected.length);
+    // destruction stands from then on, so every later read is nil and gates its emit.
+    assert.equal(emits.length, 1);
+    assert.ok(emits[0].endsWith(`args 1 ${liveToken} result void`), `unexpected emit line: ${emits[0]}`);
   }
 });

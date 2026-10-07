@@ -7,7 +7,8 @@
  * - `DO [emit 6 * 7]`
  * - `DO [emit 9 / 2]`
  * - `DO [emit negative 5]`
- * - `DO [emit 1 / 0]` -- the divisor is zero, so the operator evaluates nil.
+ * - `DO [emit 1 / 0]` -- the divisor is zero, so the operator evaluates nil,
+ *   and an emit whose placed value evaluates to nil does not dispatch.
  *
  * Every operand is exactly representable at both profile precisions, so the
  * two precision variants differ only in the width of the rendered bit pattern.
@@ -23,11 +24,8 @@ import { ConformanceHostActions } from "../profile";
 
 const CASE_ID = "arithmetic-operators";
 
-/** Emits of a think: one per rule, and every rule fires on every think. */
-const EMITS_PER_TICK = 5;
-
-/** The one emit of a think whose argument is the nil a zero divisor evaluates to. */
-const NIL_EMITS_PER_TICK = 1;
+/** Emits of a think: one per rule but the one dividing by zero, and every rule fires on every think. */
+const EMITS_PER_TICK = 4;
 
 function build(environment: WendooEnvironment): IBrainDef {
   const tiles = conformanceTiles(environment);
@@ -68,7 +66,10 @@ test(`${CASE_ID}: the committed corpus artifacts are byte-stable and its traces 
     assert.equal(traceLines(variant.trace, "tick ").length, minted.entry.schedule.length);
     assert.equal(traceLines(variant.trace, emitEvent).length, EMITS_PER_TICK * minted.entry.schedule.length);
     assert.equal(traceLines(variant.trace, "fault ").length, 0);
-    const nilEmits = traceLines(variant.trace, emitEvent).filter((line) => line.endsWith("args 1 nil result void"));
-    assert.equal(nilEmits.length, NIL_EMITS_PER_TICK * minted.entry.schedule.length);
+    assert.equal(
+      traceLines(variant.trace, "args 1 nil ").length,
+      0,
+      "no emit received the nil a zero divisor evaluates to"
+    );
   }
 });
