@@ -159,6 +159,15 @@ function actorRefSnapshotNative(source: StructValue, ctx: ExecutionContext): unk
 }
 
 /**
+ * Existence hook for the actorRef native struct type: whether the value
+ * resolves to an actor the engine has not killed.
+ */
+function actorRefExists(source: StructValue, ctx: ExecutionContext): boolean {
+  const actor = resolveActor(source, ctx);
+  return actor !== undefined && !actor.isDying;
+}
+
+/**
  * Field getter for the actorRef native struct type.
  */
 function actorRefFieldGetter(source: StructValue, fieldId: number, ctx: ExecutionContext): Value | undefined {
@@ -262,6 +271,7 @@ export function registerTypes(api: WendooModuleApi) {
     fieldGetter: actorRefFieldGetter,
     fieldSetter: actorRefFieldSetter,
     snapshotNative: actorRefSnapshotNative,
+    exists: actorRefExists,
     accessors: ["id", "energy pct", "position"],
     variableFactory: true,
   });

@@ -97,6 +97,12 @@ const TARGET_TYPE_NAME = "Target";
 /** TypeId of the conformance `Target` native-backed struct type. */
 export const CONFORMANCE_TARGET_TYPE_ID = mkTypeId(NativeType.Struct, TARGET_TYPE_NAME);
 
+/** Type name of the profile's existence-hooked native struct type. */
+const MARKER_TYPE_NAME = "Marker";
+
+/** TypeId of the conformance `Marker` native-backed struct type. */
+export const CONFORMANCE_MARKER_TYPE_ID = mkTypeId(NativeType.Struct, MARKER_TYPE_NAME);
+
 /** Type name of the profile's program-local enum type; its typeId derives from it. */
 const MODE_TYPE_NAME = "Mode";
 
@@ -132,6 +138,7 @@ export const ConformanceTypeAtomIds = {
   Point: TARGET_TYPE_ATOM_BASE,
   Anchor: TARGET_TYPE_ATOM_BASE + 1,
   Target: TARGET_TYPE_ATOM_BASE + 2,
+  Marker: TARGET_TYPE_ATOM_BASE + 3,
 } as const;
 
 /** Field ids (also storage slots) of the `Point` struct. Wire-stable; never renumber. */
@@ -149,6 +156,11 @@ export const ConformanceAnchorField = {
 /** Field ids of the `Target` native struct type. Wire-stable; never renumber. */
 export const ConformanceTargetField = {
   Value: 0,
+} as const;
+
+/** Field ids of the `Marker` native struct type. Wire-stable; never renumber. */
+export const ConformanceMarkerField = {
+  X: 0,
 } as const;
 
 /**
@@ -268,6 +280,7 @@ export const ConformanceActionKeys = {
   DestroyAnchor: "actuator.conformance.destroy-anchor",
   NotANumber: "sensor.conformance.not-a-number",
   PointOutputs: "sensor.conformance.point-outputs",
+  Marker: "sensor.conformance.marker",
 } as const;
 
 /**
@@ -351,6 +364,11 @@ export const ConformanceHostActions = {
     actionId: TARGET_ACTION_ID_BASE + 17,
     fnId: TARGET_FUNC_ID_BASE + 19,
   },
+  Marker: {
+    key: ConformanceActionKeys.Marker,
+    actionId: TARGET_ACTION_ID_BASE + 18,
+    fnId: TARGET_FUNC_ID_BASE + 21,
+  },
 } as const;
 
 /**
@@ -402,6 +420,7 @@ const emitAllCallDef = mkCallDef(bag(repeated(AnonAny, { min: 0 })));
 const destroyAnchorCallDef = mkCallDef(bag());
 const notANumberCallDef = mkCallDef(bag());
 const pointOutputsCallDef = mkCallDef(bag());
+const markerCallDef = mkCallDef(bag());
 
 const kEchoValueSlotId = getSlotId(echoCallDef, AnonValue);
 const kDeferEchoValueSlotId = getSlotId(deferEchoCallDef, AnonValue);
@@ -478,7 +497,8 @@ export class ConformanceWorld {
   /**
    * Destroy the world's one anchor host object. Every `Anchor` value already
    * handed out keeps fronting it, and every field hook of the type then
-   * designates nothing. Destroying an already destroyed anchor changes
+   * designates nothing; every `Marker` value over it reads as gone to its
+   * type's existence hook. Destroying an already destroyed anchor changes
    * nothing.
    */
   destroyAnchor(): void {
@@ -750,6 +770,25 @@ function targetFieldGetter(source: StructValue, fieldId: number, ctx: ExecutionC
   return undefined;
 }
 
+/**
+ * Field getter of the `Marker` type: reads the field off the anchor host
+ * object behind `source` whether or not the world destroyed it, so only the
+ * type's existence hook reports the destruction. A value carrying no host
+ * object, and a field id the type does not declare, both read as absent.
+ */
+function markerFieldGetter(source: StructValue, fieldId: number, _ctx: ExecutionContext): Value | undefined {
+  const anchor = source.native as ConformanceAnchorObject | undefined;
+  if (!anchor || fieldId !== ConformanceMarkerField.X) {
+    return undefined;
+  }
+  return mkNumberValue(anchor.x);
+}
+
+/** Existence hook of the `Marker` type: whether `source` carries an anchor host object the world has not destroyed. */
+function markerExists(source: StructValue, _ctx: ExecutionContext): boolean {
+  return resolveAnchorObject(source) !== undefined;
+}
+
 function execDeferAnchor(ctx: ExecutionContext, _args: ReadonlyList<Value>, handle: AsyncHandle): void {
   const world = worldOf(ctx);
   if (!world) {
@@ -784,6 +823,10 @@ function execEmitFlag(_ctx: ExecutionContext, args: ReadonlyList<Value>): Value 
 function execDestroyAnchor(ctx: ExecutionContext): Value {
   worldOf(ctx)?.destroyAnchor();
   return VOID_VALUE;
+}
+
+function execMarker(ctx: ExecutionContext): Value {
+  return mkNativeStructValue(CONFORMANCE_MARKER_TYPE_ID, worldOf(ctx)?.anchor());
 }
 
 function execNotANumber(): Value {
@@ -1039,6 +1082,18 @@ const pointOutputsSensor = {
   metadata: { label: "point outputs" },
 } satisfies CreateHostSensorOptions;
 
+const markerSensor = {
+  key: ConformanceHostActions.Marker.key,
+  actionId: ConformanceHostActions.Marker.actionId,
+  fnId: ConformanceHostActions.Marker.fnId,
+  callDef: markerCallDef,
+  fn: { exec: execMarker },
+  isAsync: false,
+  outputType: CONFORMANCE_MARKER_TYPE_ID,
+  inline: true,
+  metadata: { label: "marker" },
+} satisfies CreateHostSensorOptions;
+
 const emitAllActuator = {
   key: ConformanceHostActions.EmitAll.key,
   actionId: ConformanceHostActions.EmitAll.actionId,
@@ -1110,7 +1165,8 @@ const emitAllActuator = {
  *   world's one anchor host object. Every `Anchor` value handed out before the
  *   call keeps fronting that object, and from then on the type's field hooks
  *   designate nothing: reads return absent, which the VM renders nil, and
- *   writes are rejected.
+ *   writes are rejected. Every `Marker` value over the object is falsy from
+ *   then on.
  * - `defer target()` -- asynchronous inline sensor whose handle resolves to a
  *   fresh `Target` value exactly one tick after its dispatch, backed by a
  *   lazy resolver over the world's call-counting target resolution. `Target`
@@ -1129,6 +1185,14 @@ const emitAllActuator = {
  *   brain may write a field through its tile, and `{x: 6.25, y: 0.75}` to
  *   `sealed`, whose value is read-only. Each output's tile reads the struct in
  *   the sensor's rule and the rules below it.
+ * - `marker()` -- synchronous inline sensor returning a fresh `Marker` value
+ *   over the world's one anchor host object. `Marker` (atom id 1027, field
+ *   `x`, read-only) is a second native-backed view of that object, and the
+ *   profile's one type declaring an existence hook: the hook reports whether
+ *   the world has destroyed the object, so after `destroy anchor` every
+ *   `Marker` value is falsy. Its field getter reads `x` off the object whether
+ *   or not it was destroyed, so a nil read of a `Marker` field can only come
+ *   from the hook.
  * - `seek` -- literal tile carrying the `Mode` enum constant `seek`. `Mode`
  *   is the profile's program-local enum type (symbols `idle`, `seek`, `flee`,
  *   each valued by its own key), registered under the dynamic owner so its
@@ -1179,6 +1243,18 @@ export function conformanceModule(): WendooModule {
         ]),
         fieldGetter: targetFieldGetter,
         snapshotNative: targetSnapshotNative,
+        accessors: true,
+      });
+      api.defineType({
+        coreType: NativeType.Struct,
+        typeId: CONFORMANCE_MARKER_TYPE_ID,
+        name: MARKER_TYPE_NAME,
+        atomId: ConformanceTypeAtomIds.Marker,
+        fields: List.from([
+          { name: "x", typeId: CoreTypeIds.Number, readOnly: true, fieldIndex: ConformanceMarkerField.X },
+        ]),
+        fieldGetter: markerFieldGetter,
+        exists: markerExists,
         accessors: true,
       });
       // The dynamic owner makes `Mode` a program-local type: it compiles as a
@@ -1250,6 +1326,7 @@ export function conformanceModule(): WendooModule {
       for (const outputTile of buildDescriptorOutputTiles(pointOutputs.descriptor.outputs ?? [])) {
         api.registerTile(outputTile);
       }
+      api.registerHostSensor(createHostSensor(markerSensor));
       api.registerOperator({
         spec: {
           id: ConformanceOperators.DeferAdd.opId,

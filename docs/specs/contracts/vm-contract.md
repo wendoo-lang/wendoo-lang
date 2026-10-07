@@ -624,7 +624,23 @@ Truthiness follows the value-model rule defined in
 [Value model](#value-model): unknown, void, nil, `false`, numeric `0`,
 the empty string, empty lists, empty maps, and error values are falsy.
 Enums, structs, function values, handle values, nonzero numbers,
-non-empty strings, and non-empty collections are truthy.
+non-empty strings, and non-empty collections are truthy, except a
+struct whose type's existence hook reports it gone, which is falsy.
+
+**Existence hook.** A native-backed struct type may declare one
+optional existence hook (`StructTypeDef.exists`): a read-only
+predicate over a value of the type that answers whether the host
+object behind the value still exists. A struct value whose type
+declares the hook is truthy exactly when the hook answers true; a
+struct value whose type declares none is always truthy. A truthiness
+test checks the value's tag first and consults the hook only for a
+struct whose type declares one, calling it afresh on every test --
+the answer may change between tests, and no VM caches it. The hook is
+consulted by truthiness alone, which is what `JMP_IF_FALSE`,
+`JMP_IF_TRUE`, `WHEN_END`, and `WHEN_END_CHAIN` test; the presence
+gates, equality, deep copy, field access, and the arguments handed to
+host calls are unaffected, and the value keeps holding its host
+object.
 
 ### Function calls
 

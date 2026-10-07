@@ -79,6 +79,7 @@ interface TypeDefLike {
   fieldGetter?: unknown;
   fieldSetter?: unknown;
   snapshotNative?: unknown;
+  exists?: unknown;
 }
 
 interface ConversionLike {
@@ -321,6 +322,7 @@ export function snapshotTypes(env: WendooEnvironment): SnapshotMap {
       hasFieldGetter: typeDef.fieldGetter !== undefined,
       hasFieldSetter: typeDef.fieldSetter !== undefined,
       hasSnapshotNative: typeDef.snapshotNative !== undefined,
+      hasExists: typeDef.exists !== undefined,
     };
 
     if (typeDef.fields !== undefined) {

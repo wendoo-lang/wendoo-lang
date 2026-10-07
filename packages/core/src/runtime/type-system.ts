@@ -429,6 +429,7 @@ export class TypeRegistry implements ITypeRegistry {
       fieldGetter: shape.fieldGetter,
       fieldSetter: shape.fieldSetter,
       snapshotNative: shape.snapshotNative,
+      exists: shape.exists,
       methods: shape.methods,
       atomId: shape.atomId,
     };
@@ -491,6 +492,7 @@ export class TypeRegistry implements ITypeRegistry {
     if (shape.fieldGetter) structDef.fieldGetter = shape.fieldGetter;
     if (shape.fieldSetter) structDef.fieldSetter = shape.fieldSetter;
     if (shape.snapshotNative) structDef.snapshotNative = shape.snapshotNative;
+    if (shape.exists) structDef.exists = shape.exists;
     if (shape.methods) structDef.methods = shape.methods;
   }
 

@@ -19,7 +19,7 @@
     },
     {
       "id": "action-placed-nil-gate",
-      "description": "A value placed in an action's anonymous slot that evaluates to nothing -- nil, void, or unknown -- gates the call: no later argument evaluates, the action is not dispatched (an asynchronous one takes no handle), and the call reads nil, so a WHEN it is read in does not fire. 0, false, the empty string, and not-a-number are values and dispatch; an empty slot and a literal gate nothing."
+      "description": "A value placed in an action's anonymous slot that evaluates to nothing -- nil, void, unknown, or a struct its type's existence hook reports gone -- gates the call: no later argument evaluates, the action is not dispatched (an asynchronous one takes no handle), and the call reads nil, so a WHEN it is read in does not fire. 0, false, the empty string, and not-a-number are values and dispatch; an empty slot and a literal gate nothing."
     },
     {
       "id": "async-handle-cancel",
@@ -283,7 +283,7 @@
     },
     {
       "id": "struct-field-nil-read",
-      "description": "A compiled field read whose object is falsy -- nil, void, or unknown -- branches past STRUCT_GET_FIELD and pushes nil, at every link of an accessor chain."
+      "description": "A compiled field read whose object is falsy -- nil, void, unknown, or a struct its type's existence hook reports gone -- branches past STRUCT_GET_FIELD and pushes nil, at every link of an accessor chain."
     },
     {
       "id": "struct-field-nil-write",
@@ -296,6 +296,10 @@
     {
       "id": "struct-native-destroyed-read",
       "description": "A field read of a native-backed struct whose host object the host has destroyed dispatches the type's field getter, which designates nothing, and pushes nil."
+    },
+    {
+      "id": "struct-native-existence-hook",
+      "description": "A native-backed struct value whose type declares an existence hook is falsy while the hook reports its host object gone, the hook consulted afresh at every truthiness test: a WHEN holding the value does not fire, a compiled accessor chain through it reads nil before any field hook runs, and an action it is placed in is not dispatched. A value of a type declaring no hook stays truthy after its host object is gone."
     },
     {
       "id": "struct-native-field-hooks",

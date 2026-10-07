@@ -176,6 +176,15 @@ export type StructFieldSetterFn = (
  */
 export type StructSnapshotNativeFn = (source: StructValue, ctx: ExecutionContext) => unknown;
 
+/**
+ * Existence hook for native-backed struct types.
+ * Called by every truthiness test of a value whose `StructTypeDef` has `exists` registered.
+ * Receives the source StructValue and the current ExecutionContext.
+ * Returns false when the host object behind the value is gone, which makes the value falsy.
+ * Read-only: it must not change host state, and its answer may differ between calls.
+ */
+export type StructExistsFn = (source: StructValue, ctx: ExecutionContext) => boolean;
+
 /** Tagged-union of host function bindings: synchronous or asynchronous. */
 export type HostFn = HostSyncFn | HostAsyncFn;
 

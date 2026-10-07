@@ -123,6 +123,7 @@ Singletons: `UNKNOWN_VALUE`, `VOID_VALUE`, `NIL_VALUE`, `TRUE_VALUE`, `FALSE_VAL
 
 `STRUCT_GET`/`STRUCT_SET` resolve field names through `StructTypeDef.fieldIndexByName` and then access `struct.v` (the indexed `List<Value>`).
 `GET_FIELD`/`SET_FIELD` go through `fieldGetter`/`fieldSetter` hooks registered on the `StructTypeDef` when present, enabling native-backed struct types; otherwise they use `fieldIndexByName`.
+`isTruthy` consults the optional `exists` hook of a struct value's `StructTypeDef`: a value whose hook reports its host object gone is falsy, so conditional jumps and truthiness-gated WHENs read it as nothing. It is the hook's only consult point.
 
 ## Fiber Lifecycle
 

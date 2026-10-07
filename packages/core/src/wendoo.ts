@@ -624,6 +624,7 @@ function registerWendooTypeDefinition(services: BrainServices, definition: Wendo
           fieldGetter: structDef.fieldGetter,
           fieldSetter: structDef.fieldSetter,
           snapshotNative: structDef.snapshotNative,
+          exists: structDef.exists,
           methods: structDef.methods,
           atomId: structDef.atomId,
         }),

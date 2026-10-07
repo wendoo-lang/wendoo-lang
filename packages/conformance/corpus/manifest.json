@@ -611,6 +611,76 @@
       "schedule": [16, 16, 16, 16]
     },
     {
+      "id": "struct-native-existence-chain-read",
+      "source": "packages/conformance/src/cases/struct-native-existence-chain-read.spec.ts",
+      "summary": "A field read of a held native-backed value whose type declares an existence hook, before and after the world destroys its host object, with the field getter reading through the destruction, pinning that the hook makes the value falsy so the compiled chain reads nil before the getter runs and gates the emit it is placed in.",
+      "behaviors": [
+        "action-placed-nil-gate",
+        "child-rule-spawn",
+        "child-rule-synchronous-cascade",
+        "host-sync-action-call",
+        "root-rule-respawn",
+        "rule-when-empty",
+        "struct-field-nil-read",
+        "struct-native-existence-hook",
+        "struct-native-field-hooks",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
+      "id": "struct-native-existence-hookless",
+      "source": "packages/conformance/src/cases/struct-native-existence-hookless.spec.ts",
+      "summary": "A held native-backed value whose type declares no existence hook, fronting a host object the world has destroyed, firing a WHEN that holds it alone on every think, pinning that a hookless type keeps every value truthy.",
+      "behaviors": [
+        "async-sensor-when-evaluation",
+        "host-sync-action-call",
+        "root-rule-respawn",
+        "rule-when-gate-falsy",
+        "rule-when-gate-truthy",
+        "struct-native-existence-hook",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16]
+    },
+    {
+      "id": "struct-native-existence-placed-gate",
+      "source": "packages/conformance/src/cases/struct-native-existence-placed-gate.spec.ts",
+      "summary": "A held native-backed value whose type declares an existence hook placed whole in an emit before and after the world destroys its host object, dispatching opaque while the object exists and gated off once the hook reports it gone.",
+      "behaviors": [
+        "action-placed-nil-gate",
+        "child-rule-spawn",
+        "child-rule-synchronous-cascade",
+        "host-sync-action-call",
+        "root-rule-respawn",
+        "rule-when-empty",
+        "struct-native-existence-hook",
+        "struct-native-opaque-render",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
+      "id": "struct-native-existence-when-gate",
+      "source": "packages/conformance/src/cases/struct-native-existence-when-gate.spec.ts",
+      "summary": "A WHEN holding only a variable of a native-backed type that declares an existence hook, firing while the host object exists and never again once a child rule destroys it, pinning that the hook flips the held value falsy.",
+      "behaviors": [
+        "child-rule-spawn",
+        "host-sync-action-call",
+        "root-rule-respawn",
+        "rule-when-empty",
+        "rule-when-gate-falsy",
+        "rule-when-gate-truthy",
+        "struct-native-existence-hook",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16]
+    },
+    {
       "id": "struct-native-lifetime",
       "source": "packages/conformance/src/cases/struct-native-lifetime.spec.ts",
       "summary": "A captured native-backed value read before and after the world destroys its host object, pinning that the type's field getter resolves nothing once the object is gone and every later read is nil, gating the emit it is placed in.",

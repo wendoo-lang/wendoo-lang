@@ -18,6 +18,7 @@ import { BrainTileOperatorDef, BrainTileVariableDef } from "@wendoo/core/brain/t
 import type { TypeCodec, TypeId } from "@wendoo/core/runtime";
 import {
   CONFORMANCE_ANCHOR_TYPE_ID,
+  CONFORMANCE_MARKER_TYPE_ID,
   CONFORMANCE_MODE_LITERAL_KEY,
   CONFORMANCE_MODE_TYPE_ID,
   CONFORMANCE_POINT_LITERAL_LABEL,
@@ -69,6 +70,8 @@ export interface ConformanceTiles {
   readonly deferTarget: IBrainTileDef;
   /** Inline synchronous sensor tile of `not a number()`, returning the number not-a-number. */
   readonly notANumber: IBrainTileDef;
+  /** Inline synchronous sensor tile of `marker()`, returning a `Marker` native struct value over the world's anchor. */
+  readonly marker: IBrainTileDef;
   /** WHEN-side sensor tile of `point outputs()`, writing a fresh `Point` to each of its two outputs. */
   readonly pointOutputs: IBrainTileDef;
   /** Output tile reading the `open` `Point` output of `point outputs`, a value a field write may go through. */
@@ -85,6 +88,8 @@ export interface ConformanceTiles {
   readonly anchorY: IBrainTileDef;
   /** Accessor tile reading the `value` field of a `Target` value through the type's field getter. */
   readonly targetValue: IBrainTileDef;
+  /** Accessor tile reading the `x` field of a `Marker` value through the type's field getter. */
+  readonly markerX: IBrainTileDef;
   /** Literal tile carrying the `Mode` enum constant `seek`. */
   readonly modeSeek: IBrainTileDef;
   /** Literal tile carrying the closed `Point` struct constant `waypoint`. */
@@ -143,6 +148,7 @@ export function conformanceTiles(environment: WendooEnvironment): ConformanceTil
     deferAnchor: requireTile(environment, mkSensorTileId(ConformanceHostActions.DeferAnchor.key)),
     deferTarget: requireTile(environment, mkSensorTileId(ConformanceHostActions.DeferTarget.key)),
     notANumber: requireTile(environment, mkSensorTileId(ConformanceHostActions.NotANumber.key)),
+    marker: requireTile(environment, mkSensorTileId(ConformanceHostActions.Marker.key)),
     pointOutputs: requireTile(environment, mkSensorTileId(ConformanceHostActions.PointOutputs.key)),
     pointOpen: requireTile(environment, mkOutputTileId(CONFORMANCE_POINT_TYPE_ID, ConformancePointOutputName.Open)),
     pointSealed: requireTile(environment, mkOutputTileId(CONFORMANCE_POINT_TYPE_ID, ConformancePointOutputName.Sealed)),
@@ -151,6 +157,7 @@ export function conformanceTiles(environment: WendooEnvironment): ConformanceTil
     anchorX: requireTile(environment, mkAccessorTileId(CONFORMANCE_ANCHOR_TYPE_ID, "x")),
     anchorY: requireTile(environment, mkAccessorTileId(CONFORMANCE_ANCHOR_TYPE_ID, "y")),
     targetValue: requireTile(environment, mkAccessorTileId(CONFORMANCE_TARGET_TYPE_ID, "value")),
+    markerX: requireTile(environment, mkAccessorTileId(CONFORMANCE_MARKER_TYPE_ID, "x")),
     modeSeek: requireTile(environment, mkLiteralTileId(CONFORMANCE_MODE_TYPE_ID, CONFORMANCE_MODE_LITERAL_KEY)),
     pointWaypoint: requireTile(
       environment,
@@ -381,6 +388,20 @@ export function pointVariable(brainDef: BrainDef, name: string): IBrainTileDef {
  */
 export function anchorVariable(brainDef: BrainDef, name: string): IBrainTileDef {
   const variable = new BrainTileVariableDef(`variable:conformance.${name}`, name, CONFORMANCE_ANCHOR_TYPE_ID, name);
+  brainDef.catalog().registerTileDef(variable);
+  return variable;
+}
+
+/**
+ * Mints a brain-scoped `Marker`-typed variable tile and registers it in
+ * `brainDef`'s catalog. The tile id and the variable's unique id are derived
+ * from `name`, so one authored case always names one variable slot.
+ *
+ * @param brainDef - Document the variable belongs to.
+ * @param name - Variable name, as authored and as compiled into the slot pool.
+ */
+export function markerVariable(brainDef: BrainDef, name: string): IBrainTileDef {
+  const variable = new BrainTileVariableDef(`variable:conformance.${name}`, name, CONFORMANCE_MARKER_TYPE_ID, name);
   brainDef.catalog().registerTileDef(variable);
   return variable;
 }

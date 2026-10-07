@@ -171,7 +171,6 @@ const V = {
   },
 };
 
-// Value comparison for truthiness
 /**
  * Deep-copy a Value for assignment semantics.
  * Primitives (boolean, number, string, enum, nil, void, unknown) are immutable and returned as-is.
@@ -220,7 +219,13 @@ function deepCopyValue(v: Value, types: ITypeRegistry, ctx: ExecutionContext, vi
   return { t: NativeType.Struct, typeId: v.typeId, v: newFields, native: nativeHandle };
 }
 
-function isTruthy(v: Value): boolean {
+/**
+ * Truthiness of a value, as every conditional branch and truthiness-gated WHEN tests it.
+ * Unknown, void, nil, `false`, zero, the empty string, empty collections and buffers, and
+ * error values are falsy. A struct is truthy unless its type registers an `exists` hook and
+ * the hook reports the value's host object gone; the hook is called on every test.
+ */
+function isTruthy(v: Value, types: ITypeRegistry, ctx: ExecutionContext): boolean {
   switch (v.t) {
     case NativeType.Unknown:
     case NativeType.Void:
@@ -238,8 +243,10 @@ function isTruthy(v: Value): boolean {
       return v.v.size() > 0;
     case NativeType.Map:
       return v.v.size() > 0;
-    case NativeType.Struct:
-      return true;
+    case NativeType.Struct: {
+      const exists = (types.get(v.typeId) as StructTypeDef | undefined)?.exists;
+      return exists === undefined || exists(v, ctx);
+    }
     case NativeType.Function:
       return true;
     case NativeType.Buffer:
@@ -935,14 +942,14 @@ export class VM implements IVM {
   private execJmpIfFalse(fiber: Fiber, ins: Instr, frame: Frame): undefined {
     const rel = (ins.a ?? 0) | 0;
     const v = this.pop(fiber);
-    frame.pc = isTruthy(v) ? frame.pc + 1 : frame.pc + rel;
+    frame.pc = isTruthy(v, this.runtime.types, fiber.executionContext) ? frame.pc + 1 : frame.pc + rel;
     return undefined;
   }
 
   private execJmpIfTrue(fiber: Fiber, ins: Instr, frame: Frame): undefined {
     const rel = (ins.a ?? 0) | 0;
     const v = this.pop(fiber);
-    frame.pc = isTruthy(v) ? frame.pc + rel : frame.pc + 1;
+    frame.pc = isTruthy(v, this.runtime.types, fiber.executionContext) ? frame.pc + rel : frame.pc + 1;
     return undefined;
   }
 
@@ -1452,7 +1459,9 @@ export class VM implements IVM {
     const ruleFuncId = this.resolveFrameRuleFuncId(fiber.executionContext, frame);
     brain.ruleVars.setByName(ruleFuncId, "__whenResult", whenResult);
 
-    const fired = presenceGated ? whenResult.t !== NativeType.Nil : isTruthy(whenResult);
+    const fired = presenceGated
+      ? whenResult.t !== NativeType.Nil
+      : isTruthy(whenResult, this.runtime.types, fiber.executionContext);
     brain.ruleFiring.set(
       ruleFuncId,
       chained

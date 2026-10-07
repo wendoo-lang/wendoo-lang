@@ -692,7 +692,8 @@ export class ExprCompiler implements ExprVisitor<void> {
    * nothing, and falls through with it otherwise. A value whose static type is
    * number, boolean, or string is tested with that type's own `!= nil`
    * operator, so `0`, `false`, and the empty string pass; any other value
-   * passes when it is truthy, as every struct, enum, and function value is.
+   * passes when it is truthy, as every enum and function value is, and every
+   * struct whose type's existence hook does not report it gone.
    *
    * Stack effect: `[value] -> [value]`.
    *
@@ -980,10 +981,11 @@ export class ExprCompiler implements ExprVisitor<void> {
   /**
    * Lowers a field read. A field whose object has a concrete struct type reads
    * by numeric id through a nil-tolerant chain: when the object, or any object
-   * further down an unbroken chain of id-keyed reads, is falsy (nil, void, or
-   * unknown -- a struct is always truthy), the whole chain yields NIL and no
-   * read after that link runs. Any other field resolves its name at runtime
-   * through `GET_FIELD`, which yields NIL for a non-struct object itself.
+   * further down an unbroken chain of id-keyed reads, is falsy (nil, void,
+   * unknown, or a struct whose type's existence hook reports it gone), the
+   * whole chain yields NIL and no read after that link runs. Any other field
+   * resolves its name at runtime through `GET_FIELD`, which yields NIL for a
+   * non-struct object itself.
    *
    * Stack effect: `[] -> [value]`.
    */

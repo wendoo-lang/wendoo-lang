@@ -2,7 +2,7 @@ import type { Dict } from "../platform/dict";
 import type { List } from "../platform/list";
 import type { StableIdOwner } from "./abi-ids";
 import type { Value } from "./value";
-import type { StructFieldGetterFn, StructFieldSetterFn, StructSnapshotNativeFn } from "./vm-types";
+import type { StructExistsFn, StructFieldGetterFn, StructFieldSetterFn, StructSnapshotNativeFn } from "./vm-types";
 
 // ----------------------------------------------------
 // Type System
@@ -240,6 +240,11 @@ export interface StructTypeShape {
    * Returns the resolved native value to store in the copy.
    */
   snapshotNative?: StructSnapshotNativeFn;
+  /**
+   * If provided, called by every truthiness test of a value of this type; a value it reports
+   * gone is falsy. Without it, every value of the type is truthy.
+   */
+  exists?: StructExistsFn;
   /** If provided, struct methods callable via HOST_CALL on instances of this type. */
   methods?: List<StructMethodDecl>;
   /** Stable type-atom id; see {@link TypeDef.atomId} for the assignment rules. */
