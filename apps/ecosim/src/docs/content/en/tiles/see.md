@@ -45,7 +45,8 @@ never a crate.
 ## Sight refreshes every third tick
 
 A creature re-checks what it can see on every third tick, and reuses the last answer in between.
-Right at the edge of a distance filter, that can make a rule look like it fires only some of the
+A creature that dies in between drops out of that answer at once, so see never targets one that is
+gone. Right at the edge of a distance filter, that can make a rule look like it fires only some of the
 time. That is the refresh cadence showing through, not chance.
 
 ## Example

@@ -99,25 +99,22 @@ function execSee(ctx: ExecutionContext, args: ReadonlyList<Value>): Value {
 
     // Build the filtered list in a single pass, avoiding redundant getActorById
     // lookups and distance recomputations.  Uses distanceSq already present on
-    // each SightResult (populated by queryVisibleActors).
-    let filteredSightQueue: SightResult[];
+    // each SightResult (populated by queryVisibleActors).  The sight queue
+    // persists between vision refreshes, so it can hold actors the engine has
+    // killed since; those are skipped.
+    const filteredSightQueue: SightResult[] = [];
 
     const needsArchetypeFilter = archetype !== undefined;
     const needsNearby = nearbyCount > 0;
     const needsFarAway = !needsNearby && farAwayCount > 0;
-    const needsAnyFilter = needsArchetypeFilter || needsNearby || needsFarAway;
 
-    if (needsAnyFilter) {
-      filteredSightQueue = [];
-      for (let i = 0; i < self.sightQueue.length; i++) {
-        const sr = self.sightQueue[i];
-        if (needsArchetypeFilter && sr.actor.archetype !== archetype) continue;
-        if (needsNearby && sr.distanceSq > nearbyThresholdSq) continue;
-        if (needsFarAway && sr.distanceSq < farAwayThresholdSq) continue;
-        filteredSightQueue.push(sr);
-      }
-    } else {
-      filteredSightQueue = self.sightQueue;
+    for (let i = 0; i < self.sightQueue.length; i++) {
+      const sr = self.sightQueue[i];
+      if (sr.actor.isDying) continue;
+      if (needsArchetypeFilter && sr.actor.archetype !== archetype) continue;
+      if (needsNearby && sr.distanceSq > nearbyThresholdSq) continue;
+      if (needsFarAway && sr.distanceSq < farAwayThresholdSq) continue;
+      filteredSightQueue.push(sr);
     }
 
     if (filteredSightQueue.length > 0) {
