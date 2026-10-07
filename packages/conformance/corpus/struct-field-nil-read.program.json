@@ -8,28 +8,6 @@
             "op": 70
           },
           {
-            "op": 0,
-            "a": 0
-          },
-          {
-            "op": 2
-          },
-          {
-            "op": 11,
-            "a": 0
-          },
-          {
-            "op": 71,
-            "a": 15
-          },
-          {
-            "op": 72
-          },
-          {
-            "op": 0,
-            "a": 1
-          },
-          {
             "op": 10,
             "a": 0
           },
@@ -53,7 +31,22 @@
           },
           {
             "op": 0,
-            "a": 1
+            "a": 0
+          },
+          {
+            "op": 71,
+            "a": 7
+          },
+          {
+            "op": 72
+          },
+          {
+            "op": 0,
+            "a": 0
+          },
+          {
+            "op": 4,
+            "a": 0
           },
           {
             "op": 6,
@@ -69,16 +62,8 @@
             "op": 73
           },
           {
-            "op": 32,
-            "a": 1
-          },
-          {
-            "op": 32,
-            "a": 2
-          },
-          {
             "op": 0,
-            "a": 1
+            "a": 0
           },
           {
             "op": 31
@@ -93,7 +78,7 @@
           },
           {
             "op": 0,
-            "a": 1
+            "a": 0
           },
           {
             "op": 10,
@@ -108,7 +93,7 @@
           },
           {
             "op": 114,
-            "a": 1
+            "a": 0
           },
           {
             "op": 20,
@@ -119,7 +104,7 @@
           },
           {
             "op": 0,
-            "a": 1
+            "a": 0
           },
           {
             "op": 6,
@@ -136,43 +121,7 @@
           },
           {
             "op": 0,
-            "a": 1
-          },
-          {
-            "op": 31
-          }
-        ],
-        "numParams": 0
-      },
-      {
-        "code": [
-          {
-            "op": 72
-          },
-          {
-            "op": 0,
-            "a": 1
-          },
-          {
-            "op": 10,
             "a": 0
-          },
-          {
-            "op": 6,
-            "a": 0
-          },
-          {
-            "op": 44,
-            "a": 1025,
-            "b": 1,
-            "c": 2
-          },
-          {
-            "op": 73
-          },
-          {
-            "op": 0,
-            "a": 1
           },
           {
             "op": 31
@@ -182,35 +131,17 @@
       }
     ],
     "constantPools": {
-      "numbers": [],
+      "numbers": [
+        1
+      ],
       "strings": [],
       "values": [
-        {
-          "t": 8,
-          "typeId": "struct:<Point>",
-          "v": [
-            {
-              "t": 3,
-              "v": 3.5
-            },
-            {
-              "t": 3,
-              "v": -4.25
-            }
-          ]
-        },
         {
           "t": 1
         }
       ]
     },
-    "types": [
-      {
-        "tag": "atom",
-        "typeId": "struct:<Point>",
-        "atomId": 1024
-      }
-    ],
+    "types": [],
     "variableNames": [
       "pos"
     ],
@@ -218,19 +149,9 @@
     "actions": [],
     "ruleFuncIds": [
       0,
-      1,
-      2
+      1
     ],
-    "ruleAncestors": [
-      {
-        "ruleFuncId": 1,
-        "parentRuleFuncId": 0
-      },
-      {
-        "ruleFuncId": 2,
-        "parentRuleFuncId": 0
-      }
-    ]
+    "ruleAncestors": []
   },
   "pages": [
     {
@@ -238,7 +159,8 @@
       "pageId": "1uQGngetiRKxqU5k",
       "pageName": "Unnamed Page",
       "rootRuleFuncIds": [
-        0
+        0,
+        1
       ],
       "actionCallSites": [
         {
@@ -249,11 +171,6 @@
         {
           "binding": "host",
           "callSiteId": 1,
-          "actionId": 1025
-        },
-        {
-          "binding": "host",
-          "callSiteId": 2,
           "actionId": 1025
         }
       ]

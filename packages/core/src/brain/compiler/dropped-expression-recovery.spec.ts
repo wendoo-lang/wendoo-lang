@@ -10,18 +10,24 @@
 
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-
-import type { ReadonlyList } from "@wendoo/core";
 import {
   coreModule,
   createHostActuator,
   createHostSensor,
   createWendooEnvironment,
+  List,
+  type ReadonlyList,
   type WendooEnvironment,
   type WendooModule,
 } from "@wendoo/core";
 import type { IBrainDef, IBrainTileDef } from "@wendoo/core/brain";
-import { CoreControlFlowId, mkControlFlowTileId, mkOperatorTileId, RuleSide } from "@wendoo/core/brain";
+import {
+  CoreControlFlowId,
+  mkAccessorTileId,
+  mkControlFlowTileId,
+  mkOperatorTileId,
+  RuleSide,
+} from "@wendoo/core/brain";
 import { __test__appendTile } from "@wendoo/core/brain/__test__";
 import type { BrainBuildDiagnostic, DiagCode } from "@wendoo/core/brain/compiler";
 import { CompilationDiagCode, ParseDiagCode, TypeDiagCode } from "@wendoo/core/brain/compiler";
@@ -35,6 +41,7 @@ import {
   type ErrorValue,
   getSlotId,
   mkCallDef,
+  mkTypeId,
   mod,
   NativeType,
   optional,
@@ -51,6 +58,8 @@ const kVoidSensorKey = "droppedspec.nothing";
 const kSteadyModifierId = "droppedspec-steady";
 const kFastModifierId = "droppedspec-fast";
 const kAmountParameterId = "droppedspec-amount";
+const kPosTypeId = mkTypeId(NativeType.Struct, "DroppedSpecPos");
+const kBodyTypeId = mkTypeId(NativeType.Struct, "DroppedSpecBody");
 
 /**
  * Native type tag of each positional argument one `steer` call received, in
@@ -146,6 +155,22 @@ function createFixture(): Fixture {
     module: {
       id: "dropped-expression-spec-host",
       install(api): void {
+        api.defineType({
+          coreType: NativeType.Struct,
+          typeId: kPosTypeId,
+          name: "DroppedSpecPos",
+          atomId: 1024,
+          fields: List.from([{ name: "x", typeId: CoreTypeIds.Number, fieldIndex: 0 }]),
+          accessors: true,
+        });
+        api.defineType({
+          coreType: NativeType.Struct,
+          typeId: kBodyTypeId,
+          name: "DroppedSpecBody",
+          atomId: 1025,
+          fields: List.from([{ name: "pos", typeId: kPosTypeId, fieldIndex: 0 }]),
+          accessors: true,
+        });
         api.registerHostActuator(steer);
         api.registerHostActuator(mark);
         api.registerHostSensor(voidSensor);
@@ -341,6 +366,26 @@ describe("a dropped expression leaves a program the VM runs", () => {
 
     assertRecovered(outcome);
     assert.deepEqual(droppedDiags(outcome), [], "an unmatched overload is not an expression drop");
+    assert.deepEqual([...outcome.gates.values()], [false], "the rule reached its gate and did not fire");
+    assert.equal(fixture.markCalls(), 0);
+  });
+
+  test("a recovered base under two accessors reads nil, gating its rule off instead of faulting", () => {
+    const fixture = createFixture();
+    const { environment, brainDef, rule } = newBrain(fixture);
+    const tiles = environment.brainServices.edit.tiles;
+
+    // An empty group stands NIL in for the base of `[pos] [x]`.
+    __test__appendTile(rule.when(), tiles.get(mkControlFlowTileId(CoreControlFlowId.OpenParen))!);
+    __test__appendTile(rule.when(), tiles.get(mkControlFlowTileId(CoreControlFlowId.CloseParen))!);
+    __test__appendTile(rule.when(), tiles.get(mkAccessorTileId(kBodyTypeId, "pos"))!);
+    __test__appendTile(rule.when(), tiles.get(mkAccessorTileId(kPosTypeId, "x"))!);
+    __test__appendTile(rule.do(), fixture.markTile);
+
+    const outcome = buildAndRun(environment, brainDef);
+
+    assertRecovered(outcome);
+    assert.ok(droppedDiags(outcome).length > 0, "the empty group is reported as a drop");
     assert.deepEqual([...outcome.gates.values()], [false], "the rule reached its gate and did not fire");
     assert.equal(fixture.markCalls(), 0);
   });

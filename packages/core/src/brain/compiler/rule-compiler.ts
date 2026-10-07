@@ -547,15 +547,7 @@ export class ExprCompiler implements ExprVisitor<void> {
       // Field assignment: object.field = value
       const fieldId = this.context.typeEnv.get(expr.target.nodeId)?.fieldId;
       if (fieldId !== undefined) {
-        // Id-based store. Convert the value into the field's type if inference
-        // annotated a conversion, deep-copy it to preserve the brain's struct
-        // value-semantics (STRUCT_DEEP_COPY is a runtime no-op for non-structs),
-        // then store by numeric id. STRUCT_SET_FIELD pops [struct, value].
-        acceptExprVisitor(expr.target.object, this);
-        acceptExprVisitor(expr.value, this);
-        this.emitConversionIfNeeded(expr.value.nodeId);
-        this.emitter.structDeepCopy();
-        this.emitter.structSetField(fieldId);
+        this.emitGuardedFieldStore(expr.target, expr.value, fieldId);
       } else {
         // Fallback: name-keyed store. SET_FIELD deep-copies the value internally, so
         // no explicit STRUCT_DEEP_COPY here.
@@ -590,6 +582,38 @@ export class ExprCompiler implements ExprVisitor<void> {
 
       // Stack now contains the assigned value (assignment as expression)
     }
+  }
+
+  /**
+   * Lowers an assignment of `value` to the field `fieldId` of `target`'s object,
+   * whose static type is a concrete struct. The object, then the value,
+   * evaluate unconditionally; the value converts into the field's type if
+   * inference annotated a conversion. When the object is a struct, the value is
+   * deep-copied (preserving the brain's struct value-semantics) and stored by
+   * numeric id. When the object is falsy (nil, void, or unknown), the store is
+   * skipped and the value discarded. Either way the object is left as the
+   * assignment's result.
+   *
+   * Stack effect: `[] -> [object]`.
+   */
+  private emitGuardedFieldStore(target: FieldAccessExpr, value: Expr, fieldId: number): void {
+    const skipLabel = this.emitter.label();
+    const endLabel = this.emitter.label();
+    // Two spare copies of the object: one tests the guard, one stays as the result.
+    acceptExprVisitor(target.object, this);
+    this.emitter.dup();
+    this.emitter.dup();
+    acceptExprVisitor(value, this);
+    this.emitConversionIfNeeded(value.nodeId);
+    // [object, object, object, value] -> [object, value, object]
+    this.emitter.stackSetRel(1);
+    this.emitter.jmpIfFalse(skipLabel);
+    this.emitter.structDeepCopy();
+    this.emitter.structSetField(fieldId);
+    this.emitter.jmp(endLabel);
+    this.emitter.mark(skipLabel);
+    this.emitter.pop();
+    this.emitter.mark(endLabel);
   }
 
   // ==========================================
@@ -836,18 +860,57 @@ export class ExprCompiler implements ExprVisitor<void> {
   // Field Access
   // ==========================================
 
+  /**
+   * Lowers a field read. A field whose object has a concrete struct type reads
+   * by numeric id through a nil-tolerant chain: when the object, or any object
+   * further down an unbroken chain of id-keyed reads, is falsy (nil, void, or
+   * unknown -- a struct is always truthy), the whole chain yields NIL and no
+   * read after that link runs. Any other field resolves its name at runtime
+   * through `GET_FIELD`, which yields NIL for a non-struct object itself.
+   *
+   * Stack effect: `[] -> [value]`.
+   */
   visitFieldAccess(expr: FieldAccessExpr): void {
-    acceptExprVisitor(expr.object, this);
     const fieldId = this.context.typeEnv.get(expr.nodeId)?.fieldId;
-    if (fieldId !== undefined) {
-      // Object's static type is a concrete struct: read the field by its numeric id.
-      this.emitter.structGetField(fieldId);
-    } else {
-      // Object's static type is not a concrete struct with this field: resolve the
-      // field name to its id at runtime via the name-keyed opcode.
+    if (fieldId === undefined) {
+      acceptExprVisitor(expr.object, this);
       this.pushStringConstant(expr.accessor.fieldName);
       this.emitter.getField();
+      return;
     }
+
+    const nilLabel = this.emitter.label();
+    const endLabel = this.emitter.label();
+    this.emitGuardedFieldRead(expr, fieldId, nilLabel);
+    this.emitter.jmp(endLabel);
+    this.emitter.mark(nilLabel);
+    // The falsy object the guard kept on the stack is replaced by the chain's NIL result.
+    this.emitter.pop();
+    this.pushNil();
+    this.emitter.mark(endLabel);
+  }
+
+  /**
+   * Emits the id-keyed read of `fieldId` from `expr`'s object, jumping to
+   * `nilLabel` with the falsy object on the stack when that object is falsy. An
+   * object that is itself an id-keyed field read is lowered by this same method
+   * against the same `nilLabel`, so a falsy link anywhere in the chain skips
+   * every read after it.
+   *
+   * Stack effect: `[] -> [value]` on fall-through, `[] -> [falsy object]` at
+   * `nilLabel`.
+   */
+  private emitGuardedFieldRead(expr: FieldAccessExpr, fieldId: number, nilLabel: number): void {
+    const object = expr.object;
+    const objectFieldId = object.kind === "fieldAccess" ? this.context.typeEnv.get(object.nodeId)?.fieldId : undefined;
+    if (object.kind === "fieldAccess" && objectFieldId !== undefined) {
+      this.emitGuardedFieldRead(object, objectFieldId, nilLabel);
+    } else {
+      acceptExprVisitor(object, this);
+    }
+    this.emitter.dup();
+    this.emitter.jmpIfFalse(nilLabel);
+    this.emitter.structGetField(fieldId);
   }
 
   // ==========================================

@@ -497,6 +497,37 @@
       "schedule": [16, 16]
     },
     {
+      "id": "struct-field-nil-read",
+      "source": "packages/conformance/src/cases/struct-field-nil-read.spec.ts",
+      "summary": "A field read of a struct variable no rule assigns, guarded by the compiler on its nil object, reading nil in a WHEN that therefore does not fire and in an emit, with nothing faulting.",
+      "behaviors": [
+        "host-sync-action-call",
+        "root-rule-respawn",
+        "rule-when-empty",
+        "rule-when-gate-falsy",
+        "struct-field-nil-read",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
+      "id": "struct-field-nil-write",
+      "source": "packages/conformance/src/cases/struct-field-nil-write.spec.ts",
+      "summary": "A field assignment through a struct variable no rule assigns, guarded by the compiler on its nil object, evaluating its value and skipping the store, with the field reading back nil and nothing faulting.",
+      "behaviors": [
+        "child-rule-spawn",
+        "child-rule-synchronous-cascade",
+        "host-sync-action-call",
+        "root-rule-respawn",
+        "struct-field-nil-read",
+        "struct-field-nil-write",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
       "id": "struct-field-reads",
       "source": "packages/conformance/src/cases/struct-field-reads.spec.ts",
       "summary": "An asynchronous struct reading captured into a variable, with slot-indexed field reads feeding the emits and no struct value in an observable position.",

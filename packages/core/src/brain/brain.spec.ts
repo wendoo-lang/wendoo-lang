@@ -2694,10 +2694,15 @@ describe("Brain -- slot-keyed variable storage", () => {
   });
 });
 
-// ---- Field access emits id-based opcodes ----
+// ---- Field access emits nil-guarded id-based opcodes ----
 
-describe("Field access emits id-based opcodes", () => {
-  function compileToInstrs(whenTiles: unknown[], doTiles: unknown[]): Instr[] {
+describe("Field access emits nil-guarded id-based opcodes", () => {
+  interface Compiled {
+    readonly instrs: Instr[];
+    readonly values: ReadonlyList<Value>;
+  }
+
+  function compileToInstrs(whenTiles: unknown[], doTiles: unknown[]): Compiled {
     const brainDef = buildBrain(whenTiles, doTiles);
     const result = compileBrain(
       brainDef,
@@ -2715,46 +2720,99 @@ describe("Field access emits id-based opcodes", () => {
         instrs.push(code.get(j));
       }
     }
-    return instrs;
+    return { instrs, values: result.program!.constantPools.values };
   }
 
-  test("a concretely-typed field read emits STRUCT_GET_FIELD with the object's field id (not GET_FIELD)", () => {
-    const vec = services.runtime.types.addStructType("Vec2EmitRead", {
-      atomId: 1024,
+  /** The `[op, a]` pairs of `count` instructions starting at `start`. */
+  function opsAt(instrs: Instr[], start: number, count: number): [number, number | undefined][] {
+    return instrs.slice(start, start + count).map((ins) => [ins.op, ins.a]);
+  }
+
+  /** Index of the first `LOAD_VAR_SLOT`, the base every test's field access starts from. */
+  function baseLoadIndex(instrs: Instr[]): number {
+    const idx = instrs.findIndex((ins) => ins.op === Op.LOAD_VAR_SLOT);
+    assert.ok(idx >= 0, "the base variable should load");
+    return idx;
+  }
+
+  function vec2Type(name: string, atomId: number): string {
+    return services.runtime.types.addStructType(name, {
+      atomId,
       fields: List.from([
         { name: "x", typeId: CoreTypeIds.Number, fieldIndex: 0 },
         { name: "y", typeId: CoreTypeIds.Number, fieldIndex: 1 },
       ]),
     });
+  }
+
+  test("a concretely-typed field read guards its object, then emits STRUCT_GET_FIELD with the field id", () => {
+    const vec = vec2Type("Vec2EmitRead", 1024);
     const vVar = new BrainTileVariableDef(mkVariableTileId("vec2-emit-read"), "vv", vec, "vec2-emit-read");
     const nVar = mkVar("nn", CoreTypeIds.Number);
     const accY = new BrainTileAccessorDef(vec, "y", CoreTypeIds.Number);
 
     // DO: $n = $v.y    (reads y, id 1)
-    const instrs = compileToInstrs([], [nVar, opAssign, vVar, accY]);
-    const reads = instrs.filter((ins) => ins.op === Op.STRUCT_GET_FIELD);
-    assert.equal(reads.length, 1, "should emit exactly one STRUCT_GET_FIELD");
-    assert.equal(reads[0].a, 1, "should read Vec2.y at id 1");
+    const { instrs, values } = compileToInstrs([], [nVar, opAssign, vVar, accY]);
+    const base = baseLoadIndex(instrs);
+    assert.deepEqual(opsAt(instrs, base + 1, 6), [
+      [Op.DUP, undefined],
+      [Op.JMP_IF_FALSE, 3],
+      [Op.STRUCT_GET_FIELD, 1],
+      [Op.JMP, 3],
+      [Op.POP, undefined],
+      [Op.PUSH_CONST_VAL, instrs[base + 6].a],
+    ]);
+    assert.equal(values.get(instrs[base + 6].a!).t, NativeType.Nil, "a falsy object reads NIL");
     assert.equal(instrs.filter((ins) => ins.op === Op.GET_FIELD).length, 0, "should not emit name-keyed GET_FIELD");
   });
 
-  test("a concretely-typed field write emits STRUCT_DEEP_COPY then STRUCT_SET_FIELD (not SET_FIELD)", () => {
-    const vec = services.runtime.types.addStructType("Vec2EmitWrite", {
-      atomId: 1025,
-      fields: List.from([
-        { name: "x", typeId: CoreTypeIds.Number, fieldIndex: 0 },
-        { name: "y", typeId: CoreTypeIds.Number, fieldIndex: 1 },
-      ]),
+  test("a depth-2 field chain guards each link and shares one NIL result", () => {
+    const pos = vec2Type("Vec2EmitChainPos", 1026);
+    const body = services.runtime.types.addStructType("BodyEmitChain", {
+      atomId: 1027,
+      fields: List.from([{ name: "pos", typeId: pos, fieldIndex: 0 }]),
     });
+    const bVar = new BrainTileVariableDef(mkVariableTileId("body-emit-chain"), "bb", body, "body-emit-chain");
+    const nVar = mkVar("nn", CoreTypeIds.Number);
+    const accPos = new BrainTileAccessorDef(body, "pos", pos);
+    const accX = new BrainTileAccessorDef(pos, "x", CoreTypeIds.Number);
+
+    // DO: $n = $b.pos.x
+    const { instrs, values } = compileToInstrs([], [nVar, opAssign, bVar, accPos, accX]);
+    const base = baseLoadIndex(instrs);
+    assert.deepEqual(opsAt(instrs, base + 1, 9), [
+      [Op.DUP, undefined],
+      [Op.JMP_IF_FALSE, 6],
+      [Op.STRUCT_GET_FIELD, 0],
+      [Op.DUP, undefined],
+      [Op.JMP_IF_FALSE, 3],
+      [Op.STRUCT_GET_FIELD, 0],
+      [Op.JMP, 3],
+      [Op.POP, undefined],
+      [Op.PUSH_CONST_VAL, instrs[base + 9].a],
+    ]);
+    assert.equal(values.get(instrs[base + 9].a!).t, NativeType.Nil, "a falsy link reads NIL");
+  });
+
+  test("a concretely-typed field write guards its object, then emits STRUCT_DEEP_COPY and STRUCT_SET_FIELD", () => {
+    const vec = vec2Type("Vec2EmitWrite", 1025);
     const vVar = new BrainTileVariableDef(mkVariableTileId("vec2-emit-write"), "vv", vec, "vec2-emit-write");
     const accX = new BrainTileAccessorDef(vec, "x", CoreTypeIds.Number);
 
     // DO: $v.x = 10
-    const instrs = compileToInstrs([], [vVar, accX, opAssign, mkLiteral(10)]);
-    const setIdx = instrs.findIndex((ins) => ins.op === Op.STRUCT_SET_FIELD);
-    assert.ok(setIdx >= 0, "should emit STRUCT_SET_FIELD");
-    assert.equal(instrs[setIdx].a, 0, "should write Vec2.x at id 0");
-    assert.equal(instrs[setIdx - 1].op, Op.STRUCT_DEEP_COPY, "STRUCT_DEEP_COPY must immediately precede the store");
+    const { instrs } = compileToInstrs([], [vVar, accX, opAssign, mkLiteral(10)]);
+    const base = baseLoadIndex(instrs);
+    assert.deepEqual(opsAt(instrs, base + 1, 9), [
+      [Op.DUP, undefined],
+      [Op.DUP, undefined],
+      [Op.PUSH_CONST_NUM, instrs[base + 3].a],
+      [Op.STACK_SET_REL, 1],
+      [Op.JMP_IF_FALSE, 4],
+      [Op.STRUCT_DEEP_COPY, undefined],
+      [Op.STRUCT_SET_FIELD, 0],
+      [Op.JMP, 2],
+      [Op.POP, undefined],
+    ]);
     assert.equal(instrs.filter((ins) => ins.op === Op.SET_FIELD).length, 0, "should not emit name-keyed SET_FIELD");
   });
 });

@@ -1,0 +1,9 @@
+mctrace 1
+profile 3e8
+precision f64
+tick 1 time 4030000000000000 dt 0000000000000000
+action 410 site 0 args 0 result number 7ff8000000000000
+action 401 site 1 args 1 nil result void
+tick 2 time 4040000000000000 dt 4030000000000000
+action 410 site 0 args 0 result number 7ff8000000000000
+action 401 site 1 args 1 nil result void
