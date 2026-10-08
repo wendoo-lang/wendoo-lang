@@ -198,6 +198,12 @@ a display field is PRESENT where that matters; never its content.
   the behavior under test.
 - Error and diagnostic assertions match stable codes, never message prose.
 
+The ban is a default with an explicit exception path, never a style
+preference: a test may pin display prose only under an exception ruled
+for that test, and the test states its exception where the reader meets
+it. A prose-pinning test without a stated exception is a defect in any
+suite, however old the test is.
+
 ## Report Every Issue With A Proposed Time
 
 When you notice a problem you are not fixing -- a defect adjacent to your change, a value that
