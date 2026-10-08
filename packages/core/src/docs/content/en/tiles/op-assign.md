@@ -92,7 +92,7 @@ Place the variable on the left, the `tile:tile.op->assign` tile in the middle, a
 }
 ```
 
-Works with any variable type -- numbers, booleans, and strings.
+Works with any variable type -- numbers, booleans, strings, and the data types an application defines.
 
 ## See Also
 

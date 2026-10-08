@@ -8,8 +8,10 @@ To create a variable: select a "Create a Variable" tile from the tile picker for
 
 ## Starting Value
 
-A brand-new variable already holds the empty value for its data type: a number starts at `0`,
-a true/false starts at `false`, and a text starts at `""` (the empty text).
+A brand-new number, true/false or text variable already holds the empty value for its data type:
+a number starts at `0`, a true/false starts at `false`, and a text starts at `""` (the empty text).
+A variable of a data type with no empty value starts out holding nothing until a rule assigns to
+it; `concept:nothing` has the details.
 You can read a variable straight away, before any rule has assigned to it -- a rule like
 "WHEN the count is under three" works from the very first frame.
 
@@ -105,7 +107,8 @@ Each brain instance has its own copy of every variable.
 ## Persistence
 
 Variable values persist across frames. A value written in one frame is still there on the next frame,
-unless the variable is reassigned.
+unless the variable is reassigned. A variable holding something that has since been removed, such
+as an object taken out of the world, reads as nothing.
 
 ## Tips
 

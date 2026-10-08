@@ -237,4 +237,10 @@ export const coreConceptDocs: readonly CoreConceptDocMeta[] = [
     tags: ["literals", "values", "numbers", "fundamentals"],
     contentKey: "literals",
   },
+  {
+    id: "nothing",
+    title: "When There Is No Value",
+    tags: ["nil", "nothing", "values", "parameters", "fundamentals"],
+    contentKey: "nothing",
+  },
 ] as const;

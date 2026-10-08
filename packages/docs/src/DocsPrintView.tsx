@@ -17,7 +17,12 @@ import {
   parseBrainFenceMeta,
   resolveBrainFenceTiles,
 } from "./brain-fence";
-import { useDocsBrainServices, useDocsResolveTileVisual, useDocsTileCatalog } from "./DocsSidebarContext";
+import {
+  useDocsBrainServices,
+  useDocsResolveTileVisual,
+  useDocsSidebar,
+  useDocsTileCatalog,
+} from "./DocsSidebarContext";
 
 // ---------------------------------------------------------------------------
 // Print-friendly tile chip -- no glass, no gradients, border-only
@@ -286,7 +291,7 @@ function PrintMarkdownCode({
   children?: ReactNode;
   node?: unknown;
 }) {
-  const tileCatalog = useDocsTileCatalog();
+  const { tileCatalog, registry } = useDocsSidebar();
   const lang = (className ?? "").replace("language-", "");
 
   if (lang === "brain") {
@@ -303,6 +308,14 @@ function PrintMarkdownCode({
         return <PrintInlineTileIcon tileDef={tileDef} />;
       }
       return <code className="docs-print-code-inline">{tileId}</code>;
+    }
+    if (text.startsWith("concept:")) {
+      const conceptId = text.slice(8);
+      const concept = registry.concepts.get(conceptId);
+      if (concept) {
+        return <>{concept.title}</>;
+      }
+      return <code className="docs-print-code-inline">{conceptId}</code>;
     }
     if (text.startsWith("tag:")) {
       const spec = parsePrintTagSpec(text);
@@ -323,7 +336,11 @@ interface DocsPrintViewProps {
   content: string;
 }
 
-/** Renders a markdown doc page with print-optimized styling. */
+/**
+ * Renders a markdown doc page with print-optimized styling. A `concept:xxx`
+ * reference prints as the concept page's registered title, and as the id it
+ * names when the registry holds no such concept.
+ */
 export function DocsPrintView({ content }: DocsPrintViewProps) {
   return (
     <div className="docs-print-view">

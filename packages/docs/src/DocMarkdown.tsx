@@ -6,7 +6,7 @@ import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { BrainCodeBlock } from "./BrainCodeBlock";
 import { InlineTileIcon } from "./DocsRule";
-import { useDocsResolveTileVisual, useDocsSidebar, useDocsTileCatalog } from "./DocsSidebarContext";
+import { useDocsResolveTileVisual, useDocsSidebar } from "./DocsSidebarContext";
 
 // ---------------------------------------------------------------------------
 // Tag pill helpers
@@ -78,6 +78,26 @@ function InlineTileLink({ tileId, tileDef }: { tileId: string; tileDef: IBrainTi
       aria-label={`View docs for ${label}`}
     >
       <InlineTileIcon tileDef={tileDef} />
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// InlineConceptLink -- a concept page's registered title, navigating to that
+// page on click.
+// ---------------------------------------------------------------------------
+
+function InlineConceptLink({ conceptId, title }: { conceptId: string; title: string }) {
+  const { navigateToEntry } = useDocsSidebar();
+
+  return (
+    <button
+      type="button"
+      data-concept-id={conceptId}
+      onClick={() => navigateToEntry("concepts", conceptId)}
+      className="text-foreground underline hover:text-foreground/80 transition-colors"
+    >
+      {title}
     </button>
   );
 }
@@ -243,7 +263,7 @@ const MD_COMPONENTS: Components = {
 };
 
 function MarkdownCode({ className, children, node }: { className?: string; children?: ReactNode; node?: unknown }) {
-  const tileCatalog = useDocsTileCatalog();
+  const { tileCatalog, registry } = useDocsSidebar();
   const lang = (className ?? "").replace("language-", "");
 
   if (lang === "brain") {
@@ -264,6 +284,14 @@ function MarkdownCode({ className, children, node }: { className?: string; child
         return <InlineTileLink tileId={tileId} tileDef={tileDef} />;
       }
       return <code className="bg-muted text-warning px-1 rounded text-xs font-mono">{tileId}</code>;
+    }
+    if (text.startsWith("concept:")) {
+      const conceptId = text.slice(8);
+      const concept = registry.concepts.get(conceptId);
+      if (concept) {
+        return <InlineConceptLink conceptId={conceptId} title={concept.title} />;
+      }
+      return <code className="bg-muted text-warning px-1 rounded text-xs font-mono">{conceptId}</code>;
     }
     if (text.startsWith("tag:")) {
       const spec = parseTagSpec(text);
@@ -287,8 +315,11 @@ interface DocMarkdownProps {
 /**
  * Render a markdown string with the docs-package custom components: ```brain```
  * fences are rendered via {@link BrainCodeBlock}, ```assistant``` fences via
- * {@link AssistantSection}, and `tile:xxx` references via
- * {@link InlineTileIcon}.
+ * {@link AssistantSection}, `tile:xxx` references via {@link InlineTileIcon},
+ * and `concept:xxx` references via {@link InlineConceptLink}, which reads the
+ * concept page's registered title and opens that page. A reference naming a
+ * tile the catalog does not hold, or a concept the registry does not hold,
+ * renders the id it names as warning-colored code.
  */
 export function DocMarkdown({ children }: DocMarkdownProps) {
   return (

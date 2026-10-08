@@ -84,8 +84,9 @@
   --color-brain-ink: #fff;
   --color-brain-recess: #000;
   /* The label an inline chip is read in where documentation prose names a tile
-     or a value type. */
-  --color-brain-inline-ink: #e2e8f0;
+     or a value type. Follows the theme's foreground so the label stays legible
+     on light and dark backgrounds alike. */
+  --color-brain-inline-ink: var(--color-foreground);
   /* Semantic amber, which marks a change: the word whose tile just changed,
      and text naming no tile that fits. It is never an accent.
      --color-brain-amber is the mark, --color-brain-amber-ink the same meaning

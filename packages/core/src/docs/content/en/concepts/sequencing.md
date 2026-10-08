@@ -464,7 +464,7 @@ is worth knowing in both directions: it is a handy switch, and it is a common su
 **ELSE fits in beside it.** An ELSE rule under a THEN takes the frames the THEN did not
 fire on, which includes every frame it is still waiting. That is the "meanwhile" branch,
 or the "it did not happen" branch, and it sits right next to the step it belongs to.
-What Starts a Rule has the details.
+`concept:trigger-modes` has the details.
 
 **Each step checks its own condition at its own moment.** A link with a condition reads
 it fresh, at the moment the step above finishes -- not back when the sequence started.

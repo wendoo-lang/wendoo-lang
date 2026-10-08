@@ -26,7 +26,7 @@ src/
   DocsSidebarContext.tsx   Provider, useDocsSidebar(), state management
   DocsSidebar.tsx          Slide-out sidebar (desktop) / fullscreen overlay (mobile)
   DocsPage.tsx             Standalone full-page docs view with URL sync
-  DocMarkdown.tsx          Markdown renderer with brain-fence and tile-ref support
+  DocMarkdown.tsx          Markdown renderer with brain-fence, tile-ref and concept-ref support
   DocsRule.tsx             Rule/tile chip rendering components
   BrainCodeBlock.tsx       Renders brain code fences as visual tiles/rules
   DocsPrintView.tsx        Print-friendly documentation layout
@@ -187,6 +187,16 @@ switch uses, and the copy affordance carries the mode into the destination brain
 through it, so the two surfaces accept exactly the same shapes.
 
 **Inline tile refs**: `` `tile:tile.op->add` `` renders as a colored tile chip.
+
+**Inline concept refs**: `` `concept:nothing` `` renders as a link reading the concept page's
+registered title, opening that page. Write the reference where the title would stand in the
+sentence: `` `concept:nothing` has the details. ``
+
+A tile ref naming a tile the catalog does not hold, and a concept ref naming a concept the
+registry does not hold, render the id as warning-colored code. `DocMarkdown` and
+`DocsPrintView` both resolve both forms; the print view prints a concept ref as the title alone.
+`core-content-concept-refs.spec.ts` sweeps the core content's concept refs against the core
+manifest's concept ids.
 
 **Inline tag pills**: `` `tag:Operator;color:#FFE500` `` renders as a colored badge.
 
