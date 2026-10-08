@@ -605,6 +605,18 @@ Two things worth knowing if you are diagnosing something similar:
   `plugin-react` dedupe -- which reproduces this error for reasons that have nothing to do with the
   repo's real configuration.
 
+**Toasts have one owner: this package.** `src/ui/sonner.tsx` exports `toast` and the `Toaster`
+region it raises toasts in, and `sonner` is a dependency of this package alone among the shared
+packages -- `@wendoo/docs` imports `toast` from `@wendoo/ui`. Two rules bind a consuming app:
+
+- **Every page the app mounts renders `Toaster`**, the standalone docs page included (pass it as a
+  child of `DocsPage`). A toast raised on a page with no `Toaster` is silently dropped.
+- **One sonner module copy per bundle.** Because this package is aliased to source, its `sonner`
+  import resolves from `packages/ui/node_modules`; an app importing `sonner` from its own
+  `node_modules` gets a second copy, and toasts raised through one copy never reach the other's
+  `Toaster`. Raise toasts through `@wendoo/ui`'s `toast`; an app that still depends on `sonner`
+  directly must set `resolve.dedupe: ["sonner"]` in its production config, as `apps/ecosim` does.
+
 **tsconfig.json**:
 
 ```json

@@ -101,10 +101,9 @@ src/
 ## Dependencies
 
 - **@wendoo/core** -- brain tile definitions, docs manifests, compiler services
-- **@wendoo/ui** -- TileVisual, color utilities, glass effects, rule clipboard
+- **@wendoo/ui** -- TileVisual, color utilities, glass effects, rule clipboard, toast notifications
 - **lucide-react** -- icons
 - **react-markdown + remark-gfm** -- markdown rendering
-- **sonner** -- toast notifications
 - **React 19** (peer dependency)
 
 ## Development

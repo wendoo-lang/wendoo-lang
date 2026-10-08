@@ -1,9 +1,9 @@
 import type { ITileCatalog } from "@wendoo/core/brain";
 import type { TileCatalog } from "@wendoo/core/brain/tiles";
+import { toast } from "@wendoo/ui";
 import { setClipboardFromJson } from "@wendoo/ui/brain-editor/rule-clipboard";
 import { ClipboardCopy } from "lucide-react";
 import { useMemo } from "react";
-import { toast } from "sonner";
 import {
   type BrainFenceRule,
   brainFenceRuleTrigger,

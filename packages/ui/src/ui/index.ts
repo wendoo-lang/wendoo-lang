@@ -43,5 +43,5 @@ export type { LoadingIndicatorProps } from "./loading-indicator";
 export { LoadingIndicator } from "./loading-indicator";
 export { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "./popover";
 export { Slider } from "./slider";
-export { Toaster } from "./sonner";
+export { Toaster, toast } from "./sonner";
 export { Switch } from "./switch";

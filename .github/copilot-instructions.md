@@ -96,3 +96,8 @@ These instructions apply to all Copilot features, including inline tab completio
   floor survives `tailwind-merge`. A control that would deform is exempted in
   `ui.css` and reaches 44px another way; do not work around the floor at a call
   site.
+- Toasts have one owner: raise them with `toast` from `@wendoo/ui` and render its
+  `Toaster` on every page an app mounts, the standalone docs page included. `sonner`
+  is this package's dependency alone among the shared packages; an app importing
+  `sonner` itself bundles a second copy whose toasts never reach the `Toaster`, unless
+  its production config sets `resolve.dedupe: ["sonner"]`.
