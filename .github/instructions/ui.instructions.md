@@ -243,8 +243,9 @@ the app values win. The `--color-brain-*` group covers the editor: the page
 canvas and the rule cards, which are GRADIENT PAIRS and have no flat token --
 `desk-from` / `desk-to` / `desk-glow` and `rule-from` / `rule-to`, applied as a
 `linear-gradient` in a style prop, so `bg-brain-desk` and `bg-brain-rule` do not
-exist and resolve to nothing; `tile-border` and `armed`, `accent`
-/ `accent-ink` / `on-accent`, `ink` and `recess`, `inline-ink` (the label an
+exist and resolve to nothing; `desk-shade` (the shade cast onto the desk: the
+desk's inner-edge vignette and the offering panel's drop shadow);
+`tile-border` and `armed`, `accent` / `accent-ink` / `on-accent`, `ink` and `recess`, `inline-ink` (the label an
 inline chip carries in documentation prose), `amber` / `amber-ink` /
 `amber-wash`, `warn` / `warn-edge` / `warn-ink` (the badge on a tile whose
 reading is incomplete), `timed` / `timed-ink` (the badge on an action that may
@@ -252,6 +253,23 @@ take time; the ink draws both the chip's edge and its glyph), `capsule` /
 `capsule-edge` / `capsule-ink` with their `-otherwise` and `-then` triples
 (the trigger-mode switch at its two marked modes), and `pill` / `pill-hover` /
 `pill-edge` / `pill-ink`.
+
+Shadows a theme retunes are tokens of the same contract, in two shapes:
+
+- `--color-brain-desk-shade` is a color, composed into each surface's
+  `box-shadow` in its style prop, geometry fixed at the use site. It carries
+  its alpha: the shade's strength is what a theme sets, and no surface steps
+  it, so the alpha-step rule below does not apply to it.
+- `--shadow-brain-rule` is a whole `box-shadow` value, so a theme sets the
+  rule card's geometry along with its color. The editor's rule card and the
+  docs illustration of one both wear it. Read it as
+  `shadow-(--shadow-brain-rule)`, never `shadow-brain-rule`: Tailwind bakes a
+  `--shadow-*` theme value into its utility at build time, so that utility
+  keeps the default under any override.
+
+Neither is registered with `@property`. Themes set them on the document root,
+and a registered `inherits: false` property would not reach the surfaces
+below it.
 
 Roles the whole design system already names are taken from it, not re-minted
 under `--color-brain-*`: the editor's removal control and its badge for a tile

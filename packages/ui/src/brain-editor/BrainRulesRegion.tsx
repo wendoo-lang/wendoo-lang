@@ -25,7 +25,7 @@ export function BrainRulesRegion({ stand, children }: BrainRulesRegionProps) {
       style={{
         background: `radial-gradient(130% 90% at 50% -10%, var(--color-brain-desk-glow) 0%, transparent 55%), radial-gradient(circle at center, rgba(255, 255, 255, 0.035) 1px, transparent 1.3px), ${kBrainDeskFill}`,
         backgroundSize: "100% 100%, 22px 22px, 100% 100%",
-        boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.06), inset 0 4px 20px rgba(0, 0, 0, 0.45)",
+        boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.06), inset 0 4px 20px var(--color-brain-desk-shade)",
       }}
       aria-label="Brain page editor content"
       aria-busy={stand === "loading"}

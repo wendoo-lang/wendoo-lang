@@ -1,9 +1,9 @@
 /**
  * Pins that the editor's chrome reads its colors from the token contract: the
  * accent, the ink scale and its wells, semantic amber, the badges a tile
- * carries, the WHEN/DO capsules, the rule row's pills, and the shared
- * destructive role. Each test asserts the token reference a component emits and
- * the absence of a palette literal.
+ * carries, the WHEN/DO capsules, the rule row's pills, the shared destructive
+ * role, and the shadows cast on the desk and by a rule card. Each test asserts
+ * the token reference a component emits and the absence of a palette literal.
  *
  * Also pins that a placed tile and a candidate chip take their border from the
  * one shared computation.
@@ -20,6 +20,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { type ArmedTargetController, ArmedTargetProvider, type ArmedTileTarget } from "./ArmedTargetContext";
 import { type BrainEditorConfig, BrainEditorProvider } from "./BrainEditorContext";
 import { BrainRuleEditor } from "./BrainRuleEditor";
+import { BrainRulesRegion, type BrainRulesRegionProps } from "./BrainRulesRegion";
 import { BrainTile } from "./BrainTile";
 import {
   arrangeCandidateSubcategories,
@@ -273,5 +274,26 @@ describe("tile borders", () => {
     const expected = tileBorderColor(tileHues.when);
     assert.ok(renderRuleCard().includes(expected));
     assert.ok(renderStrip(tileDef).includes(expected));
+  });
+});
+
+describe("the editor's shadows", () => {
+  /** The desk-shade token's default value written as a palette literal. */
+  const shadeLiteral = /rgba\(0, ?0, ?0, ?0\.45\)/;
+
+  test("the rule card casts the rule card's shadow token", () => {
+    assert.ok(classes(renderRuleCard()).includes("shadow-(--shadow-brain-rule)"));
+  });
+
+  test("the desk's vignette takes the desk-shade token", () => {
+    const found = renderToStaticMarkup(createElement(BrainRulesRegion, { stand: "loading" } as BrainRulesRegionProps));
+    assert.ok(found.includes("var(--color-brain-desk-shade)"), found);
+    assert.ok(!shadeLiteral.test(found), found);
+  });
+
+  test("the offering panel's drop shadow takes the desk-shade token", () => {
+    const found = renderStrip(makeSensor(services, "token-shade"));
+    assert.ok(found.includes("var(--color-brain-desk-shade)"), found);
+    assert.ok(!shadeLiteral.test(found), found);
   });
 });

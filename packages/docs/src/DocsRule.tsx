@@ -300,7 +300,7 @@ function DocsRuleRow({ comment, trigger, whenTiles, doTiles, depth = 0, lineNumb
   return (
     <div
       role="img"
-      className={`flex flex-col rounded-xl border border-border p-2 mb-1 shadow-sm overflow-x-auto${comment ? "" : " h-30"}`}
+      className={`flex flex-col rounded-xl border border-border p-2 mb-1 shadow-(--shadow-brain-rule) overflow-x-auto${comment ? "" : " h-30"}`}
       aria-label={rowLabel}
       style={{
         marginLeft: depth * 32,

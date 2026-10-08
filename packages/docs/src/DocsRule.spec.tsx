@@ -1,16 +1,18 @@
 /**
- * Pins that the chips documentation prose renders inline read their label ink
- * from the token contract, and hold no palette literal of their own.
+ * Pins that what the docs draw reads the token contract: the chips
+ * documentation prose renders inline take their label ink from it and hold no
+ * palette literal of their own, and an illustrated rule card wears the rule
+ * card's shadow token.
  */
 
 import assert from "node:assert/strict";
 import { before, describe, test } from "node:test";
-import type { BrainServices } from "@wendoo/core/brain";
+import { type BrainServices, RuleTriggerMode } from "@wendoo/core/brain";
 import { __test__createBrainServices } from "@wendoo/core/brain/__test__";
 import { BrainTileSensorDef } from "@wendoo/core/brain/tiles";
 import { bag, CoreTypeIds, mkActionDescriptor, mkCallDef, NIL_VALUE } from "@wendoo/core/runtime";
 import { renderToStaticMarkup } from "react-dom/server";
-import { InlineTileIcon } from "./DocsRule";
+import { DocsRuleBlock, InlineTileIcon } from "./DocsRule";
 import { DocsSidebarProvider } from "./DocsSidebarContext";
 
 const INLINE_INK_TOKEN = "var(--color-brain-inline-ink)";
@@ -44,5 +46,18 @@ describe("the inline chip a tile reference renders as", () => {
     );
     assert.ok(html.includes(INLINE_INK_TOKEN), html);
     assert.ok(!/#e2e8f0/i.test(html), html);
+  });
+});
+
+describe("an illustrated rule card", () => {
+  test("casts the rule card's shadow token", () => {
+    const html = renderToStaticMarkup(
+      <DocsSidebarProvider>
+        <DocsRuleBlock
+          rules={[{ trigger: RuleTriggerMode.When, whenTiles: [], doTiles: [], depth: 0, children: [] }]}
+        />
+      </DocsSidebarProvider>
+    );
+    assert.ok(html.includes("shadow-(--shadow-brain-rule)"), html);
   });
 });

@@ -55,10 +55,18 @@
      desk holding cards of its own, and reads a step above the rule stops so it
      is legible as their container.
      --color-brain-armed is the ring drawn around the tile the tile picker is
-     armed on; it must stay clear of every hue a tile fill can take. */
+     armed on; it must stay clear of every hue a tile fill can take.
+     --color-brain-desk-shade is the shade cast onto the desk, alpha included:
+     the vignette along the desk's inner edge and the drop shadow of the
+     offering panel standing on it.
+     --shadow-brain-rule is the shadow a rule card casts, a whole box-shadow
+     value. Read it as `shadow-(--shadow-brain-rule)`, never
+     `shadow-brain-rule`; only the former follows a theme override. */
   --color-brain-desk-from: #191338;
   --color-brain-desk-to: #0e0a20;
   --color-brain-desk-glow: rgba(139, 108, 243, 0.14);
+  --color-brain-desk-shade: rgba(0, 0, 0, 0.45);
+  --shadow-brain-rule: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
   --color-brain-rule-from: #16143a;
   --color-brain-rule-to: #8b6cf3;
   --color-brain-panel: #241c4d;

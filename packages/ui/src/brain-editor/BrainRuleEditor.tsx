@@ -1141,7 +1141,7 @@ function BrainRuleEditorCard({
       {/* biome-ignore lint/a11y/useSemanticElements: changing to li requires restructuring BrainPageEditor */}
       <div
         ref={cardRef}
-        className={`flex flex-col p-2 sm:p-3 mb-1 rounded-xl border border-border shadow-sm hover:shadow-md transition-shadow w-fit relative${hasBodyBelowTiles ? "" : " h-30"}${isDragging ? ` ${kRuleChromeLayer}` : ""}`}
+        className={`flex flex-col p-2 sm:p-3 mb-1 rounded-xl border border-border shadow-(--shadow-brain-rule) hover:shadow-md transition-shadow w-fit relative${hasBodyBelowTiles ? "" : " h-30"}${isDragging ? ` ${kRuleChromeLayer}` : ""}`}
         style={{
           ...indentStyle,
           background: `${isGrabbed ? "linear-gradient(0deg, rgb(255 255 255 / 0.14), rgb(255 255 255 / 0.14)), " : ""}linear-gradient(55deg, var(--color-brain-rule-from) 0%, var(--color-brain-rule-to) 100%)`,

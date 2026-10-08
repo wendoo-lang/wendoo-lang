@@ -106,7 +106,7 @@ const kStripElements = `[${kStripFilterAttribute}],[${kStripPanelAttribute}],[${
 /** Surface the offering panel stands on, a step above the rule cards it holds. */
 const stripPanelStyle = {
   background: "var(--color-brain-panel)",
-  boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px rgba(0, 0, 0, 0.45)",
+  boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px var(--color-brain-desk-shade)",
 };
 
 /** Surface a candidate section stands on, the same fill a rule card carries. */
