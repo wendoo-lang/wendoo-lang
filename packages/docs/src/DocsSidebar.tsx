@@ -9,7 +9,7 @@ import { AcceleratorHelp } from "./AcceleratorHelp";
 import { DocMarkdown } from "./DocMarkdown";
 import { DocsEntryLink } from "./DocsEntryLink";
 import { DocsPrintView } from "./DocsPrintView";
-import type { DocsConceptEntry, DocsPatternEntry, DocsTileEntry } from "./DocsRegistry";
+import type { DocsConceptEntry, DocsPatternEntry, DocsRegistry, DocsTileEntry } from "./DocsRegistry";
 import { type DocTab, useDocsResolveTileVisual, useDocsSidebar } from "./DocsSidebarContext";
 import { DocsTileArgsSection } from "./DocsTileArgs";
 import { useDocsPrint } from "./useDocsPrint";
@@ -178,6 +178,37 @@ function getTileIconUrl(
  */
 function isActionArgTileKind(kind: IBrainTileDef["kind"] | undefined): boolean {
   return kind === "parameter" || kind === "modifier";
+}
+
+/** A tile entry the Tiles tab lists: one carrying a category. */
+export type ListedDocsTileEntry = DocsTileEntry & { category: string };
+
+/**
+ * The tile entries the Tiles tab lists, in registration order: each entry of
+ * `registry` carrying a category whose tile `tileCatalog` holds neither hidden
+ * nor deprecated -- a tile it does not hold counts as neither. While `search`
+ * is empty, entries whose tile is of a kind documented on its placing action's
+ * page are left out; while it is set, only the entries it matches by label,
+ * tile id, tag, category or content are listed, whatever their kind. An entry
+ * carrying no category is never listed.
+ *
+ * @param registry - The registry whose tile entries are listed.
+ * @param tileCatalog - Catalog the entries' tiles are read from; `undefined` reads every tile as visible.
+ * @param search - The search text; `""` while the reader is browsing.
+ * @param labelOf - The display label of the tile with the given id.
+ */
+export function listedTileEntries(
+  registry: DocsRegistry,
+  tileCatalog: ITileCatalog | undefined,
+  search: string,
+  labelOf: (tileId: string) => string
+): ListedDocsTileEntry[] {
+  const tiles = Array.from(registry.tiles.values()).filter((t): t is ListedDocsTileEntry => {
+    const tileDef = tileCatalog?.get(t.tileId);
+    return t.category !== undefined && !tileDef?.hidden && !tileDef?.deprecated;
+  });
+  if (!search) return tiles.filter((t) => !isActionArgTileKind(tileCatalog?.get(t.tileId)?.kind));
+  return tiles.filter((t) => matchesSearch(search, labelOf(t.tileId), t.tileId, t.tags, t.category, t.content));
 }
 
 // ---------------------------------------------------------------------------
@@ -418,23 +449,13 @@ export function DocsPanelContent({ tabBarClassName, scrollClassName = "p-3", sea
   );
 
   // Filter entries based on search
-  const filteredTiles = useMemo(() => {
-    const tiles = Array.from(registry.tiles.values()).filter((t) => {
-      const tileDef = tileCatalog?.get(t.tileId);
-      return !tileDef?.hidden && !tileDef?.deprecated;
-    });
-    if (!search) return tiles.filter((t) => !isActionArgTileKind(tileCatalog?.get(t.tileId)?.kind));
-    return tiles.filter((t) =>
-      matchesSearch(
-        search,
-        getTileLabel(tileCatalog, resolveTileVisual, t.tileId),
-        t.tileId,
-        t.tags,
-        t.category,
-        t.content
-      )
-    );
-  }, [registry, search, tileCatalog, resolveTileVisual]);
+  const filteredTiles = useMemo(
+    () =>
+      listedTileEntries(registry, tileCatalog, search, (tileId) =>
+        getTileLabel(tileCatalog, resolveTileVisual, tileId)
+      ),
+    [registry, search, tileCatalog, resolveTileVisual]
+  );
 
   const filteredPatterns = useMemo(() => {
     const patterns = Array.from(registry.patterns.values());

@@ -15,8 +15,13 @@
 export interface DocsTileEntry {
   tileId: string;
   tags: string[];
-  /** Category for grouping in the sidebar (e.g. "Sensors", "Operators"). */
-  category: string;
+  /**
+   * Category the sidebar lists the entry under (e.g. "Sensors", "Operators").
+   * Omit it to leave the entry unlisted: no list or search shows it, and it
+   * still opens by its tile id -- from a `tile:` reference, a tile's docs
+   * action, or its `/docs/tiles/<tileId>` page.
+   */
+  category?: string;
   /** Markdown content (may contain brain fences and tile: inline refs). */
   content: string;
 }
@@ -105,12 +110,12 @@ export class DocsRegistry {
     return this._concepts;
   }
 
-  /** All unique tile categories in registration order. */
+  /** All unique tile categories in registration order; unlisted entries carry none. */
   get tileCategories(): string[] {
     const seen = new Set<string>();
     const result: string[] = [];
     for (const entry of this._tiles.values()) {
-      if (!seen.has(entry.category)) {
+      if (entry.category !== undefined && !seen.has(entry.category)) {
         seen.add(entry.category);
         result.push(entry.category);
       }

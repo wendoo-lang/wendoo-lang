@@ -44,6 +44,12 @@ src/
 - **buildDocsRegistry**: Merges core docs (from `@wendoo/core/docs`) with optional
   app-specific entries. Apps supply `{ meta, content }` for tiles and patterns.
 - **DocsPage**: Full-page view with URL sync (`/docs/{tab}/{entryKey}`).
+- **Unlisted tile entries**: a `DocsTileEntry` carrying no `category` is in no
+  list and no search result -- `listedTileEntries` in `DocsSidebar.tsx` and the
+  registry's `tileCategories` both skip it -- yet opens by its tile id like any
+  other entry: from a `tile:` reference, `openDocsForTile`, or its
+  `/docs/tiles/<tileId>` page. Use it for a page reached only from the pages
+  and tiles that point to it.
 - **Tile chrome**: `DocsRule.tsx` draws its own read-only tile and rule chrome, but
   from the same source as the editor -- the `--color-brain-*` tokens, which it picks
   up by inheritance from whichever host app renders it, and the shared derivation in

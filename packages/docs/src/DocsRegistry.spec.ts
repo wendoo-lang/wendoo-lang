@@ -49,3 +49,28 @@ describe("DocsRegistry tile content templating", () => {
     assert.equal(registry.tiles.get(kButtonTileId)?.content, literal);
   });
 });
+
+describe("DocsRegistry unlisted tile entries", () => {
+  const kListedTileId = "tile.sensor->listed";
+  const kUnlistedTileId = "tile.sensor->unlisted";
+
+  /** A registry holding one entry carrying a category and one carrying none. */
+  function listingRegistry(): DocsRegistry {
+    const registry = new DocsRegistry();
+    registry.register({
+      tiles: [
+        { tileId: kListedTileId, tags: [], category: "Sensors", content: "listed" },
+        { tileId: kUnlistedTileId, tags: [], content: "unlisted" },
+      ],
+    });
+    return registry;
+  }
+
+  test("contribute no tile category", () => {
+    assert.deepEqual(listingRegistry().tileCategories, ["Sensors"]);
+  });
+
+  test("are held under their tile id", () => {
+    assert.equal(listingRegistry().tiles.get(kUnlistedTileId)?.tileId, kUnlistedTileId);
+  });
+});

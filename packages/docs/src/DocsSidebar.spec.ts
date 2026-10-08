@@ -1,6 +1,6 @@
 /**
- * Pins the desktop panel's resize arithmetic and where its footprint is
- * published.
+ * Pins the desktop panel's resize arithmetic, where its footprint is
+ * published, and which tile entries the Tiles tab lists.
  *
  * The panel publishes its footprint through the shared inset seam in
  * `packages/ui`. The source pin below asserts the panel writes no custom
@@ -11,7 +11,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { panelWidthPctAtPointer, separatorMoveAction } from "./DocsSidebar";
+import { DocsRegistry } from "./DocsRegistry";
+import { listedTileEntries, panelWidthPctAtPointer, separatorMoveAction } from "./DocsSidebar";
 
 const sidebarSource = readFileSync(fileURLToPath(new URL("./DocsSidebar.tsx", import.meta.url)), "utf8");
 
@@ -62,5 +63,37 @@ describe("the separator's drag end", () => {
     for (const prop of ["onPointerUp", "onPointerCancel", "onLostPointerCapture"]) {
       assert.match(sidebarSource, new RegExp(`${prop}=\\{handleSeparatorDragEnd\\}`));
     }
+  });
+});
+
+describe("listedTileEntries", () => {
+  const kListedTileId = "tile.sensor->listed";
+  const kUnlistedTileId = "tile.sensor->unlisted";
+  const kSharedContent = "sharedterm";
+
+  /** A registry holding one entry carrying a category and one carrying none, both holding {@link kSharedContent}. */
+  function listingRegistry(): DocsRegistry {
+    const registry = new DocsRegistry();
+    registry.register({
+      tiles: [
+        { tileId: kListedTileId, tags: [], category: "Sensors", content: kSharedContent },
+        { tileId: kUnlistedTileId, tags: [], content: kSharedContent },
+      ],
+    });
+    return registry;
+  }
+
+  /** The tile ids of the entries listed for `search` over {@link listingRegistry}. */
+  function listedIds(search: string): string[] {
+    return listedTileEntries(listingRegistry(), undefined, search, (tileId) => tileId).map((entry) => entry.tileId);
+  }
+
+  test("lists an entry carrying a category, and not one carrying none, while browsing", () => {
+    assert.deepEqual(listedIds(""), [kListedTileId]);
+  });
+
+  test("lists no entry carrying no category among search results, by content or by tile id", () => {
+    assert.deepEqual(listedIds(kSharedContent), [kListedTileId]);
+    assert.deepEqual(listedIds(kUnlistedTileId), []);
   });
 });
