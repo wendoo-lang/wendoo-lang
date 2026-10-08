@@ -20,3 +20,6 @@ Text values used for display and identification.
 
 These are the basic data types common to all Wendoo-enabled experiences. Applications
 may define their own data types in addition.
+
+A variable of any type can also hold nothing, which is no value at all; `concept:nothing` has
+the details.

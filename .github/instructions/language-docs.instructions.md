@@ -202,7 +202,8 @@ A tile ref naming a tile the catalog does not hold, and a concept ref naming a c
 registry does not hold, render the id as warning-colored code. `DocMarkdown` and
 `DocsPrintView` both resolve both forms; the print view prints a concept ref as the title alone.
 `core-content-concept-refs.spec.ts` sweeps the core content's concept refs against the core
-manifest's concept ids.
+manifest's concept ids, and `core-content-tile-refs.spec.ts` its tile refs against the core
+catalog.
 
 **Inline tag pills**: `` `tag:Operator;color:#FFE500` `` renders as a colored badge.
 
@@ -225,11 +226,26 @@ resolves -- reading the markdown source, so an edit is swept before core's `buil
 runs. It resolves the `${tileId}` placeholder the way `DocsRegistry.register` does, and
 names the tile pages the core manifest registers no entry for, whose fences it skips.
 
-A tile doc never restates a default, a range, or a unit its action declares on the
-argument slot: those are structure, read out of the call spec by the editor, the runtime's
+A tile doc never restates a default or a range its action declares on the argument
+slot: those are structure, read out of the call spec by the editor, the runtime's
 tests, and the assistant alike, and a second copy in prose drifts from the first. Doc
 prose says what a value MEANS -- what the thing it sets does, what picking a larger or
-smaller one gets you -- and leaves the number to the declaration.
+smaller one gets you -- and leaves the number to the declaration. Units are the
+exception while no surface reads a declared unit out of the call spec: prose may name
+the unit, because the reader otherwise has no way to learn it; once a surface shows
+declared units, unit prose follows defaults and ranges out of the pages.
+
+## Audience and Restraint
+
+The docs serve kids learning the basics. Clear and simple beats complete: a page says what a
+tile or idea does in the plain case, and kids meet the edge cases and the fuller feature set
+through play and example. The tile language is larger than any page shows, so restraint is the
+default, and when in doubt a page says less.
+
+- When a claim on a page turns out false, prefer removing the overclaim to documenting the
+  fuller behavior.
+- Do not document an extension mechanism, or an exception that behaves the way a kid would
+  already expect.
 
 ## Consuming This Package
 

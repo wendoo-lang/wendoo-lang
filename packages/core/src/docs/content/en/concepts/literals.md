@@ -26,6 +26,10 @@ and with `tile:tile.op->assign` to set boolean variables.
 
 String literals are short text values.
 
+## Nil Literal
+
+The nil literal stands for no value at all; `concept:nothing` has the details.
+
 ## When to Use a Literal vs. a Variable
 
 Use a literal when the value never changes. Use a `tile:tile.op->assign` variable

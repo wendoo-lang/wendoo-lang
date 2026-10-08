@@ -50,7 +50,7 @@ function coreContentConceptRefs(): ContentConceptRef[] {
 }
 
 describe("the concept references in the core docs content", () => {
-  test("are found at all, so an empty sweep cannot pass as a clean one", () => {
+  test("number at least one", () => {
     assert.ok(coreContentConceptRefs().length > 0, `no concept references found under ${CORE_CONTENT_DIR}`);
   });
 

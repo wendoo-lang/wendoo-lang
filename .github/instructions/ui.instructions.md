@@ -249,8 +249,9 @@ inline chip carries in documentation prose), `amber` / `amber-ink` /
 `amber-wash`, `warn` / `warn-edge` / `warn-ink` (the badge on a tile whose
 reading is incomplete), `timed` / `timed-ink` (the badge on an action that may
 take time; the ink draws both the chip's edge and its glyph), `capsule` /
-`capsule-edge` / `capsule-ink`, and `pill` / `pill-hover` / `pill-edge` /
-`pill-ink`.
+`capsule-edge` / `capsule-ink` with their `-otherwise` and `-then` triples
+(the trigger-mode switch at its two marked modes), and `pill` / `pill-hover` /
+`pill-edge` / `pill-ink`.
 
 Roles the whole design system already names are taken from it, not re-minted
 under `--color-brain-*`: the editor's removal control and its badge for a tile

@@ -4,7 +4,7 @@
 
 # Multiply
 
-Multiplies two numbers.
+Multiplies two values together.
 
 ---
 

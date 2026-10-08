@@ -109,11 +109,8 @@
   /* The WHEN and DO capsules standing at the head of each side of a rule.
      --color-brain-capsule, --color-brain-capsule-edge and
      --color-brain-capsule-ink fill, rim and letter the DO capsule, and the
-     trigger-mode switch while it stands at the `when` mode: a dark fill under
-     white letters. The -otherwise and -then triples paint it at its two other
-     modes as solid bright chips under dark letters, the treatment a placed tile
-     wears -- a saturated fill, an edge of the same hue well darkened, and near
-     black letters.
+     trigger-mode switch while it stands at the `when` mode. The -otherwise and
+     -then triples fill, rim and letter the switch at its two other modes.
      Rules a theme must hold to:
      - The two marked modes hold one fill lightness and separate from each other
        by hue, 120 degrees apart here, which is what carries them apart where a

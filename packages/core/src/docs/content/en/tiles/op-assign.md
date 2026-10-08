@@ -4,7 +4,7 @@
 
 # Gets
 
-Sets a variable to a new value.
+Sets a variable, or a part of something, to a new value.
 
 ---
 

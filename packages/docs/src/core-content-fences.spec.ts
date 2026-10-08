@@ -115,7 +115,7 @@ before(() => {
 });
 
 describe("the brain fences in the core docs content", () => {
-  test("are found at all, so an empty sweep cannot pass as a clean one", () => {
+  test("number at least one", () => {
     assert.ok(coreContentFences().length > 0, `no brain fences found under ${CORE_CONTENT_DIR}`);
   });
 

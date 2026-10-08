@@ -56,9 +56,9 @@ Set the time interval by providing an anonymous numeric parameter. Value is in s
 
 ## Modifiers & Parameters
 
-| Parameter   | Type     | Description                                 |
-| ----------- | -------- | ------------------------------------------- |
-| (anonymous) | `Number` | The time interval, in seconds. Default: `1` |
+| Parameter   | Type     | Description                    |
+| ----------- | -------- | ------------------------------ |
+| (anonymous) | `Number` | The time interval, in seconds. |
 
 ## See Also
 

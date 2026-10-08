@@ -4,7 +4,7 @@
 
 # Subtract
 
-Subtracts the right number from the left number.
+Subtracts the value on the right from the value on the left.
 
 ---
 

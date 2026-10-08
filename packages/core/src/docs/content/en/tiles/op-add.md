@@ -4,7 +4,7 @@
 
 # Add
 
-Adds two numbers together.
+Adds two values together. Adding two texts joins them into one.
 
 ---
 
