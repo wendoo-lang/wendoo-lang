@@ -189,9 +189,27 @@ export function InlineTileIcon({ tileDef, className }: InlineTileIconProps) {
   const resolveTileVisual = useDocsResolveTileVisual();
   const visual = resolveTileVisual(tileDef);
   const label = visual?.label || tileDef.tileId.split(".").pop() || tileDef.tileId;
-  const iconUrl = visual?.iconUrl;
   const baseColor = visual?.colorDef?.when || visual?.colorDef?.do || kDefaultTileHue;
 
+  return <InlineTileChip label={label} iconUrl={visual?.iconUrl} baseColor={baseColor} className={className} />;
+}
+
+interface InlineTileChipProps {
+  /** Text the chip reads as. */
+  label: string;
+  /** Icon drawn before the label, as an image source, or undefined for none. */
+  iconUrl: string | undefined;
+  /** Hex color of the chip's border, its fill a faint wash of it; the default tile hue when omitted. */
+  baseColor?: string;
+  /** Additional classes merged onto the chip's root element. */
+  className?: string;
+}
+
+/**
+ * The compact chip an inline `tile:xxx` reference is drawn as, from a label
+ * and an icon already resolved.
+ */
+export function InlineTileChip({ label, iconUrl, baseColor = kDefaultTileHue, className }: InlineTileChipProps) {
   return (
     <span
       className={cn(

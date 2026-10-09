@@ -5,7 +5,7 @@ import { useState } from "react";
 import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { BrainCodeBlock } from "./BrainCodeBlock";
-import { InlineTileIcon } from "./DocsRule";
+import { InlineTileChip, InlineTileIcon } from "./DocsRule";
 import { useDocsResolveTileVisual, useDocsSidebar } from "./DocsSidebarContext";
 
 // ---------------------------------------------------------------------------
@@ -78,6 +78,26 @@ function InlineTileLink({ tileId, tileDef }: { tileId: string; tileDef: IBrainTi
       aria-label={`View docs for ${label}`}
     >
       <InlineTileIcon tileDef={tileDef} />
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// InlineEntryLink -- a `tile:` reference to a registry entry no catalog tile
+// stands for, drawn with the label and icon the entry carries.
+// ---------------------------------------------------------------------------
+
+function InlineEntryLink({ tileId, label, iconUrl }: { tileId: string; label: string; iconUrl: string | undefined }) {
+  const { navigateToEntry } = useDocsSidebar();
+
+  return (
+    <button
+      type="button"
+      onClick={() => navigateToEntry("tiles", tileId)}
+      className="inline-flex shrink-0 cursor-pointer hover:brightness-125 transition-[filter]"
+      aria-label={`View docs for ${label}`}
+    >
+      <InlineTileChip label={label} iconUrl={iconUrl} />
     </button>
   );
 }
@@ -283,6 +303,10 @@ function MarkdownCode({ className, children, node }: { className?: string; child
       if (tileDef) {
         return <InlineTileLink tileId={tileId} tileDef={tileDef} />;
       }
+      const entry = registry.tiles.get(tileId);
+      if (entry?.label) {
+        return <InlineEntryLink tileId={tileId} label={entry.label} iconUrl={entry.iconUrl} />;
+      }
       return <code className="bg-muted text-warning px-1 rounded text-xs font-mono">{tileId}</code>;
     }
     if (text.startsWith("concept:")) {
@@ -317,9 +341,12 @@ interface DocMarkdownProps {
  * fences are rendered via {@link BrainCodeBlock}, ```assistant``` fences via
  * {@link AssistantSection}, `tile:xxx` references via {@link InlineTileIcon},
  * and `concept:xxx` references via {@link InlineConceptLink}, which reads the
- * concept page's registered title and opens that page. A reference naming a
- * tile the catalog does not hold, or a concept the registry does not hold,
- * renders the id it names as warning-colored code.
+ * concept page's registered title and opens that page. A tile reference the
+ * catalog holds no tile for, naming a registry entry that carries a label,
+ * renders that label and the entry's icon and opens the entry. Any other
+ * reference naming a tile the catalog does not hold, and a reference naming a
+ * concept the registry does not hold, renders the id it names as
+ * warning-colored code.
  */
 export function DocMarkdown({ children }: DocMarkdownProps) {
   return (

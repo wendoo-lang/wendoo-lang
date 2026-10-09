@@ -54,7 +54,9 @@ src/
   and `iconUrl`, which the docs show for it while the tile catalog holds no
   tile under its `tileId`; a tile the catalog holds always shows its own.
   `tileEntryVisual` in `DocsSidebar.tsx` is the one resolution, read by the
-  list card, the search, and the no-docs fallback. Use it for a page naming
+  list card, the search, and the no-docs fallback; a `tile:` reference to the
+  entry draws the same label and icon, in `DocMarkdown` and `DocsPrintView`
+  alike. Use it for a page naming
   something no tile is. A type no variable factory tile stands for keys its
   page under the id that factory tile would hold, so the type has one page
   under one id -- listed once, its deep link unchanged -- whether or not a
@@ -207,9 +209,11 @@ through it, so the two surfaces accept exactly the same shapes.
 registered title, opening that page. Write the reference where the title would stand in the
 sentence: `` `concept:nothing` has the details. ``
 
-A tile ref naming a tile the catalog does not hold, and a concept ref naming a concept the
-registry does not hold, render the id as warning-colored code. `DocMarkdown` and
-`DocsPrintView` both resolve both forms; the print view prints a concept ref as the title alone.
+A tile ref naming a tile the catalog does not hold draws the label and icon of the registry entry
+it names while that entry carries a label. Any other tile ref naming a tile the catalog does not
+hold, and a concept ref naming a concept the registry does not hold, render the id as
+warning-colored code. `DocMarkdown` and `DocsPrintView` both resolve both forms; the print view
+prints a concept ref as the title alone.
 `core-content-concept-refs.spec.ts` sweeps the core content's concept refs against the core
 manifest's concept ids, and `core-content-tile-refs.spec.ts` its tile refs against the core
 catalog.

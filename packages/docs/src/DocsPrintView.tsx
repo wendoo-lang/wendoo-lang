@@ -195,9 +195,13 @@ function PrintInlineTileIcon({ tileDef }: { tileDef: IBrainTileDef }) {
   const resolveTileVisual = useDocsResolveTileVisual();
   const visual = resolveTileVisual(tileDef);
   const label = visual?.label || tileDef.tileId.split(".").pop() || tileDef.tileId;
-  const iconUrl = visual?.iconUrl;
   const baseColor = visual?.colorDef?.when || visual?.colorDef?.do || kDefaultTileHue;
 
+  return <PrintInlineTileChip label={label} iconUrl={visual?.iconUrl} baseColor={baseColor} />;
+}
+
+/** The printed chip of an inline `tile:xxx` reference, from a label, an icon and a border color already resolved. */
+function PrintInlineTileChip({ label, iconUrl, baseColor }: { label: string; iconUrl?: string; baseColor: string }) {
   return (
     <span className="docs-print-inline-tile" style={{ borderColor: baseColor }}>
       {iconUrl && <img src={iconUrl} alt="" className="docs-print-inline-tile-icon" aria-hidden="true" />}
@@ -307,6 +311,10 @@ function PrintMarkdownCode({
       if (tileDef) {
         return <PrintInlineTileIcon tileDef={tileDef} />;
       }
+      const entry = registry.tiles.get(tileId);
+      if (entry?.label) {
+        return <PrintInlineTileChip label={entry.label} iconUrl={entry.iconUrl} baseColor={kDefaultTileHue} />;
+      }
       return <code className="docs-print-code-inline">{tileId}</code>;
     }
     if (text.startsWith("concept:")) {
@@ -337,9 +345,12 @@ interface DocsPrintViewProps {
 }
 
 /**
- * Renders a markdown doc page with print-optimized styling. A `concept:xxx`
- * reference prints as the concept page's registered title, and as the id it
- * names when the registry holds no such concept.
+ * Renders a markdown doc page with print-optimized styling. A `tile:xxx`
+ * reference the tile catalog holds no tile for prints the label and icon of
+ * the registry entry it names while that entry carries a label, and the id
+ * it names otherwise. A `concept:xxx` reference prints as the concept page's
+ * registered title, and as the id it names when the registry holds no such
+ * concept.
  */
 export function DocsPrintView({ content }: DocsPrintViewProps) {
   return (

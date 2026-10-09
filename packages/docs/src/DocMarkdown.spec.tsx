@@ -2,8 +2,9 @@
  * Pins how the markdown renderer wraps fenced code: a brain fence and an
  * assistant section each draw their own container, and every other fence keeps
  * a block wrapper. Also pins that an assistant section opens closed, holding
- * none of its text until a reader opens it, and how a concept reference
- * resolves against the registry.
+ * none of its text until a reader opens it, how a concept reference resolves
+ * against the registry, and how a tile reference no catalog tile stands for
+ * resolves against the registry entry it names.
  */
 
 import assert from "node:assert/strict";
@@ -109,5 +110,42 @@ describe("a concept reference", () => {
       render(reference("concept", UNREGISTERED_CONCEPT_ID), registry),
       render(reference("tile", UNREGISTERED_CONCEPT_ID), registry)
     );
+  });
+});
+
+const LABELLED_ENTRY_ID = "tile.labelled-entry";
+const BARE_ENTRY_ID = "tile.bare-entry";
+
+/**
+ * A registry holding two tile entries no tile catalog holds a tile for: one
+ * carrying a label, under {@link LABELLED_ENTRY_ID}, and one carrying none,
+ * under {@link BARE_ENTRY_ID}.
+ */
+function entryRegistry(): DocsRegistry {
+  const registry = new DocsRegistry();
+  registry.register({
+    tiles: [
+      { tileId: LABELLED_ENTRY_ID, tags: [], label: "labelled-entry-label", content: "" },
+      { tileId: BARE_ENTRY_ID, tags: [], content: "" },
+    ],
+  });
+  return registry;
+}
+
+describe("a tile reference no catalog tile stands for", () => {
+  test("renders, for an entry carrying a label, a control reading as that label and no code", () => {
+    const registry = entryRegistry();
+    const html = render(reference("tile", LABELLED_ENTRY_ID), registry);
+    const label = /<button[^>]*><span[^>]*>([^<]*)<\/span><\/button>/.exec(html)?.[1];
+
+    assert.equal(label, registry.tiles.get(LABELLED_ENTRY_ID)?.label);
+    assert.doesNotMatch(html, /<code[\s>]/);
+  });
+
+  test("renders, for an entry carrying no label, the id it names as warning code and no control", () => {
+    const html = render(reference("tile", BARE_ENTRY_ID), entryRegistry());
+
+    assert.match(html, /<code class="[^"]*text-warning[^"]*">/);
+    assert.doesNotMatch(html, /<button[\s>]/);
   });
 });
