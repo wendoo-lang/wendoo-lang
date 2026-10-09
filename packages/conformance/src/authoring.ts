@@ -18,11 +18,17 @@ import { BrainTileOperatorDef, BrainTileVariableDef } from "@wendoo/core/brain/t
 import type { TypeCodec, TypeId } from "@wendoo/core/runtime";
 import {
   CONFORMANCE_ANCHOR_TYPE_ID,
+  CONFORMANCE_GAUGE_LITERAL_LABEL,
+  CONFORMANCE_GAUGE_TYPE_ID,
   CONFORMANCE_MARKER_TYPE_ID,
   CONFORMANCE_MODE_LITERAL_KEY,
   CONFORMANCE_MODE_TYPE_ID,
   CONFORMANCE_POINT_LITERAL_LABEL,
   CONFORMANCE_POINT_TYPE_ID,
+  CONFORMANCE_RIG_LITERAL_LABEL,
+  CONFORMANCE_RIG_TYPE_ID,
+  CONFORMANCE_SPOT_LITERAL_LABEL,
+  CONFORMANCE_SPOT_TYPE_ID,
   CONFORMANCE_TARGET_TYPE_ID,
   ConformanceHostActions,
   ConformanceOperators,
@@ -86,6 +92,16 @@ export interface ConformanceTiles {
   readonly anchorX: IBrainTileDef;
   /** Accessor tile on the `y` field of an `Anchor` value, dispatching the type's field hooks. */
   readonly anchorY: IBrainTileDef;
+  /** Accessor tile on the `at` field of an `Anchor` value: a `Point` snapshot its field getter hands out. */
+  readonly anchorAt: IBrainTileDef;
+  /** Accessor tile on the `anchor` field of a `Rig` value. */
+  readonly rigAnchor: IBrainTileDef;
+  /** Accessor tile on the `x` field of a `Spot` struct value. */
+  readonly spotX: IBrainTileDef;
+  /** Accessor tile on the `y` field of a `Spot` struct value. */
+  readonly spotY: IBrainTileDef;
+  /** Accessor tile on the routed `level` field of a `Gauge` value. */
+  readonly gaugeLevel: IBrainTileDef;
   /** Accessor tile reading the `value` field of a `Target` value through the type's field getter. */
   readonly targetValue: IBrainTileDef;
   /** Accessor tile reading the `x` field of a `Marker` value through the type's field getter. */
@@ -94,6 +110,12 @@ export interface ConformanceTiles {
   readonly modeSeek: IBrainTileDef;
   /** Literal tile carrying the closed `Point` struct constant `waypoint`. */
   readonly pointWaypoint: IBrainTileDef;
+  /** Literal tile carrying the `Rig` struct constant `bare rig`, holding no anchor. */
+  readonly rigBare: IBrainTileDef;
+  /** Literal tile carrying the `Spot` struct constant `home`, equal to the type's starting value. */
+  readonly spotHome: IBrainTileDef;
+  /** Literal tile carrying the `Gauge` struct constant `gauge one`. */
+  readonly gaugeOne: IBrainTileDef;
   /** Parameter tile naming the `ticks` argument of a deferred call. */
   readonly ticks: IBrainTileDef;
   /** Parameter tile naming the `period` argument of `signal`. */
@@ -156,6 +178,11 @@ export function conformanceTiles(environment: WendooEnvironment): ConformanceTil
     pointY: requireTile(environment, mkAccessorTileId(CONFORMANCE_POINT_TYPE_ID, "y")),
     anchorX: requireTile(environment, mkAccessorTileId(CONFORMANCE_ANCHOR_TYPE_ID, "x")),
     anchorY: requireTile(environment, mkAccessorTileId(CONFORMANCE_ANCHOR_TYPE_ID, "y")),
+    anchorAt: requireTile(environment, mkAccessorTileId(CONFORMANCE_ANCHOR_TYPE_ID, "at")),
+    rigAnchor: requireTile(environment, mkAccessorTileId(CONFORMANCE_RIG_TYPE_ID, "anchor")),
+    spotX: requireTile(environment, mkAccessorTileId(CONFORMANCE_SPOT_TYPE_ID, "x")),
+    spotY: requireTile(environment, mkAccessorTileId(CONFORMANCE_SPOT_TYPE_ID, "y")),
+    gaugeLevel: requireTile(environment, mkAccessorTileId(CONFORMANCE_GAUGE_TYPE_ID, "level")),
     targetValue: requireTile(environment, mkAccessorTileId(CONFORMANCE_TARGET_TYPE_ID, "value")),
     markerX: requireTile(environment, mkAccessorTileId(CONFORMANCE_MARKER_TYPE_ID, "x")),
     modeSeek: requireTile(environment, mkLiteralTileId(CONFORMANCE_MODE_TYPE_ID, CONFORMANCE_MODE_LITERAL_KEY)),
@@ -163,6 +190,9 @@ export function conformanceTiles(environment: WendooEnvironment): ConformanceTil
       environment,
       mkLiteralTileId(CONFORMANCE_POINT_TYPE_ID, CONFORMANCE_POINT_LITERAL_LABEL)
     ),
+    rigBare: requireTile(environment, mkLiteralTileId(CONFORMANCE_RIG_TYPE_ID, CONFORMANCE_RIG_LITERAL_LABEL)),
+    spotHome: requireTile(environment, mkLiteralTileId(CONFORMANCE_SPOT_TYPE_ID, CONFORMANCE_SPOT_LITERAL_LABEL)),
+    gaugeOne: requireTile(environment, mkLiteralTileId(CONFORMANCE_GAUGE_TYPE_ID, CONFORMANCE_GAUGE_LITERAL_LABEL)),
     ticks: requireTile(environment, mkParameterTileId(ConformanceParameterId.Ticks)),
     period: requireTile(environment, mkParameterTileId(ConformanceParameterId.Period)),
   };
@@ -388,6 +418,34 @@ export function pointVariable(brainDef: BrainDef, name: string): IBrainTileDef {
  */
 export function anchorVariable(brainDef: BrainDef, name: string): IBrainTileDef {
   const variable = new BrainTileVariableDef(`variable:conformance.${name}`, name, CONFORMANCE_ANCHOR_TYPE_ID, name);
+  brainDef.catalog().registerTileDef(variable);
+  return variable;
+}
+
+/**
+ * Mints a brain-scoped `Rig`-typed variable tile and registers it in
+ * `brainDef`'s catalog. The tile id and the variable's unique id are derived
+ * from `name`, so one authored case always names one variable slot.
+ *
+ * @param brainDef - Document the variable belongs to.
+ * @param name - Variable name, as authored and as compiled into the slot pool.
+ */
+export function rigVariable(brainDef: BrainDef, name: string): IBrainTileDef {
+  const variable = new BrainTileVariableDef(`variable:conformance.${name}`, name, CONFORMANCE_RIG_TYPE_ID, name);
+  brainDef.catalog().registerTileDef(variable);
+  return variable;
+}
+
+/**
+ * Mints a brain-scoped `Spot`-typed variable tile and registers it in
+ * `brainDef`'s catalog. The tile id and the variable's unique id are derived
+ * from `name`, so one authored case always names one variable slot.
+ *
+ * @param brainDef - Document the variable belongs to.
+ * @param name - Variable name, as authored and as compiled into the slot pool.
+ */
+export function spotVariable(brainDef: BrainDef, name: string): IBrainTileDef {
+  const variable = new BrainTileVariableDef(`variable:conformance.${name}`, name, CONFORMANCE_SPOT_TYPE_ID, name);
   brainDef.catalog().registerTileDef(variable);
   return variable;
 }

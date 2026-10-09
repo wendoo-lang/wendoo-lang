@@ -125,7 +125,9 @@ export interface TypeDef {
   /**
    * The value a brain variable of this type holds before anything writes to
    * it. Absent when the type has no meaningful empty value, in which case an
-   * unwritten variable of the type reads as nil.
+   * unwritten variable of the type reads as nil. A struct type's zero is a
+   * value of that type holding no native handle; every variable it seeds
+   * holds a fresh copy of it.
    */
   zero?: Value;
 }
@@ -249,6 +251,11 @@ export interface StructTypeShape {
   methods?: List<StructMethodDecl>;
   /** Stable type-atom id; see {@link TypeDef.atomId} for the assignment rules. */
   atomId?: number;
+  /**
+   * Starting value of a variable of this type. Must be a struct value of this
+   * type holding no native handle. Absent, a variable of the type starts nil.
+   */
+  zero?: Value;
 }
 
 /**

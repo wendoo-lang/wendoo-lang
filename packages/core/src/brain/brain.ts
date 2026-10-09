@@ -144,9 +144,10 @@ export class Brain implements IBrain {
   }
 
   /**
-   * Clear a variable by its name. Resets the underlying slot to the
-   * never-written sentinel; the slot itself is retained so subsequent
-   * bytecode operands remain valid (and observe `NIL_VALUE`).
+   * Clear a variable by its name. Resets the underlying slot to a fresh copy
+   * of its type's starting value, or to holding no value when the type
+   * declares none; the slot itself is retained so subsequent bytecode
+   * operands remain valid (a slot holding no value reads as `NIL_VALUE`).
    *
    * @param varId - Variable name
    */
@@ -155,7 +156,8 @@ export class Brain implements IBrain {
   }
 
   /**
-   * Reset every slot to the never-written sentinel while preserving the
+   * Reset every slot to a fresh copy of its type's starting value, or to
+   * holding no value when the type declares none, while preserving the
    * program-derived slot layout (slot ids and `varSlotByName` mappings
    * remain stable).
    */

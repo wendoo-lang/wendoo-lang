@@ -43,7 +43,7 @@ import {
   type TypeId,
   type UnionTypeDef,
 } from "./type-defs";
-import { type BufferValue, bufferToHex, FALSE_VALUE, isBufferValue, type Value } from "./value";
+import { type BufferValue, bufferToHex, FALSE_VALUE, isBufferValue, isStructValue, type Value } from "./value";
 import type { StructFieldGetterFn } from "./vm-types";
 
 /**
@@ -416,6 +416,10 @@ export class TypeRegistry implements ITypeRegistry {
       }
       fieldCodecs.set(field.name, fieldTypeDef.codec);
     });
+    const zero = shape.zero;
+    if (zero !== undefined && (!isStructValue(zero) || zero.typeId !== typeId || zero.native !== undefined)) {
+      throw new Error(`Struct type ${typeId} declares a zero that is not a plain value of the type`);
+    }
 
     const indexedFields = toStructFieldDefs(typeId, shape.fields, List.empty<StructFieldDef>());
     const structTypeDef: StructTypeDef = {
@@ -432,6 +436,7 @@ export class TypeRegistry implements ITypeRegistry {
       exists: shape.exists,
       methods: shape.methods,
       atomId: shape.atomId,
+      zero,
     };
     this.add(structTypeDef);
     return typeId;

@@ -1113,6 +1113,73 @@ describe("Assignment target l-value (output base)", () => {
   });
 });
 
+describe("Assignment target l-value (literal base)", () => {
+  let accessorX: BrainTileAccessorDef;
+  let accessorLevel: BrainTileAccessorDef;
+  let accessorIndex: BrainTileAccessorDef;
+  let accessorInner: BrainTileAccessorDef;
+  let accessorRoutedInner: BrainTileAccessorDef;
+  let innerLiteral: BrainTileLiteralDef;
+  let outerLiteral: BrainTileLiteralDef;
+
+  before(() => {
+    const innerTypeId = services.runtime.types.addStructType("LValueLitInner", {
+      atomId: mkTestAtomId(),
+      fields: List.empty(),
+    });
+    const outerTypeId = services.runtime.types.addStructType("LValueLitOuter", {
+      atomId: mkTestAtomId(),
+      fields: List.empty(),
+    });
+    accessorX = new BrainTileAccessorDef(innerTypeId, "x", CoreTypeIds.Number);
+    accessorLevel = new BrainTileAccessorDef(innerTypeId, "level", CoreTypeIds.Number, { routed: true });
+    accessorIndex = new BrainTileAccessorDef(innerTypeId, "index", CoreTypeIds.Number, { readOnly: true });
+    accessorInner = new BrainTileAccessorDef(outerTypeId, "inner", innerTypeId);
+    accessorRoutedInner = new BrainTileAccessorDef(outerTypeId, "routed inner", innerTypeId, { routed: true });
+    innerLiteral = new BrainTileLiteralDef(innerTypeId, VOID_VALUE, { valueLabel: "dial one" }, services);
+    outerLiteral = new BrainTileLiteralDef(outerTypeId, VOID_VALUE, { valueLabel: "rig one" }, services);
+  });
+
+  function parse(tiles: IBrainTileDef[]) {
+    return parseBrainTiles(List.from(tiles), services.app.localizer);
+  }
+
+  test("[literal] [routed] = [10] -> accepted: the store routes through the type's setter", () => {
+    const result = parse([innerLiteral, accessorLevel, opAssign, literal10]);
+    assert.equal(result.exprs.get(0).kind, "assignment");
+    assert.equal(result.diags.size(), 0);
+  });
+
+  test("[literal] [plain] = [10] -> rejected with ReadOnlyResultFieldAssignment (1015) naming the literal", () => {
+    const result = parse([innerLiteral, accessorX, opAssign, literal10]);
+    assert.equal(result.exprs.get(0).kind, "errorExpr");
+    assert.equal(result.diags.size(), 1);
+    const diag = result.diags.get(0);
+    assert.equal(diag.code, 1015);
+    assert.equal(diag.params?.tileId, innerLiteral.tileId, "the diagnostic should name the literal tile");
+  });
+
+  test("[literal] [read-only] = [10] -> rejected with ReadOnlyFieldAssignment (1014)", () => {
+    const result = parse([innerLiteral, accessorIndex, opAssign, literal10]);
+    assert.equal(result.exprs.get(0).kind, "errorExpr");
+    assert.equal(result.diags.get(0).code, 1014);
+  });
+
+  test("[literal] [plain] [routed] = [10] -> accepted: the terminal field decides", () => {
+    const result = parse([outerLiteral, accessorInner, accessorLevel, opAssign, literal10]);
+    assert.equal(result.exprs.get(0).kind, "assignment");
+    assert.equal(result.diags.size(), 0);
+  });
+
+  test("[literal] [routed] [plain] = [10] -> rejected: a routed link above a plain terminal does not admit it", () => {
+    const result = parse([outerLiteral, accessorRoutedInner, accessorX, opAssign, literal10]);
+    assert.equal(result.exprs.get(0).kind, "errorExpr");
+    const diag = result.diags.get(0);
+    assert.equal(diag.code, 1015);
+    assert.equal(diag.params?.tileId, outerLiteral.tileId);
+  });
+});
+
 // ---- Bag repeat interleaving tests ----
 
 describe("Bag repeat interleaving", () => {

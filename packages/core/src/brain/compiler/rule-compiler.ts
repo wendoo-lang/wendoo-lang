@@ -598,33 +598,101 @@ export class ExprCompiler implements ExprVisitor<void> {
 
   /**
    * Lowers an assignment of `value` to the field `fieldId` of `target`'s object,
-   * whose static type is a concrete struct. The object, then the value,
-   * evaluate unconditionally; the value converts into the field's type if
-   * inference annotated a conversion. When the object is a struct, the value is
-   * deep-copied (preserving the brain's struct value-semantics) and stored by
-   * numeric id. When the object is falsy (nil, void, or unknown), the store is
-   * skipped and the value discarded. Either way the object is left as the
-   * assignment's result.
+   * whose static type is a concrete struct, as a write-back cascade over the
+   * chain of id-keyed field reads the object is.
    *
-   * Stack effect: `[] -> [object]`.
+   * The chain's root is the first object down `target` that is not itself an
+   * id-keyed field read; a target with no such link above its own field is a
+   * chain of length one. Lowering runs in three phases:
+   *
+   * 1. Down: the root evaluates, then each link reads its field from the
+   *    intermediate below it, every intermediate staying on the stack. A falsy
+   *    intermediate (nil, void, unknown, or a struct whose type's existence
+   *    hook reports it gone) reads no further link: NIL stands for every
+   *    intermediate still unread.
+   * 2. Store: the value evaluates unconditionally and converts into the
+   *    field's type if inference annotated a conversion. When the last
+   *    intermediate -- the terminal object -- is truthy, every intermediate
+   *    is, and the value is deep-copied (preserving the brain's struct
+   *    value-semantics) and stored into it by numeric id.
+   * 3. Write-back: each intermediate is stored back into the field of its
+   *    parent it was read from, innermost first, by `STRUCT_SET_FIELD` with no
+   *    copy. Every write-back runs whatever its link is: a routed link's field
+   *    setter takes the updated intermediate to the host state behind the
+   *    parent, and a plain link re-stores the reference it read, which changes
+   *    nothing.
+   *
+   * A falsy terminal object skips the store and every write-back, and the
+   * value and the intermediates are discarded. Either way the root is left as
+   * the assignment's result.
+   *
+   * Each intermediate is treated as a copy whose one route back to its parent
+   * is its write-back, as a field getter returning a fresh snapshot makes it.
+   * A link whose getter returns a live reference into host state would make
+   * its own write-back and every write-back outside it a redundant identity
+   * store; lowering such a link differently takes a per-link signal this
+   * emission does not read.
+   *
+   * Stack effect: `[] -> [root]`. Down the chain the stack holds
+   * `[root, i1, ..., iN]`, one entry per intermediate.
    */
   private emitGuardedFieldStore(target: FieldAccessExpr, value: Expr, fieldId: number): void {
     const skipLabel = this.emitter.label();
     const endLabel = this.emitter.label();
-    // Two spare copies of the object: one tests the guard, one stays as the result.
-    acceptExprVisitor(target.object, this);
+
+    // The id-keyed links between the root and the terminal object, innermost first.
+    const links = List.empty<number>();
+    let root: Expr = target.object;
+    while (root.kind === "fieldAccess") {
+      const linkFieldId = this.context.typeEnv.get(root.nodeId)?.fieldId;
+      if (linkFieldId === undefined) {
+        break;
+      }
+      links.push(linkFieldId);
+      root = root.object;
+    }
+
+    acceptExprVisitor(root, this);
+    if (links.size() > 0) {
+      // Each link tests the intermediate it reads from; a falsy one jumps to the
+      // fill entry that pads every unread intermediate with NIL.
+      const fillLabels = List.empty<number>();
+      for (let i = links.size() - 1; i >= 0; i--) {
+        const fillLabel = this.emitter.label();
+        fillLabels.push(fillLabel);
+        this.emitter.dup();
+        this.emitter.jmpIfFalse(fillLabel);
+        this.emitter.dup();
+        this.emitter.structGetField(links.get(i));
+      }
+      const chainEndLabel = this.emitter.label();
+      this.emitter.jmp(chainEndLabel);
+      for (let i = 0; i < fillLabels.size(); i++) {
+        this.emitter.mark(fillLabels.get(i));
+        this.pushNil();
+      }
+      this.emitter.mark(chainEndLabel);
+    }
+
+    // Two spare copies of the terminal object: one tests the guard, one stays as the store target.
     this.emitter.dup();
     this.emitter.dup();
     acceptExprVisitor(value, this);
     this.emitConversionIfNeeded(value.nodeId);
-    // [object, object, object, value] -> [object, value, object]
+    // [..., object, object, object, value] -> [..., object, value, object]
     this.emitter.stackSetRel(1);
     this.emitter.jmpIfFalse(skipLabel);
     this.emitter.structDeepCopy();
     this.emitter.structSetField(fieldId);
+    for (let i = 0; i < links.size(); i++) {
+      this.emitter.structSetField(links.get(i));
+    }
     this.emitter.jmp(endLabel);
     this.emitter.mark(skipLabel);
-    this.emitter.pop();
+    // Drops the value and every intermediate above the root.
+    for (let i = 0; i <= links.size(); i++) {
+      this.emitter.pop();
+    }
     this.emitter.mark(endLabel);
   }
 

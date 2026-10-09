@@ -77,6 +77,24 @@ is part of the same change, not a follow-up. The same applies to any family of
 parallel lowering paths (argument kinds, literal forms, accessor read and
 write).
 
+## Member-Chain Stores
+
+A field store through a member chain (`a.b.x = v` and its compound forms)
+follows generic TypeScript wherever a link is a TypeScript construct, and
+adds write-back only where a link is a Wendoo hooked field.
+
+- A link through a field of a struct type with field hooks reads a copy, so
+  the store writes each such intermediate back through the field setter,
+  innermost first. A read-only hooked link refuses the store with
+  `ReadOnlyFieldAssignment`.
+- A link through a TS-authored class accessor keeps generic TypeScript
+  semantics: the getter is called, its result is mutated, and the setter is
+  not called. The compiler neither refuses the store nor writes back through
+  the setter.
+- A read-only PLAIN link (a `readonly` field of a struct type without field
+  hooks) stays assignable-through: `readonly` is shallow, so `a.ro.x = v`
+  stores into the value `a.ro` holds.
+
 ## Probe Before Believing
 
 Claims about current behavior come from compiled probes, not from reading the

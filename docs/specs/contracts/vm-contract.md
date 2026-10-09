@@ -549,8 +549,18 @@ index into `constantPools.values` or a none-marker, and a conforming VM
 materializes the referenced constant into the slot at load. A VM applies no
 zero policy of its own; the brain compiler resolves each slot type's zero and
 emits the constant, so a slot whose entry is the none-marker starts `NIL`.
-The type table is fixed: `Number` starts `0`, `Boolean` starts `false`,
-`String` starts `""`, and every other type starts `NIL`.
+`Number` starts `0`, `Boolean` starts `false`, and `String` starts `""`. A
+struct type may declare a starting value at registration -- a value of the
+type holding no native handle -- carried like any other zero; every other
+type starts `NIL`.
+
+Each seed stores a fresh deep copy of the referenced constant: a struct
+constant materializes into a new struct cell, field by field, at every seed
+-- program load, a host's clear of one variable or of all of them, and a
+slot new to a hot-reloaded program -- so two slots never share a cell, a
+field write through one slot reaches no other slot, and a later seed
+observes the constant as the program carries it. The pooled constant itself
+is never stored in a slot.
 
 `STORE_VAR_SLOT` deep-copies struct values before writing
 (consulting `ITypeRegistry`); primitive values are written by

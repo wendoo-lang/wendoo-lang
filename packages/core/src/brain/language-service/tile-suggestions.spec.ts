@@ -3063,6 +3063,30 @@ describe("Struct-specific operator and accessor behavior", () => {
       );
     }
   });
+
+  test("a literal's routed field offers assignment; its plain field does not", () => {
+    const routedLevelDef = new BrainTileAccessorDef(posStructTypeId, "level", CoreTypeIds.Number, { routed: true });
+    const literal: LiteralExpr = {
+      nodeId: 1,
+      kind: "literal",
+      tileDef: new BrainTileLiteralDef(posStructTypeId, VOID_VALUE, { valueLabel: "origin62" }, services),
+      span: { from: 0, to: 1 },
+    };
+    const offersAssign = (accessor: BrainTileAccessorDef): boolean => {
+      const expr: FieldAccessExpr = {
+        nodeId: 0,
+        kind: "fieldAccess",
+        object: literal,
+        accessor,
+        span: { from: 0, to: 2 },
+      };
+      const result = suggestTiles({ ruleSide: RuleSide.Do, expr }, catalogList(), services);
+      return listFind(result.exact, (s) => s.tileDef.tileId === mkOperatorTileId(CoreOpId.Assign)) !== undefined;
+    };
+
+    assert.equal(offersAssign(routedLevelDef), true, "a routed field of a literal is assignable");
+    assert.equal(offersAssign(accessorXDef), false, "a plain field of a literal is not");
+  });
 });
 
 // ---- Test 66-73: Parentheses / countUnclosedParens ----

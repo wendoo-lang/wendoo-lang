@@ -21,7 +21,8 @@ import {
 } from "./rule-services";
 import { createRuntimeServices } from "./runtime-services";
 import type { PlatformServices } from "./services";
-import { NIL_VALUE, type Value } from "./value";
+import { NativeType } from "./type-defs";
+import { isStructValue, NIL_VALUE, type Value } from "./value";
 import { DEFAULT_SCHEDULER_CONFIG, FiberScheduler, type SchedulerConfig, VM } from "./vm";
 import type { VmConfig } from "./vm-types";
 import { FiberState, VmStatus } from "./vm-types";
@@ -54,8 +55,9 @@ export class BrainRuntime implements IBrainRuntime {
 
   /**
    * Starting value of each slot in {@link variables}, or `undefined` for a slot
-   * whose type declares none. Slots are seeded with these at program load and
-   * returned to them by {@link clearVariable} / {@link clearVariables}.
+   * whose type declares none: the program's pooled constant itself, never
+   * stored in a slot. Slots are seeded with a fresh copy of it at program load
+   * and returned to a fresh copy by {@link clearVariable} / {@link clearVariables}.
    */
   private variableZeros: List<Value | undefined> = List.empty();
 
@@ -339,8 +341,8 @@ export class BrainRuntime implements IBrainRuntime {
   }
 
   /**
-   * Clear a variable by its name. Resets the underlying slot to its type's
-   * starting value, or to holding no value when the type declares none; the
+   * Clear a variable by its name. Resets the underlying slot to a fresh copy
+   * of its type's starting value, or to holding no value when the type declares none; the
    * slot itself is retained so subsequent bytecode operands remain valid (a
    * slot holding no value reads as `NIL_VALUE`).
    *
@@ -355,8 +357,8 @@ export class BrainRuntime implements IBrainRuntime {
   }
 
   /**
-   * Reset every slot to its type's starting value, or to holding no value when
-   * the type declares none, while preserving the program-derived slot layout
+   * Reset every slot to a fresh copy of its type's starting value, or to
+   * holding no value when the type declares none, while preserving the program-derived slot layout
    * (slot ids and `varSlotByName` mappings remain stable).
    */
   clearVariables(): void {
@@ -365,10 +367,10 @@ export class BrainRuntime implements IBrainRuntime {
     }
   }
 
-  /** Starting value of `slotId`, or `undefined` when its type declares none. */
+  /** A fresh copy of the starting value of `slotId`, or `undefined` when its type declares none. */
   private zeroForSlot(slotId: number): Value | undefined {
     if (slotId < 0 || slotId >= this.variableZeros.size()) return undefined;
-    return this.variableZeros.get(slotId);
+    return freshSeed(this.variableZeros.get(slotId));
   }
 
   /**
@@ -559,6 +561,7 @@ export class BrainRuntime implements IBrainRuntime {
    * Wire variable storage to `program`'s `variableNames` pool.
    * Allocates one slot per pool entry, builds a fresh name->slot map,
    * resolves each slot's starting value from `program.variableInitValues`,
+   * seeds each slot new to the program with a fresh copy of it,
    * and copies any previously-set values forward by name -- preserving values
    * for variables that exist in both the previous and the new program.
    * Variables present only in the previous program are dropped; variables
@@ -584,7 +587,7 @@ export class BrainRuntime implements IBrainRuntime {
       if (oldSlot !== undefined && oldSlot < previousValues.size()) {
         newValues.push(previousValues.get(oldSlot));
       } else {
-        newValues.push(zero);
+        newValues.push(freshSeed(zero));
       }
     }
 
@@ -972,4 +975,23 @@ export class BrainRuntime implements IBrainRuntime {
 export interface VariableSnapshot {
   values: List<Value | undefined>;
   slotsByName: Dict<string, number>;
+}
+
+/**
+ * A fresh copy of the pooled starting value `zero` for storing in a variable
+ * slot: a struct copies into a new struct cell, field by field and
+ * recursively, so no slot ever holds the pooled constant or shares a cell
+ * with another slot; any other value is immutable and returned as is, and
+ * `undefined` stays `undefined`.
+ */
+function freshSeed(zero: Value | undefined): Value | undefined {
+  if (zero === undefined || !isStructValue(zero)) return zero;
+  const fields = List.empty<Value>();
+  const source = zero.v;
+  if (source) {
+    for (let i = 0; i < source.size(); i++) {
+      fields.push(freshSeed(source.get(i)) as Value);
+    }
+  }
+  return { t: NativeType.Struct, typeId: zero.typeId, v: fields };
 }

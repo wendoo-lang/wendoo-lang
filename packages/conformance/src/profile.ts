@@ -26,6 +26,7 @@ import {
   isStructValue,
   List,
   mkCallDef,
+  mkClosedStructValue,
   mkClosedStructValueByName,
   mkNativeStructValue,
   mkNumberValue,
@@ -103,6 +104,24 @@ const MARKER_TYPE_NAME = "Marker";
 /** TypeId of the conformance `Marker` native-backed struct type. */
 export const CONFORMANCE_MARKER_TYPE_ID = mkTypeId(NativeType.Struct, MARKER_TYPE_NAME);
 
+/** Type name of the profile's program-local container struct type. */
+const RIG_TYPE_NAME = "Rig";
+
+/** TypeId of the conformance `Rig` struct type. */
+export const CONFORMANCE_RIG_TYPE_ID = mkTypeId(NativeType.Struct, RIG_TYPE_NAME);
+
+/** Type name of the profile's storage-backed struct type whose writable field routes through its field setter. */
+const GAUGE_TYPE_NAME = "Gauge";
+
+/** TypeId of the conformance `Gauge` struct type. */
+export const CONFORMANCE_GAUGE_TYPE_ID = mkTypeId(NativeType.Struct, GAUGE_TYPE_NAME);
+
+/** Type name of the profile's program-local struct type declaring a starting value. */
+const SPOT_TYPE_NAME = "Spot";
+
+/** TypeId of the conformance `Spot` struct type. */
+export const CONFORMANCE_SPOT_TYPE_ID = mkTypeId(NativeType.Struct, SPOT_TYPE_NAME);
+
 /** Type name of the profile's program-local enum type; its typeId derives from it. */
 const MODE_TYPE_NAME = "Mode";
 
@@ -129,6 +148,31 @@ export const CONFORMANCE_POINT_CONSTANT = { x: 3.5, y: -4.25 } as const;
 /** Value label (and tile-id basis) of the `waypoint` Point literal tile. */
 export const CONFORMANCE_POINT_LITERAL_LABEL = "waypoint";
 
+/** Value label (and tile-id basis) of the `bare rig` Rig literal tile, whose `anchor` field holds nil. */
+export const CONFORMANCE_RIG_LITERAL_LABEL = "bare rig";
+
+/** Value label (and tile-id basis) of the `gauge one` Gauge literal tile, naming the gauge of index 1. */
+export const CONFORMANCE_GAUGE_LITERAL_LABEL = "gauge one";
+
+/**
+ * Field values of the `Spot` type's starting value, which every `Spot`
+ * variable holds a fresh copy of until a rule writes it. Both are exactly
+ * representable at f32.
+ */
+export const CONFORMANCE_SPOT_ZERO = { x: 0, y: -2.5 } as const;
+
+/**
+ * Value label (and tile-id basis) of the `home` Spot literal tile, holding
+ * the same field values as the type's starting value.
+ */
+export const CONFORMANCE_SPOT_LITERAL_LABEL = "home";
+
+/** Index the `gauge one` literal names; exactly representable at f32. */
+export const CONFORMANCE_GAUGE_ONE_INDEX = 1;
+
+/** Level every gauge of a world holds until a write sets it; exactly representable at f32. */
+export const CONFORMANCE_GAUGE_START_LEVEL = 0;
+
 /**
  * Stable type-atom ids of the conformance profile's nominal types, dense from
  * core's `TARGET_TYPE_ATOM_BASE`. Serialized programs record these verbatim:
@@ -139,6 +183,7 @@ export const ConformanceTypeAtomIds = {
   Anchor: TARGET_TYPE_ATOM_BASE + 1,
   Target: TARGET_TYPE_ATOM_BASE + 2,
   Marker: TARGET_TYPE_ATOM_BASE + 3,
+  Gauge: TARGET_TYPE_ATOM_BASE + 4,
 } as const;
 
 /** Field ids (also storage slots) of the `Point` struct. Wire-stable; never renumber. */
@@ -151,6 +196,7 @@ export const ConformancePointField = {
 export const ConformanceAnchorField = {
   X: 0,
   Y: 1,
+  At: 2,
 } as const;
 
 /** Field ids of the `Target` native struct type. Wire-stable; never renumber. */
@@ -161,6 +207,23 @@ export const ConformanceTargetField = {
 /** Field ids of the `Marker` native struct type. Wire-stable; never renumber. */
 export const ConformanceMarkerField = {
   X: 0,
+} as const;
+
+/** Field ids (also storage slots) of the program-local `Rig` struct. Wire-stable; never renumber. */
+export const ConformanceRigField = {
+  Anchor: 0,
+} as const;
+
+/** Field ids (also storage slots) of the program-local `Spot` struct. Wire-stable; never renumber. */
+export const ConformanceSpotField = {
+  X: 0,
+  Y: 1,
+} as const;
+
+/** Field ids (also storage slots) of the `Gauge` struct. Wire-stable; never renumber. */
+export const ConformanceGaugeField = {
+  Index: 0,
+  Level: 1,
 } as const;
 
 /**
@@ -467,8 +530,9 @@ interface PendingSettlement {
 
 /**
  * Deterministic world the conformance host actions run against: the pending
- * deferred settlements and nothing else. It owns no clock and no random
- * stream, so two runs of one program over one schedule observe the same world.
+ * deferred settlements, the anchor host object, the call-counting target
+ * resolution, and the gauge levels. It owns no clock and no random stream, so
+ * two runs of one program over one schedule observe the same world.
  *
  * Attach an instance as the brain runtime's context data, and call
  * {@link ConformanceWorld.settleDue} with the ordinal of the think that is
@@ -488,6 +552,8 @@ export class ConformanceWorld {
   private readonly laterTarget: ConformanceTargetObject = { value: CONFORMANCE_TARGET_READING.second };
 
   private targetResolutions = 0;
+
+  private readonly gaugeLevels = new Map<number, number>();
 
   /** The world's one `Anchor` host object; every `defer anchor` reading is backed by it. */
   anchor(): ConformanceAnchorObject {
@@ -513,6 +579,19 @@ export class ConformanceWorld {
   resolveTarget(): ConformanceTargetObject {
     this.targetResolutions += 1;
     return this.targetResolutions === 1 ? this.firstTarget : this.laterTarget;
+  }
+
+  /**
+   * The level of the gauge of index `index`: the last level written to it,
+   * or {@link CONFORMANCE_GAUGE_START_LEVEL} before any write.
+   */
+  gaugeLevel(index: number): number {
+    return this.gaugeLevels.get(index) ?? CONFORMANCE_GAUGE_START_LEVEL;
+  }
+
+  /** Set the level of the gauge of index `index`. */
+  setGaugeLevel(index: number, level: number): void {
+    this.gaugeLevels.set(index, level);
   }
 
   /**
@@ -631,6 +710,14 @@ function execDeferRead(ctx: ExecutionContext, args: ReadonlyList<Value>, handle:
   });
 }
 
+/** A fresh `Spot` struct value holding the type's starting field values. */
+function mkSpotZero(): Value {
+  return mkClosedStructValue(
+    CONFORMANCE_SPOT_TYPE_ID,
+    List.from<Value>([mkNumberValue(CONFORMANCE_SPOT_ZERO.x), mkNumberValue(CONFORMANCE_SPOT_ZERO.y)])
+  );
+}
+
 /**
  * Builds one closed `Point` struct value carrying `x` and `y`, in the
  * environment `ctx` executes in. Throws when that environment has not
@@ -683,10 +770,11 @@ function resolveAnchorObject(source: StructValue): ConformanceAnchorObject | und
 
 /**
  * Field getter of the `Anchor` type: reads the field off the host object
- * `source` designates. A value designating no host object, and a field id the
- * type does not declare, both read as absent.
+ * `source` designates, `at` as a fresh `Point` snapshot of the object's `x`
+ * and `y`. A value designating no host object, and a field id the type does
+ * not declare, both read as absent.
  */
-function anchorFieldGetter(source: StructValue, fieldId: number, _ctx: ExecutionContext): Value | undefined {
+function anchorFieldGetter(source: StructValue, fieldId: number, ctx: ExecutionContext): Value | undefined {
   const anchor = resolveAnchorObject(source);
   if (!anchor) {
     return undefined;
@@ -697,17 +785,34 @@ function anchorFieldGetter(source: StructValue, fieldId: number, _ctx: Execution
   if (fieldId === ConformanceAnchorField.Y) {
     return mkNumberValue(anchor.y);
   }
+  if (fieldId === ConformanceAnchorField.At) {
+    return mkPointValue(ctx, anchor.x, anchor.y);
+  }
   return undefined;
 }
 
 /**
  * Field setter of the `Anchor` type: writes the field of the host object
- * `source` designates. Rejects a value designating no host object, a
- * non-number value, and a field id the type does not declare.
+ * `source` designates, `at` by taking both fields of a `Point`. Rejects a
+ * value designating no host object, a value of the wrong kind for the field,
+ * and a field id the type does not declare.
  */
 function anchorFieldSetter(source: StructValue, fieldId: number, value: Value, _ctx: ExecutionContext): boolean {
   const anchor = resolveAnchorObject(source);
-  if (!anchor || !isNumberValue(value)) {
+  if (!anchor) {
+    return false;
+  }
+  if (fieldId === ConformanceAnchorField.At) {
+    const x = pointFieldNumber(value, ConformancePointField.X);
+    const y = pointFieldNumber(value, ConformancePointField.Y);
+    if (x === undefined || y === undefined) {
+      return false;
+    }
+    anchor.x = x;
+    anchor.y = y;
+    return true;
+  }
+  if (!isNumberValue(value)) {
     return false;
   }
   if (fieldId === ConformanceAnchorField.X) {
@@ -719,6 +824,46 @@ function anchorFieldSetter(source: StructValue, fieldId: number, value: Value, _
     return true;
   }
   return false;
+}
+
+/** The index a `Gauge` value names, or undefined when its `index` field holds no number. */
+function gaugeIndexOf(source: StructValue): number | undefined {
+  const index = source.v?.at(ConformanceGaugeField.Index);
+  return index !== undefined && isNumberValue(index) ? index.v : undefined;
+}
+
+/**
+ * Field getter of the `Gauge` type: `index` reads the value's own storage,
+ * and `level` reads the world's level of the gauge the value names. A value
+ * naming no gauge, a run with no world, and a field id the type does not
+ * declare all read as absent.
+ */
+function gaugeFieldGetter(source: StructValue, fieldId: number, ctx: ExecutionContext): Value | undefined {
+  if (fieldId === ConformanceGaugeField.Index) {
+    return source.v?.at(ConformanceGaugeField.Index);
+  }
+  const index = gaugeIndexOf(source);
+  const world = worldOf(ctx);
+  if (fieldId !== ConformanceGaugeField.Level || index === undefined || !world) {
+    return undefined;
+  }
+  return mkNumberValue(world.gaugeLevel(index));
+}
+
+/**
+ * Field setter of the `Gauge` type: a number written to `level` sets the
+ * world's level of the gauge the value names, leaving the value's own storage
+ * untouched. Rejects every other field, a non-number value, a value naming no
+ * gauge, and a run with no world.
+ */
+function gaugeFieldSetter(source: StructValue, fieldId: number, value: Value, ctx: ExecutionContext): boolean {
+  const index = gaugeIndexOf(source);
+  const world = worldOf(ctx);
+  if (fieldId !== ConformanceGaugeField.Level || index === undefined || !world || !isNumberValue(value)) {
+    return false;
+  }
+  world.setGaugeLevel(index, value.v);
+  return true;
 }
 
 /**
@@ -1158,9 +1303,12 @@ const emitAllActuator = {
  * - `defer anchor()` -- asynchronous inline sensor whose handle resolves to a
  *   fresh `Anchor` value exactly one tick after its dispatch, constructed at
  *   settle time over the world's one anchor host object. `Anchor` (atom id
- *   1025, fields `x` and `y`) is native-backed: its registered field getter
- *   and setter read and write the host object behind the value, and a deep
- *   copy shares that object by reference, so every copy aliases one anchor.
+ *   1025, fields `x`, `y` and `at`) is native-backed: its registered field
+ *   getter and setter read and write the host object behind the value, and a
+ *   deep copy shares that object by reference, so every copy aliases one
+ *   anchor. `at` reads a fresh `Point` snapshot of the object's `x` and `y`,
+ *   and a `Point` written to it sets both, so a field write through the
+ *   snapshot reaches the object only by being written back.
  * - `destroy anchor()` -- synchronous actuator returning void, destroying the
  *   world's one anchor host object. Every `Anchor` value handed out before the
  *   call keeps fronting that object, and from then on the type's field hooks
@@ -1200,6 +1348,21 @@ const emitAllActuator = {
  *   atom.
  * - `waypoint` -- literal tile carrying the closed `Point` struct constant
  *   `{x: 3.5, y: -4.25}`.
+ * - `bare rig` -- literal tile carrying a `Rig` struct constant whose
+ *   `anchor` field holds nil. `Rig` (field `anchor`, an `Anchor`) is the
+ *   profile's program-local plain container struct type, registered under the
+ *   dynamic owner like `Mode`.
+ * - `home` -- literal tile carrying a `Spot` struct constant `{x: 0, y:
+ *   -2.5}`. `Spot` (fields `x` and `y`, accessor tiles registered) is the
+ *   profile's program-local struct type declaring a starting value, the same
+ *   `{x: 0, y: -2.5}`, so every `Spot` variable holds a fresh copy of it from
+ *   program load; registered under the dynamic owner like `Mode`.
+ * - `gauge one` -- literal tile carrying a `Gauge` struct constant whose
+ *   `index` field holds 1. `Gauge` (atom id 1028, fields `index`, read-only,
+ *   and `level`) keeps `index` in the value's own storage, and its field
+ *   getter and setter route `level` to the world's level of the gauge the
+ *   value names, every gauge starting at 0, so a write to `level` changes
+ *   world state and never the value's storage.
  *
  * Nothing here reads a clock, a random stream, or any state outside the
  * {@link ConformanceWorld} attached to the runtime, the think ordinal on the
@@ -1228,6 +1391,7 @@ export function conformanceModule(): WendooModule {
         fields: List.from([
           { name: "x", typeId: CoreTypeIds.Number, fieldIndex: ConformanceAnchorField.X },
           { name: "y", typeId: CoreTypeIds.Number, fieldIndex: ConformanceAnchorField.Y },
+          { name: "at", typeId: CONFORMANCE_POINT_TYPE_ID, fieldIndex: ConformanceAnchorField.At },
         ]),
         fieldGetter: anchorFieldGetter,
         fieldSetter: anchorFieldSetter,
@@ -1257,9 +1421,42 @@ export function conformanceModule(): WendooModule {
         exists: markerExists,
         accessors: true,
       });
-      // The dynamic owner makes `Mode` a program-local type: it compiles as a
-      // type-table entry carrying its symbols, not as a type-atom reference.
+      api.defineType({
+        coreType: NativeType.Struct,
+        typeId: CONFORMANCE_GAUGE_TYPE_ID,
+        name: GAUGE_TYPE_NAME,
+        atomId: ConformanceTypeAtomIds.Gauge,
+        fields: List.from([
+          { name: "index", typeId: CoreTypeIds.Number, readOnly: true, fieldIndex: ConformanceGaugeField.Index },
+          { name: "level", typeId: CoreTypeIds.Number, fieldIndex: ConformanceGaugeField.Level },
+        ]),
+        fieldGetter: gaugeFieldGetter,
+        fieldSetter: gaugeFieldSetter,
+        accessors: true,
+      });
+      // The dynamic owner makes `Mode`, `Rig` and `Spot` program-local types:
+      // each compiles as a type-table entry carrying its symbols or fields.
       api.brainServices.runtime.types.withOwner("dynamic", () => {
+        api.defineType({
+          coreType: NativeType.Struct,
+          typeId: CONFORMANCE_SPOT_TYPE_ID,
+          name: SPOT_TYPE_NAME,
+          fields: List.from([
+            { name: "x", typeId: CoreTypeIds.Number, fieldIndex: ConformanceSpotField.X },
+            { name: "y", typeId: CoreTypeIds.Number, fieldIndex: ConformanceSpotField.Y },
+          ]),
+          accessors: true,
+          zero: mkSpotZero(),
+        });
+        api.defineType({
+          coreType: NativeType.Struct,
+          typeId: CONFORMANCE_RIG_TYPE_ID,
+          name: RIG_TYPE_NAME,
+          fields: List.from([
+            { name: "anchor", typeId: CONFORMANCE_ANCHOR_TYPE_ID, fieldIndex: ConformanceRigField.Anchor },
+          ]),
+          accessors: true,
+        });
         api.defineType({
           coreType: NativeType.Enum,
           typeId: CONFORMANCE_MODE_TYPE_ID,
@@ -1295,6 +1492,44 @@ export function conformanceModule(): WendooModule {
             valueLabel: CONFORMANCE_POINT_LITERAL_LABEL,
             persist: false,
             metadata: { label: CONFORMANCE_POINT_LITERAL_LABEL },
+          },
+          api.brainServices
+        )
+      );
+      const rigTypeDef = api.brainServices.runtime.types.get(CONFORMANCE_RIG_TYPE_ID) as StructTypeDef;
+      api.registerTile(
+        new BrainTileLiteralDef(
+          CONFORMANCE_RIG_TYPE_ID,
+          mkClosedStructValueByName(rigTypeDef, new Dict([["anchor", NIL_VALUE]])),
+          {
+            valueLabel: CONFORMANCE_RIG_LITERAL_LABEL,
+            persist: false,
+            metadata: { label: CONFORMANCE_RIG_LITERAL_LABEL },
+          },
+          api.brainServices
+        )
+      );
+      api.registerTile(
+        new BrainTileLiteralDef(
+          CONFORMANCE_SPOT_TYPE_ID,
+          mkSpotZero(),
+          {
+            valueLabel: CONFORMANCE_SPOT_LITERAL_LABEL,
+            persist: false,
+            metadata: { label: CONFORMANCE_SPOT_LITERAL_LABEL },
+          },
+          api.brainServices
+        )
+      );
+      const gaugeTypeDef = api.brainServices.runtime.types.get(CONFORMANCE_GAUGE_TYPE_ID) as StructTypeDef;
+      api.registerTile(
+        new BrainTileLiteralDef(
+          CONFORMANCE_GAUGE_TYPE_ID,
+          mkClosedStructValueByName(gaugeTypeDef, new Dict([["index", mkNumberValue(CONFORMANCE_GAUGE_ONE_INDEX)]])),
+          {
+            valueLabel: CONFORMANCE_GAUGE_LITERAL_LABEL,
+            persist: false,
+            metadata: { label: CONFORMANCE_GAUGE_LITERAL_LABEL },
           },
           api.brainServices
         )

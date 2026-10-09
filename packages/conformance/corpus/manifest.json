@@ -596,6 +596,52 @@
       "schedule": [16, 16, 16, 16]
     },
     {
+      "id": "struct-field-write-back",
+      "source": "packages/conformance/src/cases/struct-field-write-back.spec.ts",
+      "summary": "A field write through the Point snapshot a native-backed value's field getter hands out, written back through the type's field setter so the host object takes it, with the host object's other field unchanged.",
+      "behaviors": [
+        "child-rule-spawn",
+        "child-rule-synchronous-cascade",
+        "struct-field-access",
+        "struct-field-write-back",
+        "struct-native-field-hooks",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16]
+    },
+    {
+      "id": "struct-field-write-back-depth",
+      "source": "packages/conformance/src/cases/struct-field-write-back-depth.spec.ts",
+      "summary": "A field write through a three-link chain -- a plain container variable, the native-backed value it holds, and that value's getter snapshot -- written back innermost first, the snapshot through the field setter to the host object and the value into its container.",
+      "behaviors": [
+        "child-rule-spawn",
+        "child-rule-synchronous-cascade",
+        "struct-constant-push",
+        "struct-field-access",
+        "struct-field-write-back",
+        "struct-native-field-hooks",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16]
+    },
+    {
+      "id": "struct-field-write-back-nil-links",
+      "source": "packages/conformance/src/cases/struct-field-write-back-nil-links.spec.ts",
+      "summary": "A field write through a three-link chain with the root, the middle link, and the getter snapshot each reading nil in turn, every falsy link skipping the store and every write-back while the value still evaluates, with no fault from the destroyed host object's setter.",
+      "behaviors": [
+        "child-rule-spawn",
+        "child-rule-synchronous-cascade",
+        "struct-field-nil-write",
+        "struct-field-write-back-nil-skip",
+        "struct-native-destroyed-read",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16, 16, 16]
+    },
+    {
       "id": "struct-native-aliasing",
       "source": "packages/conformance/src/cases/struct-native-aliasing.spec.ts",
       "summary": "A captured native-backed value copied into a second variable, with a field write through the copy visible through both variables and the value whole rendering opaque, pinning that the native handle copies by reference.",
@@ -731,6 +777,32 @@
       "schedule": [16, 16, 16, 16]
     },
     {
+      "id": "struct-plain-literal-root-rejected",
+      "source": "packages/conformance/src/cases/struct-plain-literal-root-rejected.spec.ts",
+      "summary": "A field assignment rooted at a struct literal through a plain field, refused at compile time so the program carries no store and the rule below reads the literal's own field.",
+      "behaviors": [
+        "child-rule-spawn",
+        "struct-constant-push",
+        "struct-field-access",
+        "struct-literal-field-write-rejected"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
+      "id": "struct-routed-literal-root",
+      "source": "packages/conformance/src/cases/struct-routed-literal-root.spec.ts",
+      "summary": "A field assignment rooted at a struct literal through a field its type routes to host state, compiling and reaching the world through the field setter, with the rule below reading the written level back through the same literal.",
+      "behaviors": [
+        "child-rule-spawn",
+        "struct-constant-push",
+        "struct-literal-routed-field-write",
+        "struct-native-field-hooks"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
       "id": "struct-setter-rejection",
       "source": "packages/conformance/src/cases/struct-setter-rejection.spec.ts",
       "summary": "A field write through a native-backed value whose host object the world has destroyed, pinning that the type's field setter rejecting the write faults the fiber with ScriptError.",
@@ -746,6 +818,58 @@
       ],
       "precisions": ["f32", "f64"],
       "schedule": [16, 16, 16, 16]
+    },
+    {
+      "id": "struct-zero-no-alias",
+      "source": "packages/conformance/src/cases/struct-zero-no-alias.spec.ts",
+      "summary": "Two variables of a struct type declaring a starting value, one written through a field and the other read, pinning that each slot is seeded with its own copy of the type's starting value, so the write lands in the written variable alone.",
+      "behaviors": [
+        "child-rule-spawn",
+        "child-rule-synchronous-cascade",
+        "host-sync-action-call",
+        "root-rule-respawn",
+        "struct-field-access",
+        "struct-zero-fresh-copy",
+        "struct-zero-seed",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
+      "id": "struct-zero-no-leak",
+      "source": "packages/conformance/src/cases/struct-zero-no-leak.spec.ts",
+      "summary": "A variable of a struct type declaring a starting value written through a field beside a literal holding the same value, pinning that the slot is seeded with a copy of its pooled starting value and the write never reaches the literal.",
+      "behaviors": [
+        "child-rule-spawn",
+        "child-rule-synchronous-cascade",
+        "host-sync-action-call",
+        "root-rule-respawn",
+        "struct-constant-push",
+        "struct-field-access",
+        "struct-zero-fresh-copy",
+        "struct-zero-seed",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
+    },
+    {
+      "id": "struct-zero-seed",
+      "source": "packages/conformance/src/cases/struct-zero-seed.spec.ts",
+      "summary": "A variable of a struct type declaring a starting value, read before any rule writes it, firing the WHEN that holds it and reading its starting fields from the first think, beside a variable of a struct type declaring none, which starts nil and never fires its WHEN.",
+      "behaviors": [
+        "child-rule-spawn",
+        "host-sync-action-call",
+        "root-rule-respawn",
+        "rule-when-gate-falsy",
+        "rule-when-gate-truthy",
+        "struct-field-access",
+        "struct-zero-seed",
+        "variable-slot-storage"
+      ],
+      "precisions": ["f32", "f64"],
+      "schedule": [16, 16]
     },
     {
       "id": "then-trigger-abandoned",

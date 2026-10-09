@@ -74,6 +74,11 @@ export type ConversionDefinition = Conversion;
 type TypeDefInput = Omit<TypeDef, "codec">;
 
 interface StructDefineOptions {
+  /**
+   * Registers an accessor tile for every field (`true`) or for the named
+   * fields. Each tile is read-only when its field is; a writable field of a
+   * type registering a `fieldSetter` gets a routed tile.
+   */
   accessors?: boolean | string[];
   variableFactory?: boolean;
 }
@@ -627,6 +632,7 @@ function registerWendooTypeDefinition(services: BrainServices, definition: Wendo
           exists: structDef.exists,
           methods: structDef.methods,
           atomId: structDef.atomId,
+          zero: structDef.zero,
         }),
         structDef.typeId,
         structDef.name
@@ -636,13 +642,13 @@ function registerWendooTypeDefinition(services: BrainServices, definition: Wendo
         for (let i = 0; i < structDef.fields.size(); i++) {
           const field = structDef.fields.get(i);
           if (subset && subset.indexOf(field.name) === -1) continue;
-          registerAccessorTileDef(
-            registeredTypeId,
-            field.name,
-            field.typeId,
-            field.readOnly ? { readOnly: field.readOnly } : undefined,
-            services
-          );
+          let accessorOpts: { readOnly?: boolean; routed?: boolean } | undefined;
+          if (field.readOnly) {
+            accessorOpts = { readOnly: field.readOnly };
+          } else if (structDef.fieldSetter) {
+            accessorOpts = { routed: true };
+          }
+          registerAccessorTileDef(registeredTypeId, field.name, field.typeId, accessorOpts, services);
         }
       }
       if (structDef.variableFactory) {

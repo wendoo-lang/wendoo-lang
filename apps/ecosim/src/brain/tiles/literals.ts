@@ -2,7 +2,7 @@ import { BrainTileLiteralDef, mkNativeStructValue, type WendooModuleApi } from "
 import { getSelf, getTargetActor } from "../execution-context-types";
 import { ICON_BASE } from "../icon-base";
 import { TargetActorCapabilityBitSet } from "../tileids";
-import { EcosimTypeIds } from "../type-system";
+import { EcosimTypeIds, mkVector2Origin, VECTOR2_ORIGIN_KEY } from "../type-system";
 
 export function registerLiteralTiles(api: WendooModuleApi) {
   const meVisual = {
@@ -35,6 +35,18 @@ export function registerLiteralTiles(api: WendooModuleApi) {
         persist: false,
         valueLabel: "it",
         requirements: TargetActorCapabilityBitSet,
+      },
+      api.brainServices
+    )
+  );
+  api.registerTile(
+    new BrainTileLiteralDef(
+      EcosimTypeIds.Vector2,
+      mkVector2Origin(),
+      {
+        metadata: { label: VECTOR2_ORIGIN_KEY, iconUrl: `${ICON_BASE}/vector2.svg` },
+        persist: false,
+        valueLabel: VECTOR2_ORIGIN_KEY,
       },
       api.brainServices
     )

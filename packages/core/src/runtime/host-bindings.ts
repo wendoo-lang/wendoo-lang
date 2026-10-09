@@ -244,7 +244,10 @@ export interface IBrainRuntime {
    */
   getVariable(varId: string): Value | undefined;
   setVariable(varId: string, value: Value): void;
-  /** Reset the named variable to its type's starting value, or to holding no value when its type declares none. */
+  /**
+   * Reset the named variable to a fresh copy of its type's starting value, or
+   * to holding no value when its type declares none.
+   */
   clearVariable(varId: string): void;
   /** Reset every variable, each per {@link clearVariable}. */
   clearVariables(): void;

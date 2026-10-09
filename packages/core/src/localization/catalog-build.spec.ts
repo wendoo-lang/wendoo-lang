@@ -5,7 +5,7 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, test } from "node:test";
@@ -39,18 +39,26 @@ function toEntries(json: CatalogJson): CatalogEntryInput[] {
   return entries;
 }
 
-/** Write a generated module to disk and load it back as a {@link LocaleCatalog}. */
+/** Write a generated module to a temp dir, load it back as a {@link LocaleCatalog}, and delete the dir. */
 async function loadGeneratedModule(locale: string, source: string): Promise<LocaleCatalog> {
   const dir = mkdtempSync(join(tmpdir(), "wendoo-localization-"));
-  const file = join(dir, `${locale}.ts`);
-  writeFileSync(file, source, "utf-8");
-  const loaded = (await import(pathToFileURL(file).href)) as {
-    locale: string;
-    pluralRule: PluralRuleSpec;
-    entries: Record<string, string>;
-    contexts: Record<string, Record<string, string>>;
-  };
-  return loaded;
+  try {
+    const file = join(dir, `${locale}.ts`);
+    writeFileSync(file, source, "utf-8");
+    try {
+      const loaded = (await import(pathToFileURL(file).href)) as {
+        locale: string;
+        pluralRule: PluralRuleSpec;
+        entries: Record<string, string>;
+        contexts: Record<string, Record<string, string>>;
+      };
+      return loaded;
+    } finally {
+      unlinkSync(file);
+    }
+  } finally {
+    rmdirSync(dir);
+  }
 }
 
 describe("catalog round trip", () => {

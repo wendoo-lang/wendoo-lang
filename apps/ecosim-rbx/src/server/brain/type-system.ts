@@ -7,6 +7,7 @@ import {
   getClosedStructFieldByName,
   List,
   mkCallDef,
+  mkClosedStructValue,
   mkClosedStructValueByName,
   mkNativeStructValue,
   mkNumberValue,
@@ -61,6 +62,19 @@ enum ActorRefField {
  * owns Context ids 0-5; app extensions start at 6.
  */
 const CONTEXT_SELF_FIELD_ID = 6;
+
+/**
+ * Key of the `Vector2` literal `origin`, holding 0 in both `x` and `y`, and
+ * the value every `Vector2` variable starts holding. Public identity in saved
+ * brains, which place the literal by a tile id derived from it: never rename
+ * or reuse it.
+ */
+export const VECTOR2_ORIGIN_KEY = "origin";
+
+/** A fresh `Vector2` struct value holding 0 in both `x` and `y`. */
+export function mkVector2Origin(): StructValue {
+  return mkClosedStructValue(EcosimTypeIds.Vector2, List.from<Value>([mkNumberValue(0), mkNumberValue(0)]));
+}
 
 const Vector2Fields = List.from([
   { name: "x", typeId: CoreTypeIds.Number, fieldIndex: Vector2Field.X },
@@ -249,6 +263,7 @@ export function registerTypes(api: WendooModuleApi) {
     fields: Vector2Fields,
     accessors: true,
     variableFactory: true,
+    zero: mkVector2Origin(),
   });
   vector2TypeDef = api.brainServices.runtime.types.get(EcosimTypeIds.Vector2) as StructTypeDef | undefined;
   if (!vector2TypeDef) {

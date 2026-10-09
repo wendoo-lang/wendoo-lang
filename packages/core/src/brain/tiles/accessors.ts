@@ -3,10 +3,16 @@ import { type BrainTileDefCreateOptions, mkAccessorTileId, TilePlacement } from 
 import { BrainTileDefBase } from "../model/tiledef";
 import type { BrainServices } from "../services";
 
-/** Options for {@link BrainTileAccessorDef}. Adds a `readOnly` flag to the standard tile options. */
+/** Options for {@link BrainTileAccessorDef}. Adds the `readOnly` and `routed` flags to the standard tile options. */
 export type BrainAccessorTileDefCreateOptions = BrainTileDefCreateOptions & {
   /** When true, the field is read-only and cannot appear as an assignment target. */
   readOnly?: boolean;
+  /**
+   * When true, a write to the field routes through its struct type's field
+   * setter to the host state behind the value, never into the value's own
+   * storage. Meaningful only on a writable field.
+   */
+  routed?: boolean;
 };
 
 /**
@@ -23,7 +29,9 @@ export type BrainAccessorTileDefCreateOptions = BrainTileDefCreateOptions & {
  *
  * When `readOnly` is true, the parser rejects assignments to this field and the
  * tile suggestion system suppresses the assignment operator after a field access
- * using this accessor.
+ * using this accessor. When `routed` is true, a write to the field reaches host
+ * state through the struct type's field setter, which makes the field assignable
+ * even on a literal value.
  */
 export class BrainTileAccessorDef extends BrainTileDefBase {
   readonly kind = "accessor";
@@ -31,6 +39,8 @@ export class BrainTileAccessorDef extends BrainTileDefBase {
   readonly structTypeId: TypeId;
   readonly fieldTypeId: TypeId;
   readonly readOnly: boolean;
+  /** Whether a write to the field routes through its struct type's field setter. */
+  readonly routed: boolean;
 
   constructor(
     structTypeId: TypeId,
@@ -44,6 +54,7 @@ export class BrainTileAccessorDef extends BrainTileDefBase {
     this.fieldName = fieldName;
     this.fieldTypeId = fieldTypeId;
     this.readOnly = opts.readOnly ?? false;
+    this.routed = opts.routed ?? false;
   }
 }
 

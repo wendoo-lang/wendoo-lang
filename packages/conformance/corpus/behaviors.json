@@ -290,6 +290,22 @@
       "description": "A compiled field assignment whose object is falsy -- nil, void, or unknown -- evaluates the object and the value, branches past STRUCT_SET_FIELD, and discards the value."
     },
     {
+      "id": "struct-field-write-back",
+      "description": "A compiled field assignment through a chain of field reads keeps each intermediate, stores the field into the innermost, then writes each intermediate back into the field of its parent it was read from, innermost first: a field setter carries a snapshot its getter handed out back to the host object, and a plain field re-stores the reference it read."
+    },
+    {
+      "id": "struct-field-write-back-nil-skip",
+      "description": "A falsy intermediate at any link of a compiled field assignment's chain skips the rest of the chain, the store, and every write-back, while the assigned value still evaluates."
+    },
+    {
+      "id": "struct-literal-field-write-rejected",
+      "description": "A field assignment rooted at a literal whose assigned field is not routed through its type's field setter is refused at compile time: the program carries no store, and the literal keeps its value."
+    },
+    {
+      "id": "struct-literal-routed-field-write",
+      "description": "A field assignment rooted at a literal whose assigned field is routed through its type's field setter compiles, and the store reaches the host state the setter writes, never the literal's constant."
+    },
+    {
       "id": "struct-native-alias-on-copy",
       "description": "A deep copy of a native-backed struct whose type registers no snapshotNative copies the native handle by reference, so every copy fronts the same host object."
     },
@@ -320,6 +336,14 @@
     {
       "id": "struct-value-render",
       "description": "A struct value in an observable position renders as its struct token: the field count in minimal hex, then one value token per field slot, in slot order."
+    },
+    {
+      "id": "struct-zero-fresh-copy",
+      "description": "Every seed of a variable of a struct type declaring a starting value stores a fresh copy of the pooled constant: two slots never share a struct cell, and a field write through one reaches neither another slot nor the constant a literal of the same value pushes."
+    },
+    {
+      "id": "struct-zero-seed",
+      "description": "A struct type may declare a starting value at registration, which the program carries as a pooled constant like any other zero: a variable of the type holds it from program load, truthy and with its fields readable and writable before any rule assigns it, while a variable of a struct type declaring none starts nil."
     },
     {
       "id": "timeout-sensor-bad-delay",

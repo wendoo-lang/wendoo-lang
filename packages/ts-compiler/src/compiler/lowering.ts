@@ -14,6 +14,7 @@ import {
   NativeType,
   NIL_VALUE,
   type NullableTypeDef,
+  type StructFieldDef,
   type StructTypeDef,
   type TypeId,
   type UnionTypeDef,
@@ -524,7 +525,12 @@ function resolveEnumMemberOwnerTypeId(
   return resolveRegisteredEnumTypeIdFromSymbol(sym, services, projectNamespace, checker);
 }
 
-function unwrapTypeResolutionExpression(expr: ts.Expression): ts.Expression {
+/**
+ * Strips the parentheses, `as` casts, and non-null assertions around `expr`,
+ * each of which evaluates to the value of the expression it wraps, and returns
+ * the expression they wrap; `expr` itself when it has none.
+ */
+function unwrapTransparentExpression(expr: ts.Expression): ts.Expression {
   let current = expr;
   while (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isNonNullExpression(current)) {
     current = current.expression;
@@ -533,7 +539,7 @@ function unwrapTypeResolutionExpression(expr: ts.Expression): ts.Expression {
 }
 
 function resolveDeclaredEnumTypeId(exprNode: ts.Expression, ctx: LowerContext): string | undefined {
-  const targetExpr = unwrapTypeResolutionExpression(exprNode);
+  const targetExpr = unwrapTransparentExpression(exprNode);
   if (!ts.isIdentifier(targetExpr)) {
     return undefined;
   }
@@ -6045,6 +6051,115 @@ function lowerLogicalAssignment(
   }
 }
 
+/** One link of a member chain a field store writes back through: the struct field it reads. */
+interface FieldWriteBackLink {
+  /** Name of the field the link reads. */
+  readonly fieldName: string;
+  /** Storage slot of the field the link reads. */
+  readonly fieldIndex: number;
+}
+
+/**
+ * The struct field `link` reads, when lowering it reads one by numeric id from
+ * the struct its object evaluates to: not a parameter read, a static member,
+ * or a class accessor. Undefined otherwise.
+ */
+function structFieldOfLink(
+  link: ts.PropertyAccessExpression,
+  ctx: LowerContext
+): { readonly structDef: StructTypeDef; readonly field: StructFieldDef } | undefined {
+  if (
+    ctx.paramsSymbol !== undefined &&
+    ts.isIdentifier(link.expression) &&
+    ctx.checker.getSymbolAtLocation(link.expression) === ctx.paramsSymbol
+  ) {
+    return undefined;
+  }
+  if (resolveStaticMemberAccess(link, ctx) || resolveThisStaticAccess(link, ctx)) return undefined;
+  const structDef = resolveThisReceiverStructDef(link.expression, ctx);
+  if (!structDef || !isIndexedStruct(structDef)) return undefined;
+  const fieldName = link.name.text;
+  const ci = ctx.classInfos.find((c) => c.name === bareClassName(structDef.name));
+  if (ci?.getterFuncIds.has(fieldName)) return undefined;
+  const field = findStructField(structDef, fieldName);
+  return field ? { structDef, field } : undefined;
+}
+
+/**
+ * Lowers `object`, the object a field store writes into, as a chain of
+ * struct field reads that keeps every intermediate on the stack: a nil result
+ * slot is pushed, the chain's root -- the first expression down `object` that
+ * is not a struct field read by numeric id -- evaluates, then each link reads
+ * its field from the intermediate below it, outermost first. The walk down
+ * `object` passes through parentheses, `as` casts, and non-null assertions
+ * around any link, and a link written as an optional access inside one of
+ * those reads its field like any other link. Returns the links
+ * innermost first, the order {@link emitFieldStore} writes them back in; an
+ * object that is no such read returns no links and lowers as itself.
+ *
+ * A link through a read-only field of a struct type with field hooks refuses
+ * the store: it reports {@link LoweringDiagCode.ReadOnlyFieldAssignment} and
+ * returns undefined with nothing lowered.
+ *
+ * Stack effect: `[] -> [result, root, i1, ..., iN]`, `result` being the slot
+ * {@link emitFieldStore} fills with the stored value and `iN` being
+ * `object`'s value.
+ */
+function lowerFieldStoreObject(object: ts.Expression, ctx: LowerContext): FieldWriteBackLink[] | undefined {
+  const links: FieldWriteBackLink[] = [];
+  let root = unwrapTransparentExpression(object);
+  while (ts.isPropertyAccessExpression(root)) {
+    const resolved = structFieldOfLink(root, ctx);
+    if (!resolved) break;
+    const { structDef, field } = resolved;
+    if (field.readOnly && (structDef.fieldGetter !== undefined || structDef.fieldSetter !== undefined)) {
+      ctx.diagnostics.push(
+        makeDiag(
+          LoweringDiagCode.ReadOnlyFieldAssignment,
+          `Cannot assign through read-only field '${field.name}': its value is a copy that cannot be written back`,
+          root
+        )
+      );
+      return undefined;
+    }
+    links.push({ fieldName: field.name, fieldIndex: field.fieldIndex });
+    root = unwrapTransparentExpression(root.expression);
+  }
+  ctx.ir.push({ kind: "PushConst", value: NIL_VALUE });
+  lowerExpression(root, ctx);
+  for (let i = links.length - 1; i >= 0; i--) {
+    ctx.ir.push({ kind: "Dup" });
+    ctx.ir.push({ kind: "GetField", fieldName: links[i].fieldName, fieldIndex: links[i].fieldIndex });
+  }
+  return links;
+}
+
+/**
+ * Stores the value on top of the stack into the innermost intermediate
+ * {@link lowerFieldStoreObject} left on the stack, then writes each
+ * intermediate back into the field of its parent it was read from, innermost
+ * first, leaving the stored value as the assignment's result. Every
+ * write-back runs: a field of a struct type with a field setter routes the
+ * updated intermediate to the host state behind the parent, and a plain field
+ * re-stores the reference it read, which changes nothing.
+ *
+ * `fieldIndex` is the stored field's slot in an indexed struct type; undefined
+ * stores by name, with the field-name string beneath the value.
+ *
+ * Stack effect: `[result, root, i1, ..., iN, value] -> [value]`, or
+ * `[result, root, i1, ..., iN, name, value] -> [value]` when storing by name.
+ */
+function emitFieldStore(links: readonly FieldWriteBackLink[], fieldIndex: number | undefined, ctx: LowerContext): void {
+  const storeOperands = fieldIndex === undefined ? 2 : 1;
+  ctx.ir.push({ kind: "Dup" });
+  ctx.ir.push({ kind: "StackSetRel", d: links.length + 1 + storeOperands });
+  ctx.ir.push(fieldIndex === undefined ? { kind: "SetField" } : { kind: "SetField", fieldIndex });
+  for (const link of links) {
+    ctx.ir.push({ kind: "SetField", fieldIndex: link.fieldIndex });
+  }
+  ctx.ir.push({ kind: "Pop" });
+}
+
 function lowerAssignment(expr: ts.BinaryExpression, ctx: LowerContext): void {
   if (ts.isElementAccessExpression(expr.left)) {
     lowerElementAccessAssignment(expr, ctx);
@@ -6164,14 +6279,15 @@ function lowerAssignment(expr: ts.BinaryExpression, ctx: LowerContext): void {
       }
       if (field) {
         if (expr.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
-          lowerExpression(expr.left.expression, ctx);
+          const writeBacks = lowerFieldStoreObject(expr.left.expression, ctx);
+          if (writeBacks === undefined) {
+            return;
+          }
           if (!isIndexedStruct(lhsStruct)) {
             ctx.ir.push({ kind: "PushConst", value: mkStringValue(fName) });
           }
           lowerExpression(expr.right, ctx);
-          ctx.ir.push(
-            isIndexedStruct(lhsStruct) ? { kind: "SetField", fieldIndex: field.fieldIndex } : { kind: "SetField" }
-          );
+          emitFieldStore(writeBacks, isIndexedStruct(lhsStruct) ? field.fieldIndex : undefined, ctx);
           return;
         }
 
@@ -6214,8 +6330,11 @@ function lowerAssignment(expr: ts.BinaryExpression, ctx: LowerContext): void {
           return;
         }
 
+        const writeBacks = lowerFieldStoreObject(expr.left.expression, ctx);
+        if (writeBacks === undefined) {
+          return;
+        }
         const tempObj = ctx.scopeStack.allocLocal();
-        lowerExpression(expr.left.expression, ctx);
         ctx.ir.push({ kind: "StoreLocal", index: tempObj });
         ctx.ir.push({ kind: "LoadLocal", index: tempObj });
         if (!isIndexedStruct(lhsStruct)) {
@@ -6229,9 +6348,7 @@ function lowerAssignment(expr: ts.BinaryExpression, ctx: LowerContext): void {
         );
         lowerExpression(expr.right, ctx);
         ctx.ir.push({ kind: "HostCall", fnName: opFnName, argc: 2 });
-        ctx.ir.push(
-          isIndexedStruct(lhsStruct) ? { kind: "SetField", fieldIndex: field.fieldIndex } : { kind: "SetField" }
-        );
+        emitFieldStore(writeBacks, isIndexedStruct(lhsStruct) ? field.fieldIndex : undefined, ctx);
         return;
       }
 
@@ -6549,20 +6666,22 @@ function lowerThisFieldAssignment(expr: ts.BinaryExpression, ctx: LowerContext):
     }
 
     ctx.ir.push({ kind: "LoadLocal", index: ctx.thisLocalIndex });
-    ctx.ir.push({ kind: "LoadLocal", index: ctx.thisLocalIndex });
     ctx.ir.push({ kind: "GetField", fieldName, fieldIndex });
     lowerExpression(expr.right, ctx);
     ctx.ir.push({ kind: "HostCall", fnName, argc: 2 });
-    ctx.ir.push({ kind: "StructSet", fieldIndex });
     ctx.ir.push({ kind: "Dup" });
+    ctx.ir.push({ kind: "LoadLocal", index: ctx.thisLocalIndex });
+    ctx.ir.push({ kind: "Swap" });
+    ctx.ir.push({ kind: "StructSet", fieldIndex });
     ctx.ir.push({ kind: "StoreLocal", index: ctx.thisLocalIndex });
     return;
   }
 
-  ctx.ir.push({ kind: "LoadLocal", index: ctx.thisLocalIndex });
   lowerExpression(expr.right, ctx);
-  ctx.ir.push({ kind: "StructSet", fieldIndex });
   ctx.ir.push({ kind: "Dup" });
+  ctx.ir.push({ kind: "LoadLocal", index: ctx.thisLocalIndex });
+  ctx.ir.push({ kind: "Swap" });
+  ctx.ir.push({ kind: "StructSet", fieldIndex });
   ctx.ir.push({ kind: "StoreLocal", index: ctx.thisLocalIndex });
 }
 
@@ -7673,6 +7792,20 @@ function lowerElementAccessAssignment(expr: ts.BinaryExpression, ctx: LowerConte
   lowerElementAccessAssignmentForList(expr, elemAccess, ctx);
 }
 
+/**
+ * Stores the value on top of the stack into the list element or map entry
+ * beneath it with `setKind`, leaving the stored value as the assignment's
+ * result in the nil slot pushed before the container.
+ *
+ * Stack effect: `[result, container, key, value] -> [value]`.
+ */
+function emitElementStore(setKind: "ListSet" | "MapSet", ctx: LowerContext): void {
+  ctx.ir.push({ kind: "Dup" });
+  ctx.ir.push({ kind: "StackSetRel", d: 3 });
+  ctx.ir.push({ kind: setKind });
+  ctx.ir.push({ kind: "Pop" });
+}
+
 function lowerElementAccessAssignmentForList(
   expr: ts.BinaryExpression,
   elemAccess: ts.ElementAccessExpression,
@@ -7682,10 +7815,11 @@ function lowerElementAccessAssignmentForList(
     lowerCompoundElementAccessAssignment(expr, elemAccess, "ListGet", "ListSet", ctx);
     return;
   }
+  ctx.ir.push({ kind: "PushConst", value: NIL_VALUE });
   lowerExpression(elemAccess.expression, ctx);
   lowerExpression(elemAccess.argumentExpression, ctx);
   lowerExpression(expr.right, ctx);
-  ctx.ir.push({ kind: "ListSet" });
+  emitElementStore("ListSet", ctx);
 }
 
 function lowerElementAccessAssignmentForMap(
@@ -7697,10 +7831,11 @@ function lowerElementAccessAssignmentForMap(
     lowerCompoundElementAccessAssignment(expr, elemAccess, "MapGet", "MapSet", ctx);
     return;
   }
+  ctx.ir.push({ kind: "PushConst", value: NIL_VALUE });
   lowerExpression(elemAccess.expression, ctx);
   lowerExpression(elemAccess.argumentExpression, ctx);
   lowerExpression(expr.right, ctx);
-  ctx.ir.push({ kind: "MapSet" });
+  emitElementStore("MapSet", ctx);
 }
 
 function lowerCompoundElementAccessAssignment(
@@ -7752,6 +7887,7 @@ function lowerCompoundElementAccessAssignment(
   const containerLocal = ctx.scopeStack.allocLocal();
   const keyLocal = ctx.scopeStack.allocLocal();
 
+  ctx.ir.push({ kind: "PushConst", value: NIL_VALUE });
   lowerExpression(elemAccess.expression, ctx);
   ctx.ir.push({ kind: "StoreLocal", index: containerLocal });
 
@@ -7769,7 +7905,7 @@ function lowerCompoundElementAccessAssignment(
   ctx.ir.push({ kind: "Swap" });
   ctx.ir.push({ kind: "LoadLocal", index: keyLocal });
   ctx.ir.push({ kind: "Swap" });
-  ctx.ir.push({ kind: setKind });
+  emitElementStore(setKind, ctx);
 }
 
 function isStringType(type: ts.Type): boolean {
