@@ -135,40 +135,39 @@ function matchesSearch(query: string, ...fields: (string | string[] | undefined)
   return false;
 }
 
-function getTileVisual(
+/** The label and icon the docs show for one tile entry. */
+export interface TileEntryVisual {
+  /** Display label. */
+  label: string;
+  /** Icon, as an image source, or undefined when there is none. */
+  iconUrl: string | undefined;
+}
+
+/**
+ * The label and icon the docs show for the tile entry under `tileId`. While
+ * `tileCatalog` holds a tile under the id, they are that tile's, as
+ * `resolveTileVisual` resolves it; while it holds none, they are the
+ * `label` and `iconUrl` `entry` carries. A label neither gives is the id's
+ * last segment after `->`.
+ *
+ * @param tileCatalog - Catalog the entry's tile is read from.
+ * @param resolveTileVisual - Resolves a held tile's label and icon.
+ * @param tileId - The entry's tile id.
+ * @param entry - The entry registered under `tileId`, or undefined when there is none.
+ */
+export function tileEntryVisual(
   tileCatalog: ITileCatalog | undefined,
   resolveTileVisual: (tileDef: IBrainTileDef) => TileVisual | undefined,
-  tileId: string
-): TileVisual | undefined {
+  tileId: string,
+  entry: DocsTileEntry | undefined
+): TileEntryVisual {
   const tileDef = tileCatalog?.get(tileId);
-  if (!tileDef) {
-    return undefined;
-  }
-  return resolveTileVisual(tileDef);
-}
-
-/** Resolve display label for a tile from the tile catalog. */
-function getTileLabel(
-  tileCatalog: ITileCatalog | undefined,
-  resolveTileVisual: (tileDef: IBrainTileDef) => TileVisual | undefined,
-  tileId: string
-): string {
-  const visual = getTileVisual(tileCatalog, resolveTileVisual, tileId);
+  const visual = tileDef ? resolveTileVisual(tileDef) : { label: entry?.label, iconUrl: entry?.iconUrl };
   if (visual?.label) {
-    return visual.label;
+    return { label: visual.label, iconUrl: visual.iconUrl };
   }
-  // Fallback: extract the last segment after ->
   const arrow = tileId.indexOf("->");
-  return arrow >= 0 ? tileId.slice(arrow + 2) : tileId;
-}
-
-/** Resolve icon URL for a tile from the tile catalog. */
-function getTileIconUrl(
-  tileCatalog: ITileCatalog | undefined,
-  resolveTileVisual: (tileDef: IBrainTileDef) => TileVisual | undefined,
-  tileId: string
-): string | undefined {
-  return getTileVisual(tileCatalog, resolveTileVisual, tileId)?.iconUrl;
+  return { label: arrow >= 0 ? tileId.slice(arrow + 2) : tileId, iconUrl: visual?.iconUrl };
 }
 
 /**
@@ -362,8 +361,7 @@ interface TileCardProps {
 function TileCard({ entry, onClick }: TileCardProps) {
   const { tileCatalog } = useDocsSidebar();
   const resolveTileVisual = useDocsResolveTileVisual();
-  const label = getTileLabel(tileCatalog, resolveTileVisual, entry.tileId);
-  const iconUrl = getTileIconUrl(tileCatalog, resolveTileVisual, entry.tileId);
+  const { label, iconUrl } = tileEntryVisual(tileCatalog, resolveTileVisual, entry.tileId, entry);
 
   return (
     <DocsEntryLink href={`/docs/tiles/${encodeURIComponent(entry.tileId)}`} onOpen={onClick}>
@@ -451,8 +449,11 @@ export function DocsPanelContent({ tabBarClassName, scrollClassName = "p-3", sea
   // Filter entries based on search
   const filteredTiles = useMemo(
     () =>
-      listedTileEntries(registry, tileCatalog, search, (tileId) =>
-        getTileLabel(tileCatalog, resolveTileVisual, tileId)
+      listedTileEntries(
+        registry,
+        tileCatalog,
+        search,
+        (tileId) => tileEntryVisual(tileCatalog, resolveTileVisual, tileId, registry.tiles.get(tileId)).label
       ),
     [registry, search, tileCatalog, resolveTileVisual]
   );
@@ -554,7 +555,7 @@ export function DocsPanelContent({ tabBarClassName, scrollClassName = "p-3", sea
 
   // No-docs fallback -- navKey is set but no content found in registry
   if (navKey) {
-    const tileLabel = getTileLabel(tileCatalog, resolveTileVisual, navKey);
+    const tileLabel = tileEntryVisual(tileCatalog, resolveTileVisual, navKey, registry.tiles.get(navKey)).label;
     return (
       <>
         <div className="flex items-center gap-1 px-3 py-2 border-b border-border shrink-0">

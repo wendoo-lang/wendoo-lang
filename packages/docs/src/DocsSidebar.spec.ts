@@ -1,6 +1,7 @@
 /**
  * Pins the desktop panel's resize arithmetic, where its footprint is
- * published, and which tile entries the Tiles tab lists.
+ * published, which tile entries the Tiles tab lists, and the label and icon
+ * it shows for one.
  *
  * The panel publishes its footprint through the shared inset seam in
  * `packages/ui`. The source pin below asserts the panel writes no custom
@@ -11,8 +12,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { DocsRegistry } from "./DocsRegistry";
-import { listedTileEntries, panelWidthPctAtPointer, separatorMoveAction } from "./DocsSidebar";
+import type { IBrainTileDef, ITileCatalog } from "@wendoo/core/brain";
+import type { TileVisual } from "@wendoo/ui/brain-editor/types";
+import { DocsRegistry, type DocsTileEntry } from "./DocsRegistry";
+import { listedTileEntries, panelWidthPctAtPointer, separatorMoveAction, tileEntryVisual } from "./DocsSidebar";
 
 const sidebarSource = readFileSync(fileURLToPath(new URL("./DocsSidebar.tsx", import.meta.url)), "utf8");
 
@@ -95,5 +98,41 @@ describe("listedTileEntries", () => {
   test("lists no entry carrying no category among search results, by content or by tile id", () => {
     assert.deepEqual(listedIds(kSharedContent), [kListedTileId]);
     assert.deepEqual(listedIds(kUnlistedTileId), []);
+  });
+});
+
+describe("tileEntryVisual", () => {
+  const kHeldTileId = "tile.var.factory->struct:<Held>";
+  const kUnheldTileId = "tile.var.factory->struct:<Unheld>";
+  const kTileVisual = { label: "held tile label", iconUrl: "data:image/png;base64,dGlsZQ==" };
+  const kEntryVisual = { label: "entry label", iconUrl: "data:image/png;base64,ZW50cnk=" };
+
+  /** A catalog holding one tile, under {@link kHeldTileId}. */
+  const catalog = {
+    get: (tileId: string) => (tileId === kHeldTileId ? ({ tileId, kind: "factory" } as IBrainTileDef) : undefined),
+  } as ITileCatalog;
+
+  /** Resolves every tile to {@link kTileVisual}. */
+  const resolve = (): TileVisual => kTileVisual;
+
+  /** An entry under `tileId`, carrying {@link kEntryVisual} as its own label and icon. */
+  function carrying(tileId: string): DocsTileEntry {
+    return { tileId, tags: [], content: "", ...kEntryVisual };
+  }
+
+  test("shows a held tile's own label and icon, whatever the entry carries", () => {
+    assert.deepEqual(tileEntryVisual(catalog, resolve, kHeldTileId, carrying(kHeldTileId)), kTileVisual);
+  });
+
+  test("shows the label and icon an entry carries while the catalog holds no tile under its id", () => {
+    assert.deepEqual(tileEntryVisual(catalog, resolve, kUnheldTileId, carrying(kUnheldTileId)), kEntryVisual);
+  });
+
+  test("shows an entry carrying neither, whose tile the catalog does not hold, by its id's last segment and no icon", () => {
+    const bare: DocsTileEntry = { tileId: kUnheldTileId, tags: [], content: "" };
+    assert.deepEqual(tileEntryVisual(catalog, resolve, kUnheldTileId, bare), {
+      label: "struct:<Unheld>",
+      iconUrl: undefined,
+    });
   });
 });

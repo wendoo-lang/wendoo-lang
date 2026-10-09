@@ -50,6 +50,15 @@ src/
   other entry: from a `tile:` reference, `openDocsForTile`, or its
   `/docs/tiles/<tileId>` page. Use it for a page reached only from the pages
   and tiles that point to it.
+- **Entries no tile stands for**: a `DocsTileEntry` may carry its own `label`
+  and `iconUrl`, which the docs show for it while the tile catalog holds no
+  tile under its `tileId`; a tile the catalog holds always shows its own.
+  `tileEntryVisual` in `DocsSidebar.tsx` is the one resolution, read by the
+  list card, the search, and the no-docs fallback. Use it for a page naming
+  something no tile is. A type no variable factory tile stands for keys its
+  page under the id that factory tile would hold, so the type has one page
+  under one id -- listed once, its deep link unchanged -- whether or not a
+  factory stands for it.
 - **Tile chrome**: `DocsRule.tsx` draws its own read-only tile and rule chrome, but
   from the same source as the editor -- the `--color-brain-*` tokens, which it picks
   up by inheritance from whichever host app renders it, and the shared derivation in

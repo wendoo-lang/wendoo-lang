@@ -8,13 +8,27 @@
 
 /**
  * A single tile documentation entry. Keyed by `tileId`.
- * Label, icon, and category are resolved at render time from the tile
- * definition via the existing tile visual service -- do NOT store derived
- * metadata here.
+ * Label and icon are resolved at render time from the tile definition via
+ * the existing tile visual service -- do NOT store derived metadata here.
+ * Only an entry no catalog tile stands for carries its own `label` and
+ * `iconUrl`.
  */
 export interface DocsTileEntry {
   tileId: string;
   tags: string[];
+  /**
+   * Label the docs show for the entry while the tile catalog holds no tile
+   * under its `tileId`: an entry standing for something no tile is, such as
+   * a type no variable factory tile stands for. A tile the catalog holds
+   * shows its own label, whatever this says.
+   */
+  label?: string;
+  /**
+   * Icon the docs show for the entry while the tile catalog holds no tile
+   * under its `tileId`, as a data URI or URL for an image source, under the
+   * same rule as `label`.
+   */
+  iconUrl?: string;
   /**
    * Category the sidebar lists the entry under (e.g. "Sensors", "Operators").
    * Omit it to leave the entry unlisted: no list or search shows it, and it
