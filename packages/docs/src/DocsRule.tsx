@@ -3,11 +3,11 @@ import { type IBrainTileDef, RuleSide, RuleTriggerMode } from "@wendoo/core/brai
 import type { BrainTileAccessorDef, BrainTileLiteralDef, BrainTileVariableDef } from "@wendoo/core/brain/tiles";
 import { createDefaultLocalizer } from "@wendoo/core/localization";
 import { adjustColor, cn, formatValue, readableInk, staticAssetUrl } from "@wendoo/ui";
-import { kDefaultTileHue, tileBorderColor, tileEdgeColor } from "@wendoo/ui/brain-editor/tile-visual-utils";
+import { kDefaultTileHue, tileBorderColor, valueTileCornerIconUrl } from "@wendoo/ui/brain-editor/tile-visual-utils";
 import { triggerModeLabel } from "@wendoo/ui/brain-editor/trigger-mode";
 import type { TileVisual } from "@wendoo/ui/brain-editor/types";
 import { useLayoutEffect, useState } from "react";
-import { useDocsResolveTileVisual } from "./DocsSidebarContext";
+import { useDocsResolveTileVisual, useDocsSidebar } from "./DocsSidebarContext";
 
 // ---------------------------------------------------------------------------
 // Single tile chip -- simplified, read-only, no interactivity
@@ -59,6 +59,7 @@ function docsTileValue(tileDef: IBrainTileDef): { text: string; italic: boolean 
 /** Read-only rendering of a single brain tile, used inside doc tile strips and rule rows. */
 export function DocsTileChip({ tileDef, side }: DocsTileChipProps) {
   const resolveTileVisual = useDocsResolveTileVisual();
+  const { dataTypeIcons } = useDocsSidebar();
   const visual = resolveTileVisual(tileDef);
   const label = visual?.label || tileDef.tileId.split(".").pop() || tileDef.tileId;
   const iconUrl = visual?.iconUrl || staticAssetUrl("assets/brain/icons/question_mark.svg");
@@ -71,7 +72,6 @@ export function DocsTileChip({ tileDef, side }: DocsTileChipProps) {
 
   const lighterColor2 = adjustColor(baseColor, 0.4);
   const darkerColor = adjustColor(baseColor, 0);
-  const darkerSaturatedColor = tileEdgeColor(baseColor);
 
   const [labelBasedWidth, setLabelBasedWidth] = useState<number | undefined>(undefined);
 
@@ -117,19 +117,10 @@ export function DocsTileChip({ tileDef, side }: DocsTileChipProps) {
       }}
     >
       {isValueTile && (
-        <div
-          style={{
-            backgroundColor: darkerSaturatedColor,
-            WebkitMaskImage: `url(${iconUrl})`,
-            WebkitMaskSize: "contain",
-            WebkitMaskRepeat: "no-repeat",
-            WebkitMaskPosition: "center",
-            maskImage: `url(${iconUrl})`,
-            maskSize: "contain",
-            maskRepeat: "no-repeat",
-            maskPosition: "center",
-          }}
-          className="absolute top-1 left-1 w-4 h-4 pointer-events-none"
+        <img
+          src={valueTileCornerIconUrl(dataTypeIcons, tileDef, iconUrl)}
+          alt=""
+          className="absolute top-1 left-1 w-4 h-4 object-contain pointer-events-none"
           aria-hidden="true"
         />
       )}

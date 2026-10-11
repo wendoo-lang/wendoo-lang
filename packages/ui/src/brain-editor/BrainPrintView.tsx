@@ -4,7 +4,7 @@ import { staticAssetUrl } from "../asset-url";
 import { useBrainEditorConfig } from "./BrainEditorContext";
 import { BrainPrintRuleSentence } from "./BrainRuleSentence";
 import { TileValue } from "./TileValue";
-import { kDefaultTileHue, resolveTileVisual, tileVisualCategory } from "./tile-visual-utils";
+import { kDefaultTileHue, resolveTileVisual, tileVisualCategory, valueTileCornerIconUrl } from "./tile-visual-utils";
 
 // -- Print tile (simplified, no glass, no gradients) -------------------------
 
@@ -27,26 +27,11 @@ function PrintTile({ tileDef, side }: PrintTileProps) {
   // A printed accessor reads its field name in a value box, its own icon in the corner.
   const isValueTile = category === "value" || category === "accessor";
   const isFactoryTile = category === "factory";
+  const cornerIconUrl = valueTileCornerIconUrl(editorConfig.dataTypeIcons, tileDef, iconUrl);
 
   return (
     <div className="brain-print-tile" style={{ borderColor: baseColor }}>
-      {isValueTile && (
-        <div
-          style={{
-            WebkitMaskImage: `url(${iconUrl})`,
-            WebkitMaskSize: "contain",
-            WebkitMaskRepeat: "no-repeat",
-            WebkitMaskPosition: "center",
-            maskImage: `url(${iconUrl})`,
-            maskSize: "contain",
-            maskRepeat: "no-repeat",
-            maskPosition: "center",
-            backgroundColor: "#555",
-          }}
-          className="brain-print-tile-icon-small"
-          aria-hidden="true"
-        />
-      )}
+      {isValueTile && <img src={cornerIconUrl} alt="" className="brain-print-tile-icon-small" aria-hidden="true" />}
       <div className="brain-print-tile-content">
         {isValueTile ? (
           <div className="brain-print-tile-value">

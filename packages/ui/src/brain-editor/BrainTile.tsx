@@ -15,8 +15,8 @@ import {
   resolveTileVisual,
   tileAccessibleName,
   tileBorderColor,
-  tileEdgeColor,
   tileVisualCategory,
+  valueTileCornerIconUrl,
 } from "./tile-visual-utils";
 
 interface BrainTileProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
@@ -30,6 +30,12 @@ interface BrainTileProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "
  * custom-drawn node alike. Valued empty.
  */
 export const kTileValueFrameAttribute = "data-tile-value-frame";
+
+/**
+ * Attribute marking the image a tile draws in its top-left corner, in the
+ * icon's own colors. Valued empty.
+ */
+export const kTileCornerIconAttribute = "data-tile-corner-icon";
 
 /** The font a tile's label is laid out in, which its measurement reproduces. */
 const kTileLabelFontSize = "0.875rem";
@@ -101,17 +107,20 @@ export const BrainTile = forwardRef<HTMLButtonElement, BrainTileProps>(
       category === "accessor"
         ? editorConfig.dataTypeIcons.get((tileDef as BrainTileAccessorDef).fieldTypeId)
         : undefined;
-    // The silhouette in the tile's top-left corner: a value tile's own icon, or
-    // an accessor's result data type's icon where it differs from the face.
-    // Undefined draws no corner.
-    const cornerIconUrl = isValueTile ? iconUrl : resultTypeIconUrl !== iconUrl ? resultTypeIconUrl : undefined;
+    // The icon in the tile's top-left corner: a value tile's data type's icon,
+    // else its own icon, or an accessor's result data type's icon where it
+    // differs from the face. Undefined draws no corner.
+    const cornerIconUrl = isValueTile
+      ? valueTileCornerIconUrl(editorConfig.dataTypeIcons, tileDef, iconUrl)
+      : resultTypeIconUrl !== iconUrl
+        ? resultTypeIconUrl
+        : undefined;
     const isFactoryTile = category === "factory";
     const isActionTile = isActionTileDef(tileDef);
     const isAsyncAction = isActionTile && tileDef.action.isAsync === true;
 
     const lighterColor2 = adjustColor(baseColor, 0.4);
     const darkerColor = adjustColor(baseColor, 0);
-    const darkerSaturatedColor = tileEdgeColor(baseColor);
     // The label sits on the tile fill, so its ink is chosen against that fill.
     const labelInk = readableInk(darkerColor);
     const surfaceStyle = {
@@ -180,19 +189,11 @@ export const BrainTile = forwardRef<HTMLButtonElement, BrainTileProps>(
           {...props}
         >
           {cornerIconUrl !== undefined && (
-            <div
-              style={{
-                backgroundColor: darkerSaturatedColor,
-                WebkitMaskImage: `url(${cornerIconUrl})`,
-                WebkitMaskSize: "contain",
-                WebkitMaskRepeat: "no-repeat",
-                WebkitMaskPosition: "center",
-                maskImage: `url(${cornerIconUrl})`,
-                maskSize: "contain",
-                maskRepeat: "no-repeat",
-                maskPosition: "center",
-              }}
-              className="absolute top-1 left-1 w-4 h-4 pointer-events-none"
+            <img
+              {...{ [kTileCornerIconAttribute]: "" }}
+              src={cornerIconUrl}
+              alt=""
+              className="absolute top-1 left-1 w-4 h-4 object-contain pointer-events-none"
               aria-hidden="true"
             />
           )}

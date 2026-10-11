@@ -510,6 +510,7 @@
   left: 2px;
   width: 12px;
   height: 12px;
+  object-fit: contain;
 }
 
 .brain-print-tile-content {

@@ -34,7 +34,7 @@ export function tileBorderColor(baseColor: string): string {
  * How a tile chip renders, derived from its kind:
  *
  * - "value" -- shows its value in a boxed value field (literal, variable, output)
- * - "accessor" -- an icon chip whose corner carries the silhouette of its result data type's icon (accessor)
+ * - "accessor" -- an icon chip whose corner carries its result data type's icon (accessor)
  * - "action" -- an icon chip that may carry the async-completion badge (sensor, actuator)
  * - "parameter" -- an icon chip with a data-type badge (parameter)
  * - "factory" -- an icon chip drawn at reduced scale (factory)
@@ -63,6 +63,34 @@ export const tileVisualCategoryByKind: Record<BrainTileKind, TileVisualCategory>
 /** The {@link TileVisualCategory} of a tile, keyed by its kind. */
 export function tileVisualCategory(tileDef: IBrainTileDef): TileVisualCategory {
   return tileVisualCategoryByKind[tileDef.kind];
+}
+
+/** The type of the value a value tile stands for: a literal's value type, a variable's type, an output's type. */
+function valueTileTypeId(tileDef: IBrainTileDef): string | undefined {
+  switch (tileDef.kind) {
+    case "literal":
+      return (tileDef as BrainTileLiteralDef).valueType;
+    case "variable":
+      return (tileDef as BrainTileVariableDef).varType;
+    case "output":
+      return (tileDef as BrainTileOutputDef).outputType;
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * The icon a value tile draws in its top-left corner: the icon `dataTypeIcons`
+ * maps the type of its value to, else `iconUrl`, the icon the tile's own
+ * visual resolves to. A tile of a kind standing for no value draws `iconUrl`.
+ */
+export function valueTileCornerIconUrl(
+  dataTypeIcons: ReadonlyMap<string, string> | undefined,
+  tileDef: IBrainTileDef,
+  iconUrl: string
+): string {
+  const typeId = valueTileTypeId(tileDef);
+  return (typeId === undefined ? undefined : dataTypeIcons?.get(typeId)) ?? iconUrl;
 }
 
 function defaultTileLabel(tileDef: IBrainTileDef): string {
