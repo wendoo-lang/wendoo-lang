@@ -66,10 +66,19 @@ not ask about and invites tangential questions.
 
 ## ASCII-Only Text in Comments and Documentation
 
-Use only keyboard-typable ASCII characters in code comments, markdown
-documentation, and string literals used for logging or display. Do not use
-Unicode arrows, em dashes, bullet characters, box-drawing characters, or other
-non-keyboard symbols.
+Use only keyboard-typable ASCII characters in prose written for a
+developer's benefit: code comments (JSDoc included), markdown written for
+developers, and log lines. Do not use Unicode arrows, em dashes, bullet
+characters, box-drawing characters, or other non-keyboard symbols there.
+
+The rule is scoped by audience, not by file. It does not govern user-facing
+prose -- labels, sentence words, notices, and docs pages a user reads may
+carry any character the text needs -- and it does not govern code
+semantics: regex character classes, data and wire literals, fixture bytes,
+image hex, annotation values a tool reads (such as a toolbox icon glyph),
+and any string a program interprets. A sweep for this rule reads comments,
+developer docs, and log lines, never whole files; a non-ASCII character
+outside the scope is left as it is and, at most, noted.
 
 Common substitutions:
 

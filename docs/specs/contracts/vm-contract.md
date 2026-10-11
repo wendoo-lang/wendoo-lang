@@ -554,6 +554,20 @@ struct type may declare a starting value at registration -- a value of the
 type holding no native handle -- carried like any other zero; every other
 type starts `NIL`.
 
+A re-initialization that replaces a brain's running program with a
+revision of it -- a hot reload -- installs the revision's slots by name
+from the replaced program's value list instead of seeding them all. A
+slot whose variable name the replaced list held keeps that value, the same
+value and not a copy, with no check of its type against the type the
+revision gives the variable; a slot a host write allocated carries the
+same way into a revision declaring its name. A slot whose name is new to
+the revision is seeded with its starting value as at program load, and a
+name the revision does not declare is dropped with its value. Every other
+start of a program -- its first load on a brain, or a brain switching to a
+different program -- carries nothing and seeds every slot. The C++ MCU
+port never hot-reloads: a device takes a new program by flashing, which is
+a fresh start.
+
 Each seed stores a fresh deep copy of the referenced constant: a struct
 constant materializes into a new struct cell, field by field, at every seed
 -- program load, a host's clear of one variable or of all of them, and a
