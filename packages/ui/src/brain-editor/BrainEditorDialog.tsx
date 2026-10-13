@@ -38,6 +38,7 @@ import {
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { staticAssetUrl } from "../asset-url";
+import { downloadTextFile, pickFile } from "../lib/file-transfer";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
 import {
@@ -589,55 +590,25 @@ export function BrainEditorDialog(props: BrainEditorDialogProps | ContinuousBrai
     });
   }, [armedTarget.target, disarmTileTarget]);
 
-  const handleSaveToFile = useCallback(async () => {
+  const handleSaveToFile = useCallback(() => {
     if (!brainDef) return;
 
     try {
       // Serialize the brain to its persisted JSON form
       const json =
         projectNamespace !== undefined ? encodePersistedBrainJson(brainDef, projectNamespace) : brainDef.toJson();
-      const text = JSON.stringify(json, null, 2);
-
-      // Use File System Access API to save
-      // biome-ignore lint/suspicious/noExplicitAny: File System Access API has no standard TS types
-      const handle = await (window as any).showSaveFilePicker({
-        suggestedName: `${brainDef.name()}.brain`,
-        types: [
-          {
-            description: "Brain Files",
-            accept: { "application/json": [".brain"] },
-          },
-        ],
-      });
-
-      const writable = await handle.createWritable();
-      await writable.write(text);
-      await writable.close();
+      downloadTextFile(JSON.stringify(json, null, 2), `${brainDef.name()}.brain`);
     } catch (err) {
-      // User cancelled or error occurred
-      if (err instanceof Error && err.name !== "AbortError") {
-        console.error("Failed to save brain:", err);
-      }
+      console.error("Failed to save brain:", err);
     }
   }, [brainDef, projectNamespace]);
 
   const handleLoadFromFile = useCallback(async () => {
-    try {
-      // Use File System Access API to load
-      // biome-ignore lint/suspicious/noExplicitAny: File System Access API has no standard TS types
-      const [handle] = await (window as any).showOpenFilePicker({
-        types: [
-          {
-            description: "Brain Files",
-            accept: { "application/octet-stream": [".brain"], "application/json": [".brain"] },
-          },
-        ],
-        multiple: false,
-      });
+    const file = await pickFile(".brain");
+    if (!file) return;
 
-      const file = await handle.getFile();
-      const arrayBuffer = await file.arrayBuffer();
-      const text = new TextDecoder().decode(new Uint8Array(arrayBuffer));
+    try {
+      const text = await file.text();
 
       const extraCatalogs = tileCatalogs ? List.from(tileCatalogs) : undefined;
       const plain = JSON.parse(text) as unknown;
@@ -658,10 +629,7 @@ export function BrainEditorDialog(props: BrainEditorDialogProps | ContinuousBrai
       if (!workingBrainDef) return;
       replaceBrainContent(commandHistory, workingBrainDef, loadedBrain, extraCatalogs);
     } catch (err) {
-      // User cancelled or error occurred
-      if (err instanceof Error && err.name !== "AbortError") {
-        console.error("Failed to load brain:", err);
-      }
+      console.error("Failed to load brain:", err);
     }
   }, [commandHistory, brainServices, tileCatalogs, projectNamespace]);
 

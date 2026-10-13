@@ -18,8 +18,10 @@ import {
   type BrainEditorDialogProps,
   BrainEditorProvider,
   Button,
+  downloadTextFile,
   ProjectPickerDialog,
   type ProjectPickerItem,
+  pickFile,
   Toaster,
 } from "@wendoo/ui";
 import { Lock, Menu, X } from "lucide-react";
@@ -52,8 +54,6 @@ import {
   ecosimFeaturedNamespaces,
 } from "./services/ecosim-extension-browser";
 import { ecosimLibraryOfferToasts } from "./services/library-offer-toasts";
-import { downloadTextFile } from "./utils/file-download";
-import { pickFile } from "./utils/file-upload";
 
 /** Compare two snapshots by display-relevant fields to skip no-op re-renders. */
 function statsEqual(

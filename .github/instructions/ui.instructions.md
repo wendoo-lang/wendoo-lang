@@ -30,6 +30,7 @@ src/
   lib/                      Utility functions
     utils.ts                cn() -- Tailwind class merge (clsx + tailwind-merge)
     color.ts                adjustColor(), saturateColor(), HSL helpers
+    file-transfer.ts        downloadTextFile() and pickFile() -- browser file save and open
     index.ts                Barrel
   ui/                       shadcn/ui primitives
     button.tsx, card.tsx, context-menu.tsx, dialog.tsx, dropdown-menu.tsx, input.tsx, slider.tsx
