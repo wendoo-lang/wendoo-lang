@@ -250,14 +250,14 @@ declared units, unit prose follows defaults and ranges out of the pages.
 
 ## Audience and Restraint
 
-The docs serve kids learning the basics. Clear and simple beats complete: a page says what a
-tile or idea does in the plain case, and kids meet the edge cases and the fuller feature set
-through play and example. The tile language is larger than any page shows, so restraint is the
-default, and when in doubt a page says less.
+The docs serve people learning the basics, many with no programming background. Clear and
+simple beats complete: a page says what a tile or idea does in the plain case, and readers meet
+the edge cases and the fuller feature set through play and example. The tile language is larger
+than any page shows, so restraint is the default, and when in doubt a page says less.
 
 - When a claim on a page turns out false, prefer removing the overclaim to documenting the
   fuller behavior.
-- Do not document an extension mechanism, or an exception that behaves the way a kid would
+- Do not document an extension mechanism, or an exception that behaves the way a reader would
   already expect.
 
 ## Consuming This Package

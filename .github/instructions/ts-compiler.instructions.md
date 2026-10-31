@@ -5,7 +5,7 @@ applyTo: "packages/ts-compiler/**"
 # TS-Compiler Operating Principles
 
 The ts-compiler turns user-authored TypeScript into Wendoo programs, tiles,
-and type-registry entries. Its users are learners writing what they believe is
+and type-registry entries. Its users are people writing what they believe is
 ordinary TypeScript; the product's credibility rests on that belief holding.
 These principles bind every change in the package. They complement the global
 instructions; where the global rules say how to write code, this file says what

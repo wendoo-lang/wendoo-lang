@@ -347,7 +347,7 @@ reconnect.
 - Trust never derives from session traffic: provenance and
   assistant-content gating ride host-attested channels and
   point-of-use allowlists, outside this system.
-- Kid-facing resilience governs every surface here: mistakes are
+- Resilience governs every surface here: mistakes are
   diagnosed with stable codes and the system soldiers on. The only
   hard stops are the version rejection, `JOIN_CODE_UNKNOWN`,
   `SESSION_REPLACED`, `SESSION_ENDED`, and an endpoint discarding an
