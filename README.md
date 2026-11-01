@@ -35,6 +35,7 @@ Wendoo draws inspiration from other tile-based programming systems past and pres
 | [@wendoo/conformance](packages/conformance/) | Cross-VM conformance corpus -- the shared host profile, trace grammar, and goldens every Wendoo VM is verified against |
 | [@wendoo/assistant-bridge](packages/assistant-bridge/) | Assistant bridge -- the open tool contract, catalog digest, trace summarizer, target adapter interface, and rehearsal adapter kit |
 | [@wendoo/assistant-relay](packages/assistant-relay/) | Assistant relay protocol -- the session handshake, turn events, and tool-call wire an assistant service speaks with a client |
+| [@wendoo/api-contract](packages/api-contract/) | The open contract of the Wendoo API service -- account session, connection tickets, the cross-site handoff, and their client-side support |
 | [@wendoo/service-api](packages/service-api/) | Request/response schemas, shared enums, error shapes, and serialization formats for backend service APIs |
 | [@wendoo/cli](packages/cli/) | Command-line tools for Wendoo projects |
 | [@wendoo/join-codes](packages/join-codes/) | Generator of the three-word join codes people type to join a Wendoo session |

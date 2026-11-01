@@ -840,6 +840,7 @@ export class AssistantMachine {
         case "turn:start":
         case "session:accepted":
         case "session:refused":
+        case "session:wallet":
           break;
         default:
           assertUnreachable(message);

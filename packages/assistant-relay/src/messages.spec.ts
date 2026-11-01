@@ -23,6 +23,18 @@ const downstream: readonly RelayDownstreamMessage[] = [
     protocolVersion: ASSISTANT_RELAY_PROTOCOL_VERSION,
     message: "reload and reconnect",
   },
+  {
+    type: "session:refused",
+    code: RelayRefusalCode.Unauthenticated,
+    protocolVersion: ASSISTANT_RELAY_PROTOCOL_VERSION,
+  },
+  {
+    type: "session:refused",
+    code: RelayRefusalCode.WalletExhausted,
+    protocolVersion: ASSISTANT_RELAY_PROTOCOL_VERSION,
+  },
+  { type: "session:wallet", leaseRemaining: 1200, leaseTotal: 5000 },
+  { type: "session:wallet", leaseRemaining: 0, leaseTotal: 5000 },
   { type: "turn:start" },
   { type: "turn:narration", text: "placing the sensor" },
   { type: "turn:narration", text: "Two ways of being.", role: NarrationRole.Plan },
@@ -43,6 +55,7 @@ const downstream: readonly RelayDownstreamMessage[] = [
   { type: "turn:end", code: RelayTurnEndCode.Stopped },
   { type: "turn:end", code: RelayTurnEndCode.Truncated },
   { type: "turn:end", code: RelayTurnEndCode.Failed, message: "the model call did not complete" },
+  { type: "turn:end", code: RelayTurnEndCode.LeaseExhausted },
 ];
 
 /** One message of every upstream type. */
@@ -57,6 +70,18 @@ const upstream: readonly RelayUpstreamMessage[] = [
       morphology: false,
       catalogDigest: "0f3a19c2",
     },
+  },
+  {
+    type: "session:connect",
+    protocolVersion: ASSISTANT_RELAY_PROTOCOL_VERSION,
+    clientBuild: __test__clientBuild,
+    manifest: {
+      target: "example-org/trg-fake",
+      tools: ["compile", "read_project"],
+      morphology: false,
+      catalogDigest: "0f3a19c2",
+    },
+    ticket: "opaque.connection.ticket",
   },
   {
     type: "session:connect",
@@ -125,6 +150,7 @@ describe("the relay wire", () => {
       "session:libraryAdded",
       "session:refused",
       "session:userMessage",
+      "session:wallet",
       "turn:end",
       "turn:narration",
       "turn:start",
@@ -152,7 +178,28 @@ describe("the relay wire", () => {
       Stopped: "stopped",
       Truncated: "truncated",
       Failed: "failed",
+      LeaseExhausted: "lease_exhausted",
     });
+  });
+
+  test("names every code a connect is refused with, as the wire spells it", () => {
+    assert.deepEqual(RelayRefusalCode, {
+      ProtocolVersionMismatch: "protocol_version_mismatch",
+      TargetUnavailable: "target_unavailable",
+      Unauthenticated: "unauthenticated",
+      WalletExhausted: "wallet_exhausted",
+    });
+  });
+
+  test("refuses a wallet status whose credits are not whole nonnegative numbers", () => {
+    for (const forged of [
+      { type: "session:wallet", leaseRemaining: -1, leaseTotal: 5000 },
+      { type: "session:wallet", leaseRemaining: 1.5, leaseTotal: 5000 },
+      { type: "session:wallet", leaseRemaining: 10 },
+      { type: "session:wallet", leaseRemaining: 10, leaseTotal: 5000, balance: 90000 },
+    ]) {
+      assert.equal(relayDownstreamMessageSchema.safeParse(forged).success, false, JSON.stringify(forged));
+    }
   });
 
   test("names every role a run of narration carries, as the wire spells it", () => {
@@ -186,6 +233,18 @@ describe("the relay wire", () => {
         catalogDigest: "0f3a19c2",
       },
       tier: "unlimited",
+    };
+
+    assert.equal(relayUpstreamMessageSchema.safeParse(forged).success, false);
+  });
+
+  test("refuses a connect carrying an empty ticket", () => {
+    const forged = {
+      type: "session:connect",
+      protocolVersion: ASSISTANT_RELAY_PROTOCOL_VERSION,
+      clientBuild: __test__clientBuild,
+      manifest: { target: "example-org/trg-fake", tools: [], morphology: false, catalogDigest: "0f3a19c2" },
+      ticket: "",
     };
 
     assert.equal(relayUpstreamMessageSchema.safeParse(forged).success, false);

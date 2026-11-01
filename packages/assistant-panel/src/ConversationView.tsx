@@ -1069,6 +1069,8 @@ function endingNote(ending: ConversationTurnEnding): string | undefined {
       return "I lost my train of thought. Ask me again?";
     case RelayTurnEndCode.Failed:
       return "I could not finish that one.";
+    case RelayTurnEndCode.LeaseExhausted:
+      return "I reached this session's usage limit, so I stopped there.";
   }
 }
 

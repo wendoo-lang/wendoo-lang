@@ -79,6 +79,63 @@ describe("the relay handshake", () => {
     assert.deepEqual(connect.clientBuild, __test__clientBuild);
   });
 
+  test("carries the connection ticket across, and a connect without one", async () => {
+    const loopback = createRelayLoopback();
+    const connect = {
+      type: "session:connect",
+      protocolVersion: ASSISTANT_RELAY_PROTOCOL_VERSION,
+      clientBuild: __test__clientBuild,
+      manifest,
+    } as const;
+    loopback.toolServer.send({ ...connect, ticket: "opaque.connection.ticket" });
+    loopback.toolServer.send(connect);
+
+    const ticketed = await loopback.service.next();
+    const bare = await loopback.service.next();
+
+    assert.equal(ticketed.type === "session:connect" ? ticketed.ticket : undefined, "opaque.connection.ticket");
+    assert.equal(bare.type, "session:connect");
+    assert.equal("ticket" in bare, false);
+  });
+
+  test("refuses a connect carrying a field the wire does not define, ticket or no ticket", () => {
+    const base = {
+      type: "session:connect",
+      protocolVersion: ASSISTANT_RELAY_PROTOCOL_VERSION,
+      clientBuild: __test__clientBuild,
+      manifest,
+      lease: 5000,
+    };
+
+    assert.equal(relayUpstreamMessageSchema.safeParse(base).success, false);
+    assert.equal(relayUpstreamMessageSchema.safeParse({ ...base, ticket: "t" }).success, false);
+  });
+
+  test("carries each refusal a connect's authentication can draw", async () => {
+    for (const code of [RelayRefusalCode.Unauthenticated, RelayRefusalCode.WalletExhausted]) {
+      const loopback = createRelayLoopback();
+      loopback.service.send({ type: "session:refused", code, protocolVersion: ASSISTANT_RELAY_PROTOCOL_VERSION });
+
+      const answer = await loopback.toolServer.next();
+
+      assert.equal(answer.type, "session:refused");
+      assert.equal(answer.type === "session:refused" ? answer.code : undefined, code);
+    }
+  });
+
+  test("carries the lease's wallet status after the session opens", async () => {
+    const loopback = createRelayLoopback();
+    loopback.service.send({ type: "session:accepted", sessionId: "01JQ8G0000000000000000" });
+    loopback.service.send({ type: "session:wallet", leaseRemaining: 5000, leaseTotal: 5000 });
+
+    assert.equal((await loopback.toolServer.next()).type, "session:accepted");
+    assert.deepEqual(await loopback.toolServer.next(), {
+      type: "session:wallet",
+      leaseRemaining: 5000,
+      leaseTotal: 5000,
+    });
+  });
+
   test("refuses a client holding another version and names the version it speaks", async () => {
     const answer = await connectAt(ASSISTANT_RELAY_PROTOCOL_VERSION + 1);
 
@@ -103,6 +160,27 @@ describe("the relay handshake", () => {
 });
 
 describe("the version a connect states", () => {
+  test("is the fourth version of the wire", () => {
+    assert.equal(ASSISTANT_RELAY_PROTOCOL_VERSION, 4);
+  });
+
+  test("brings a client of the previous version, ticket in hand, a refusal rather than a parse failure", async () => {
+    const loopback = createRelayLoopback();
+    const previous = {
+      type: "session:connect",
+      protocolVersion: ASSISTANT_RELAY_PROTOCOL_VERSION - 1,
+      clientBuild: __test__clientBuild,
+      manifest,
+      ticket: "opaque.connection.ticket",
+    };
+
+    answerConnect(loopback, previous);
+    const answer = await loopback.toolServer.next();
+
+    assert.equal(answer.type, "session:refused");
+    assert.equal(answer.type === "session:refused" ? answer.code : undefined, RelayRefusalCode.ProtocolVersionMismatch);
+  });
+
   /** A connect an older wire wrote: no build the client runs, which this wire requires. */
   const older = {
     type: "session:connect",

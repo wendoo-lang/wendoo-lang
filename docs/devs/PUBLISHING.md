@@ -8,6 +8,7 @@ Packages have internal `file:` dependencies that form a directed graph (the
 `wendoo` package lives in `packages/cli`):
 
 ```
+api-contract      (no local deps)
 bridge-protocol   (no local deps)
 core              (no local deps)
 assistant-relay   -> core

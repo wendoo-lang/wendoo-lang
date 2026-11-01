@@ -26,6 +26,7 @@ export type {
   RelayTurnWriting,
   RelayUpstreamMessage,
   RelayUserMessage,
+  RelayWalletStatus,
 } from "./messages.js";
 export {
   NarrationJudgment,

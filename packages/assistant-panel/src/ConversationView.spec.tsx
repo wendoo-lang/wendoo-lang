@@ -818,7 +818,12 @@ describe("how a turn ended", () => {
   });
 
   test("marks every abnormal ending with the code it ended on", () => {
-    const abnormal = [RelayTurnEndCode.Stopped, RelayTurnEndCode.Truncated, RelayTurnEndCode.Failed] as const;
+    const abnormal = [
+      RelayTurnEndCode.Stopped,
+      RelayTurnEndCode.Truncated,
+      RelayTurnEndCode.Failed,
+      RelayTurnEndCode.LeaseExhausted,
+    ] as const;
 
     for (const code of abnormal) {
       const markup = render({ record: record([{ kind: "assistant", steps: [], ending: { kind: "end", code } }]) });
@@ -1807,7 +1812,12 @@ describe("where a conversation got to when a turn left no answer", () => {
   ];
 
   test("stands an account of what is kept above the note on every ending that left none", () => {
-    const answerless = [RelayTurnEndCode.Stopped, RelayTurnEndCode.Truncated, RelayTurnEndCode.Failed] as const;
+    const answerless = [
+      RelayTurnEndCode.Stopped,
+      RelayTurnEndCode.Truncated,
+      RelayTurnEndCode.Failed,
+      RelayTurnEndCode.LeaseExhausted,
+    ] as const;
 
     for (const code of answerless) {
       const markup = render({ record: record([{ kind: "assistant", steps: kept, ending: { kind: "end", code } }]) });

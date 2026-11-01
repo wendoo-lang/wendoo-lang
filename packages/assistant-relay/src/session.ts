@@ -7,7 +7,7 @@ import type { ConversationRecord } from "./conversation.js";
  * end to end: the client declares the version it holds when it connects, and
  * the service admits only its own.
  */
-export const ASSISTANT_RELAY_PROTOCOL_VERSION = 3;
+export const ASSISTANT_RELAY_PROTOCOL_VERSION = 4;
 
 /**
  * Identifier of one relay session. The service mints it from a globally unique
@@ -84,6 +84,13 @@ export interface RelayConnect {
    * session opens anyway.
    */
   readonly conversation?: ConversationRecord;
+  /**
+   * The connection ticket the API service minted for this connection, opaque to
+   * the client. A service that requires authentication refuses a connect
+   * without one, or with one it cannot accept, as `unauthenticated`; a service
+   * that does not require it accepts its absence.
+   */
+  readonly ticket?: string;
 }
 
 /** The session is open, and this is what to call it. */
@@ -106,6 +113,18 @@ export const RelayRefusalCode = {
    * not claim.
    */
   TargetUnavailable: "target_unavailable",
+  /**
+   * The connect carried no connection ticket, or one that is invalid, expired,
+   * already spent, or not addressed to this service. The client mints a fresh
+   * ticket and connects once more; refused again, it shows the signed-out
+   * state.
+   */
+  Unauthenticated: "unauthenticated",
+  /**
+   * The account's wallet cannot open a spend lease for the connection. The
+   * remedy is a purchase or the wallet's next regrant.
+   */
+  WalletExhausted: "wallet_exhausted",
 } as const;
 
 /** Why the service would not open a session. */

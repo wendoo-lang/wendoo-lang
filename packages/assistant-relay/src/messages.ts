@@ -118,6 +118,12 @@ export const RelayTurnEndCode = {
    * the last edit a tool call applied, valid and undoable.
    */
   Failed: "failed",
+  /**
+   * The connection's spend lease ran out, so the assistant stopped. What it
+   * narrated and applied before stopping stands, and the conversation
+   * continues on a connection with a new lease.
+   */
+  LeaseExhausted: "lease_exhausted",
 } as const;
 
 /** How a turn ended. */
@@ -129,6 +135,19 @@ export interface RelayTurnEnd {
   readonly code: RelayTurnEndCode;
   /** Human-readable context; the code is the contract. */
   readonly message?: string;
+}
+
+/**
+ * Where the connection's spend lease stands, in cost-normalized credits. The
+ * service sends one after `session:accepted` once the lease opens, and more as
+ * it drains. The client shows status from it and never computes money from it.
+ */
+export interface RelayWalletStatus {
+  readonly type: "session:wallet";
+  /** Credits the lease has left; a nonnegative integer. */
+  readonly leaseRemaining: number;
+  /** Credits the lease opened with; a nonnegative integer. */
+  readonly leaseTotal: number;
 }
 
 /** The client's answers to one {@link RelayToolCallBatch}, in any order. */
@@ -164,6 +183,7 @@ export interface RelayStop {
 export type RelayDownstreamMessage =
   | RelayConnectAccepted
   | RelayConnectRefused
+  | RelayWalletStatus
   | RelayTurnStart
   | RelayNarrationDelta
   | RelayTurnWriting
@@ -189,6 +209,11 @@ export const relayDownstreamMessageSchema = z.discriminatedUnion("type", [
     code: z.enum(RelayRefusalCode),
     protocolVersion: z.number().int().positive(),
     message: z.string().optional(),
+  }),
+  z.strictObject({
+    type: z.literal("session:wallet"),
+    leaseRemaining: z.number().int().nonnegative(),
+    leaseTotal: z.number().int().nonnegative(),
   }),
   z.strictObject({ type: z.literal("turn:start") }),
   z.strictObject({
@@ -219,6 +244,7 @@ export const relayUpstreamMessageSchema = z.discriminatedUnion("type", [
     clientBuild: clientBuildSchema,
     manifest: relayToolManifestSchema,
     conversation: z.unknown().optional(),
+    ticket: z.string().min(1).optional(),
   }),
   z.strictObject({ type: z.literal("turn:toolResults"), results: z.array(relayToolResultSchema) }),
   z.strictObject({ type: z.literal("session:userMessage"), text: z.string() }),

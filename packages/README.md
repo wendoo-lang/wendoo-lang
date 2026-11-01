@@ -2,6 +2,7 @@
 
 | Package                                   | Description                                                                                                                        |
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| [api-contract](api-contract/)             | The open contract of the Wendoo API service: account session, connection tickets, the cross-site handoff, and their client-side support |
 | [app-host](app-host/)                     | Project management, project file storage, and IDB persistence for Wendoo apps                                                   |
 | [assistant-bridge](assistant-bridge/)     | The Assistant tool contract, catalog digest, trace summarizer, target adapter interface, and rehearsal adapter kit                 |
 | [assistant-relay](assistant-relay/)       | The assistant relay protocol: session handshake, turn events, and the tool-call wire of the split loop                             |
