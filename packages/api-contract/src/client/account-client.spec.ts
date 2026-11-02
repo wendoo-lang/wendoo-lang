@@ -5,7 +5,7 @@ import type { Sha256 } from "../account-site.js";
 import { AccountSiteParam, AccountSitePath, HANDOFF_MESSAGE_TYPE, handoffChallenge } from "../account-site.js";
 import { AccountClientMode } from "../config.js";
 import { ApiErrorCode } from "../errors.js";
-import type { MeView } from "../routes.js";
+import type { MeLinks, MeView } from "../routes.js";
 import { AccountRole, AccountRoutePath, ticketGrantSchema } from "../routes.js";
 import type { FakeApiService } from "../testing/index.js";
 import { createFakeApiService } from "../testing/index.js";
@@ -26,8 +26,18 @@ const materialLifetimeMs = 15 * 60_000;
 const robin: MeView = {
   principalId: "principal-1",
   displayName: "Robin",
-  account: { id: "account-1", role: AccountRole.Member, tier: "free" },
+  account: {
+    id: "account-1",
+    role: AccountRole.Member,
+    wallet: { availableCredits: 300 },
+    links: { manage: `${accountSiteUrl}/account`, refill: `${accountSiteUrl}/account/refill?from=editor` },
+  },
 };
+
+/** `robin` carrying `links` in place of its own. */
+function robinWith(links: Partial<MeLinks>): MeView {
+  return { ...robin, account: { ...robin.account, links: { ...robin.account.links, ...links } } };
+}
 
 /**
  * What the account site's handoff page does once its popup opens. `self` is
@@ -36,12 +46,12 @@ const robin: MeView = {
  */
 type HandoffPage = (url: URL, post: (message: AccountWindowMessage) => void, close: () => void, self: unknown) => void;
 
-/** The account site signing the principal in and posting the code it mints, from its own origin and window. */
+/** The account site signing `view` in and posting the code it mints, from its own origin and window. */
 const honestSite =
-  (fake: FakeApiService): HandoffPage =>
+  (fake: FakeApiService, view: MeView): HandoffPage =>
   (url, post, _close, self) => {
     const challenge = url.searchParams.get(AccountSiteParam.Challenge) ?? "";
-    fake.signInPrincipal(robin);
+    fake.signInPrincipal(view);
     post({
       origin: accountSiteUrl,
       source: self,
@@ -57,6 +67,8 @@ interface StandOptions {
   readonly registeredOrigins?: readonly string[];
   /** Base URL of the fake API service. */
   readonly baseUrl?: string;
+  /** The view the honest account site signs in. Defaults to `robin`. */
+  readonly view?: MeView;
 }
 
 /** One browser running a client against a fake API service, with a clock the test moves. */
@@ -91,7 +103,7 @@ function stand(mode: AccountClientMode, options: StandOptions = {}): Stand {
   const urls: string[] = [];
   const navigations: string[] = [];
   const popups: string[] = [];
-  const handoffPage = page === undefined ? honestSite(fake) : page(fake);
+  const handoffPage = page === undefined ? honestSite(fake, options.view ?? robin) : page(fake);
 
   const client = createAccountClient(
     { baseUrl: fake.baseUrl, accountSiteUrl, clientId: "editor-web", mode },
@@ -343,6 +355,100 @@ describe("a cross-site client", () => {
     assert.deepEqual(await client.signOut(), { kind: "ok" });
     assert.deepEqual(await client.me(), { kind: "needs-sign-in" });
     assert.throws(() => fake.mintHandoffCode("challenge"));
+  });
+});
+
+/** A client in `mode` at `siteUrl` whose transport answers every request 200 with `body`. */
+function answeringClient(mode: AccountClientMode, body: unknown, siteUrl = accountSiteUrl): AccountClient {
+  return createAccountClient(
+    { baseUrl: "https://api.example.test", accountSiteUrl: siteUrl, clientId: "editor-web", mode },
+    {
+      fetch: async () => ({ status: 200, json: async () => JSON.parse(JSON.stringify(body)) }),
+      now: Date.now,
+      randomBytes: (length) => new Uint8Array(length),
+      sha256,
+      openPopup: () => undefined,
+      subscribeToMessages: () => () => {},
+      navigate: () => {},
+      currentUrl: () => editorUrl,
+    }
+  );
+}
+
+describe("the account view a client accepts", () => {
+  test("carries the credits available and the account site's links as the API service sent them", async () => {
+    const { fake, client } = stand(AccountClientMode.SameSite);
+    fake.signInPrincipal(robin);
+
+    const outcome = await client.me();
+
+    assert.equal(outcome.kind, "ok");
+    if (outcome.kind !== "ok") return;
+    assert.deepEqual(outcome.value.account.wallet, robin.account.wallet);
+    assert.deepEqual(outcome.value.account.links, robin.account.links);
+  });
+
+  test("is accepted with links on the account site's origin under a path of its own", async () => {
+    const view = robinWith({ manage: "https://example.test/site/account", refill: "https://example.test/x/refill" });
+
+    assert.deepEqual(await answeringClient(AccountClientMode.SameSite, view, "https://example.test/site").me(), {
+      kind: "ok",
+      value: view,
+    });
+  });
+
+  for (const mode of [AccountClientMode.SameSite, AccountClientMode.CrossSite]) {
+    test(`is unavailable to a ${mode} client when either link lies off the account site's origin`, async () => {
+      for (const offSite of [
+        "https://clone.example.test/account",
+        "http://account.example.test/account",
+        "https://account.example.test:8443/account",
+        "https://account.example.test.clone.test/account",
+      ]) {
+        for (const view of [robinWith({ manage: offSite }), robinWith({ refill: offSite })]) {
+          const { fake, client } = stand(mode, { view });
+          fake.signInPrincipal(view);
+          if (mode === AccountClientMode.CrossSite) assert.deepEqual(await client.signIn(), { kind: "signed-in" });
+
+          assert.deepEqual(await client.me(), { kind: "unavailable" }, offSite);
+        }
+      }
+    });
+  }
+
+  test("keeps a cross-site client's material when a view is refused for its links", async () => {
+    const view = robinWith({ refill: "https://clone.example.test/refill" });
+    const { client } = stand(AccountClientMode.CrossSite, { view });
+    await client.signIn();
+
+    assert.deepEqual(await client.me(), { kind: "unavailable" });
+    assert.equal((await client.getTicket()).kind, "ok");
+  });
+
+  test("is unavailable when the view fails the schema: a negative figure, a balance, or a tier", async () => {
+    for (const forged of [
+      { ...robin, account: { ...robin.account, wallet: { availableCredits: -5 } } },
+      { ...robin, account: { ...robin.account, wallet: { availableCredits: 5, balance: 10, reserved: 5 } } },
+      { ...robin, account: { ...robin.account, tier: "free" } },
+    ]) {
+      assert.deepEqual(
+        await answeringClient(AccountClientMode.SameSite, forged).me(),
+        { kind: "unavailable" },
+        JSON.stringify(forged)
+      );
+    }
+  });
+});
+
+describe("the fake API service's view", () => {
+  test("is refused at sign-in when it fails the schema", () => {
+    const fake = createFakeApiService();
+    for (const forged of [
+      { ...robin, account: { ...robin.account, wallet: { availableCredits: -1 } } },
+      robinWith({ manage: "/account" }),
+    ]) {
+      assert.throws(() => fake.signInPrincipal(forged), JSON.stringify(forged));
+    }
   });
 });
 

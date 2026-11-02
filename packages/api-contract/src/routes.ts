@@ -47,13 +47,48 @@ export const AccountRole = {
 /** A principal's role in the account it belongs to. */
 export type AccountRole = (typeof AccountRole)[keyof typeof AccountRole];
 
+/** The account's wallet, as a principal sees it. */
+export interface MeWallet {
+  /**
+   * Credits available for new model requests: a whole number, never negative.
+   * Zero is an ordinary value; it refuses only model requests.
+   */
+  readonly availableCredits: number;
+}
+
+/** Schema of {@link MeWallet}. Refuses a figure that is negative or not whole, and any field it does not name. */
+export const meWalletSchema = z.strictObject({
+  availableCredits: z.number().int().nonnegative(),
+}) satisfies z.ZodType<MeWallet>;
+
+/**
+ * The account site's pages for the account, as absolute `http` or `https` URLs
+ * the API service supplies. A client opens a link as it is and never builds
+ * one.
+ *
+ * Every link lies on the origin of the account site URL the client is
+ * configured with; a view carrying a link on any other origin is malformed.
+ */
+export interface MeLinks {
+  /** The page where the principal manages their account. */
+  readonly manage: string;
+  /** The page where the principal adds credits to the account's wallet. */
+  readonly refill: string;
+}
+
+/** Schema of {@link MeLinks}. Refuses a link that is not an absolute `http` or `https` URL, and any field it does not name. */
+export const meLinksSchema = z.strictObject({
+  manage: z.url({ protocol: /^https?$/ }),
+  refill: z.url({ protocol: /^https?$/ }),
+}) satisfies z.ZodType<MeLinks>;
+
 /** The account a signed-in principal belongs to, as the principal sees it. */
 export interface MeAccount {
   /** Opaque identifier of the account. */
   readonly id: string;
   readonly role: AccountRole;
-  /** Name of the account's tier. Opaque: the client displays it and never interprets it. */
-  readonly tier: string;
+  readonly wallet: MeWallet;
+  readonly links: MeLinks;
 }
 
 /** The signed-in principal, as `GET` {@link AccountRoutePath.Me} answers it. */
@@ -75,7 +110,8 @@ export const meViewSchema = z.strictObject({
   account: z.strictObject({
     id: z.string().min(1),
     role: z.enum(AccountRole),
-    tier: z.string().min(1),
+    wallet: meWalletSchema,
+    links: meLinksSchema,
   }),
 }) satisfies z.ZodType<MeView>;
 
@@ -86,9 +122,9 @@ export const meViewSchema = z.strictObject({
  */
 export interface TicketGrant {
   /**
-   * The ticket, opaque to the client. It carries the principal, the account,
-   * its tier, and a spend lease for the harness service; the client never
-   * parses it and presents it only as the connect message's `ticket`.
+   * The ticket, opaque to the client. It carries the principal and the
+   * account for the harness service; the client never parses it and presents
+   * it only as the connect message's `ticket`.
    */
   readonly ticket: string;
   /** ISO-8601 instant after which the harness service refuses the ticket. */

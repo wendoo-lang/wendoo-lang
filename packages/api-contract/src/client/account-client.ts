@@ -112,7 +112,10 @@ export type SignInOutcome =
 
 /** A client of the account routes. No method throws; each answers an outcome. */
 export interface AccountClient {
-  /** The signed-in principal and its account. */
+  /**
+   * The signed-in principal and its account. A view carrying a link on any
+   * origin but the configured account site's is answered `unavailable`.
+   */
   me(): Promise<AccountOutcome<MeView>>;
   /** A fresh connection ticket for one harness connection. */
   getTicket(): Promise<AccountOutcome<TicketGrant>>;
@@ -248,6 +251,14 @@ export function createAccountClient(config: AccountClientConfig, deps: AccountCl
     }
   };
 
+  /** Read the view, answering `unavailable` for one with a link off the account site's origin. */
+  const me = async (): Promise<AccountOutcome<MeView>> => {
+    const outcome = await authenticated(accountRoutes.me);
+    if (outcome.kind !== "ok") return outcome;
+    const links = Object.values(outcome.value.account.links);
+    return links.every((link) => new URL(link).origin === accountSiteOrigin) ? outcome : unavailable;
+  };
+
   /** Run the cross-site handoff and hold the material it redeems. */
   const handoff = async (): Promise<SignInOutcome> => {
     const verifier = base64url(deps.randomBytes(verifierBytes));
@@ -260,7 +271,7 @@ export function createAccountClient(config: AccountClientConfig, deps: AccountCl
   };
 
   return {
-    me: () => authenticated(accountRoutes.me),
+    me,
     getTicket: () => authenticated(accountRoutes.tickets),
     signOut: async () => {
       let credential: Credential = { kind: "cookie" };

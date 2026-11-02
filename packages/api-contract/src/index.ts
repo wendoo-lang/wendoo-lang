@@ -18,7 +18,9 @@ export type {
   HandoffGrant,
   HandoffRedeemRequest,
   MeAccount,
+  MeLinks,
   MeView,
+  MeWallet,
   TicketGrant,
 } from "./routes.js";
 export {
@@ -28,6 +30,9 @@ export {
   accountRoutes,
   handoffGrantSchema,
   handoffRedeemRequestSchema,
+  meLinksSchema,
   meViewSchema,
+  meWalletSchema,
   ticketGrantSchema,
 } from "./routes.js";
+export { urlUnder } from "./url.js";

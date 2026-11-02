@@ -9,14 +9,21 @@ import {
   accountRoutes,
   handoffGrantSchema,
   handoffRedeemRequestSchema,
+  meLinksSchema,
   meViewSchema,
+  meWalletSchema,
   ticketGrantSchema,
 } from "./routes.js";
 
 const me = {
   principalId: "principal-1",
   displayName: "Robin",
-  account: { id: "account-1", role: AccountRole.Owner, tier: "free" },
+  account: {
+    id: "account-1",
+    role: AccountRole.Owner,
+    wallet: { availableCredits: 1200 },
+    links: { manage: "https://account.example.test/account", refill: "https://account.example.test/account/refill" },
+  },
 };
 
 /** `value` as it comes back off the wire. */
@@ -56,6 +63,12 @@ describe("the account routes", () => {
     const examples: readonly [{ parse(value: unknown): unknown }, unknown][] = [
       [meViewSchema, me],
       [meViewSchema, { ...me, account: { ...me.account, role: AccountRole.Member } }],
+      [meViewSchema, { ...me, account: { ...me.account, wallet: { availableCredits: 0 } } }],
+      [meWalletSchema, { availableCredits: 0 }],
+      [
+        meLinksSchema,
+        { manage: "http://localhost:8788/account", refill: "https://example.test/site/refill?from=editor" },
+      ],
       [ticketGrantSchema, { ticket: "opaque.ticket.value", expiresAt: "2026-10-31T12:00:00.000Z" }],
       [handoffRedeemRequestSchema, { code: "code-1", verifier: "verifier-1" }],
       [handoffGrantSchema, { material: "opaque-material", expiresAt: "2026-10-31T12:15:00Z" }],
@@ -68,6 +81,10 @@ describe("the account routes", () => {
     const forged: readonly [{ safeParse(value: unknown): { success: boolean } }, unknown][] = [
       [meViewSchema, { ...me, wallet: 100 }],
       [meViewSchema, { ...me, account: { ...me.account, balance: 100 } }],
+      [meViewSchema, { ...me, account: { ...me.account, tier: "free" } }],
+      [meViewSchema, { ...me, account: { ...me.account, wallet: { availableCredits: 5, balance: 9 } } }],
+      [meViewSchema, { ...me, account: { ...me.account, wallet: { availableCredits: 5, reserved: 4 } } }],
+      [meViewSchema, { ...me, account: { ...me.account, links: { ...me.account.links, home: "https://x.test" } } }],
       [ticketGrantSchema, { ticket: "t", expiresAt: "2026-10-31T12:00:00Z", lease: 500 }],
       [handoffRedeemRequestSchema, { code: "c", verifier: "v", challenge: "x" }],
       [handoffGrantSchema, { material: "m", expiresAt: "2026-10-31T12:00:00Z", refresh: "r" }],
@@ -75,6 +92,38 @@ describe("the account routes", () => {
 
     for (const [schema, payload] of forged)
       assert.equal(schema.safeParse(payload).success, false, JSON.stringify(payload));
+  });
+
+  test("refuse a view missing its wallet or either link", () => {
+    const { wallet: _wallet, ...noWallet } = me.account;
+    const { manage: _manage, ...noManage } = me.account.links;
+    const { refill: _refill, ...noRefill } = me.account.links;
+    for (const account of [noWallet, { ...me.account, links: noManage }, { ...me.account, links: noRefill }]) {
+      assert.equal(meViewSchema.safeParse({ ...me, account }).success, false, JSON.stringify(account));
+    }
+  });
+
+  test("refuse a credits figure that is negative, fractional, or not a number", () => {
+    for (const availableCredits of [-1, 0.5, "100", null]) {
+      const account = { ...me.account, wallet: { availableCredits } };
+      assert.equal(meViewSchema.safeParse({ ...me, account }).success, false, String(availableCredits));
+    }
+  });
+
+  test("refuse a link that is relative or not on the web", () => {
+    for (const link of [
+      "/account",
+      "javascript:alert(1)",
+      "mailto:robin@example.test",
+      "account.example.test/account",
+    ]) {
+      for (const links of [
+        { ...me.account.links, manage: link },
+        { ...me.account.links, refill: link },
+      ]) {
+        assert.equal(meViewSchema.safeParse({ ...me, account: { ...me.account, links } }).success, false, link);
+      }
+    }
   });
 
   test("refuse a principal with an empty display name", () => {
